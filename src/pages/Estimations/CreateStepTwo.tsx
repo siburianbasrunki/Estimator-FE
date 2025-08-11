@@ -64,6 +64,7 @@ export const CreateStepTwo = () => {
     console.log("All Data:", formattedData);
     alert("Data berhasil disimpan! Lihat console untuk detail.");
   };
+  
   const getItemNumber = (rowId: string) => {
     let itemCount = 1;
     for (const row of rows) {
@@ -203,15 +204,17 @@ export const CreateStepTwo = () => {
   };
 
   return (
-    <div>
-      <h1 className="mb-6 text-2xl font-bold text-gray-800">Create</h1>
-      <div className="flex bg-white p-4 text-center rounded-lg shadow justify-center items-center ">
-        <h1 className="mb-6 text-2xl font-bold text-gray-800">
+    <div className="px-2 sm:px-4 lg:px-6">
+      <h1 className="mb-4 sm:mb-6 text-xl sm:text-2xl font-bold text-gray-800">Create</h1>
+      
+      <div className="flex bg-white p-3 sm:p-4 text-center rounded-lg shadow justify-center items-center">
+        <h1 className="mb-4 sm:mb-6 text-lg sm:text-2xl font-bold text-gray-800">
           Renovasi Rumah Kepala Desa
         </h1>
       </div>
-      <div className="mt-2 bg-white p-4 text-center rounded-lg shadow">
-        <div className="overflow-x-auto">
+
+      <div className="mt-2 bg-white p-2 sm:p-4 rounded-lg shadow">
+        <div className="hidden lg:block overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
@@ -412,60 +415,265 @@ export const CreateStepTwo = () => {
           </table>
         </div>
 
+        <div className="lg:hidden">
+          {rows.length === 0 && (
+            <div className="text-center py-8 text-gray-500">
+              Tidak ada data. Tambahkan pekerjaan.
+            </div>
+          )}
+
+          {rows.map((row) => (
+            <div key={row.id} className="mb-4 border border-gray-200 rounded-lg p-4">
+              {row.type === "title" ? (
+                <div className="flex justify-between items-start">
+                  <div>
+                    <div className="text-sm font-medium text-gray-600 mb-1">
+                      Kategori {String.fromCharCode(
+                        65 +
+                          rows
+                            .filter((r) => r.type === "title")
+                            .findIndex((r) => r.id === row.id)
+                      )}
+                    </div>
+                    <div className="text-base font-semibold text-gray-900">
+                      {row.title}
+                    </div>
+                  </div>
+                  <div className="flex gap-2 ml-4">
+                    <button
+                      onClick={() => handleAddItem(row.id)}
+                      className="text-green-500 hover:text-green-700 p-1"
+                    >
+                      <BiPlus className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => handleDeleteRow(row.id)}
+                      className="text-red-500 hover:text-red-700 p-1"
+                    >
+                      <BiTrash className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div className="flex justify-between items-center mb-3">
+                    <div className="text-sm font-medium text-gray-600">
+                      Item #{getItemNumber(row.id)}
+                    </div>
+                    <div className="flex gap-2">
+                      {!row.isEditing ? (
+                        <>
+                          <button
+                            onClick={() => handleEditItem(row.id)}
+                            className="text-blue-500 hover:text-blue-700 p-1"
+                          >
+                            <BiEdit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRow(row.id)}
+                            className="text-red-500 hover:text-red-700 p-1"
+                          >
+                            <BiTrash className="w-4 h-4" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            handleSaveItem(row.id, {
+                              value: row.item?.kode,
+                              detail: {
+                                deskripsi: row.item?.deskripsi,
+                                satuan: row.item?.satuan,
+                                harga: row.item?.hargaSatuan,
+                              },
+                            })
+                          }
+                          className="text-green-500 hover:text-green-700 p-1"
+                        >
+                          <BiSave className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Uraian Pekerjaan
+                      </label>
+                      {row.isEditing ? (
+                        <select
+                          className="w-full border rounded p-2 text-sm bg-white text-gray-800"
+                          onChange={(e) => {
+                            const selected = DropdownPekerjaan.find(
+                              (item) => item.value === e.target.value
+                            );
+                            if (selected) {
+                              handleSaveItem(row.id, selected);
+                            }
+                          }}
+                        >
+                          <option value="">Pilih Pekerjaan</option>
+                          {DropdownPekerjaan.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-sm text-gray-900">{row.item?.deskripsi}</div>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Volume
+                        </label>
+                        {row.isEditing ? (
+                          <input
+                            type="number"
+                            className="w-full border rounded p-2 text-sm"
+                            value={row.item?.volume || 0}
+                            onChange={(e) =>
+                              handleUpdateItem(
+                                row.id,
+                                "volume",
+                                parseFloat(e.target.value)
+                              )
+                            }
+                          />
+                        ) : (
+                          <div className="text-sm text-gray-900">{row.item?.volume}</div>
+                        )}
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-gray-500 mb-1">
+                          Satuan
+                        </label>
+                        {row.isEditing ? (
+                          <select
+                            className="w-full border rounded p-2 text-sm bg-white"
+                            value={row.item?.satuan || ""}
+                            onChange={(e) =>
+                              handleUpdateItem(row.id, "satuan", e.target.value)
+                            }
+                          >
+                            <option value="">Pilih Satuan</option>
+                            {UnitList.map((unit) => (
+                              <option key={unit.value} value={unit.value}>
+                                {unit.label}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div className="text-sm text-gray-900">
+                            {UnitList.find((u) => u.value === row.item?.satuan)
+                              ?.label || row.item?.satuan}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Harga Satuan
+                      </label>
+                      {row.isEditing ? (
+                        <input
+                          type="number"
+                          className="w-full border rounded p-2 text-sm"
+                          value={row.item?.hargaSatuan || 0}
+                          onChange={(e) =>
+                            handleUpdateItem(
+                              row.id,
+                              "hargaSatuan",
+                              parseFloat(e.target.value)
+                            )
+                          }
+                        />
+                      ) : (
+                        <div className="text-sm text-gray-900">
+                          Rp {row.item?.hargaSatuan.toLocaleString("id-ID")}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Harga Total
+                      </label>
+                      <div className="text-sm font-semibold text-gray-900">
+                        Rp {row.item?.hargaTotal.toLocaleString("id-ID")}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+
         <div className="mt-4">
           {isAddingTitle ? (
-            <div className="flex gap-2 items-center">
-              {isManualTitle ? (
-                <input
-                  type="text"
-                  className="border rounded p-2 flex-1 bg-white text-gray-800 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Masukkan judul manual"
-                  value={manualTitle}
-                  onChange={(e) => setManualTitle(e.target.value)}
-                />
-              ) : (
-                <select
-                  className="border rounded p-2 flex-1 bg-white text-gray-800"
-                  value={selectedTitle}
-                  onChange={(e) => setSelectedTitle(e.target.value)}
+            <div className="space-y-3">
+              <div>
+                {isManualTitle ? (
+                  <input
+                    type="text"
+                    className="w-full border rounded p-2 bg-white text-gray-800 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Masukkan judul manual"
+                    value={manualTitle}
+                    onChange={(e) => setManualTitle(e.target.value)}
+                  />
+                ) : (
+                  <select
+                    className="w-full border rounded p-2 bg-white text-gray-800"
+                    value={selectedTitle}
+                    onChange={(e) => setSelectedTitle(e.target.value)}
+                  >
+                    <option value="">Pilih Kategori Pekerjaan</option>
+                    {DropdownTitle.map((item) => (
+                      <option key={item.value} value={item.value}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                  onClick={() => setIsManualTitle(!isManualTitle)}
+                  className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm"
                 >
-                  <option value="">Pilih Kategori Pekerjaan</option>
-                  {DropdownTitle.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button
-                onClick={() => setIsManualTitle(!isManualTitle)}
-                className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded"
-              >
-                {isManualTitle ? "Pilih dari Daftar" : "Input Manual"}
-              </button>
-              <button
-                onClick={handleAddTitle}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded"
-                disabled={isManualTitle ? !manualTitle.trim() : !selectedTitle}
-              >
-                Tambah
-              </button>
-              <button
-                onClick={() => {
-                  setIsAddingTitle(false);
-                  setIsManualTitle(false);
-                  setSelectedTitle("");
-                  setManualTitle("");
-                }}
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded"
-              >
-                Batal
-              </button>
+                  {isManualTitle ? "Pilih dari Daftar" : "Input Manual"}
+                </button>
+                <button
+                  onClick={handleAddTitle}
+                  className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm"
+                  disabled={isManualTitle ? !manualTitle.trim() : !selectedTitle}
+                >
+                  Tambah
+                </button>
+                <button
+                  onClick={() => {
+                    setIsAddingTitle(false);
+                    setIsManualTitle(false);
+                    setSelectedTitle("");
+                    setManualTitle("");
+                  }}
+                  className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm"
+                >
+                  Batal
+                </button>
+              </div>
             </div>
           ) : (
             <button
               onClick={() => setIsAddingTitle(true)}
-              className="bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded"
+              className="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm"
             >
               Tambah Kategori Pekerjaan
             </button>
@@ -474,14 +682,18 @@ export const CreateStepTwo = () => {
       </div>
 
       <div className="rounded-md shadow-sm p-4 mt-4 bg-white">
-        <p className="flex justify-end text-lg font-semibold text-black">
-          Total Harga: Rp {calculateTotal().toLocaleString("id-ID")}
-        </p>
-        <div className="flex gap-2 ml-4 justify-end mt-3">
-          <Button variant="default">Draft</Button>
-          <Button variant="success" onClick={handleSaveAllData}>
-            Simpan
-          </Button>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="text-center sm:text-right">
+            <p className="text-base sm:text-lg font-semibold text-black">
+              Total Harga: Rp {calculateTotal().toLocaleString("id-ID")}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center sm:justify-end">
+            <Button variant="default">Draft</Button>
+            <Button variant="success" onClick={handleSaveAllData}>
+              Simpan
+            </Button>
+          </div>
         </div>
       </div>
     </div>
