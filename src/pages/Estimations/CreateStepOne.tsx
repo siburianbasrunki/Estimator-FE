@@ -3,6 +3,7 @@ import Input from "../../components/input";
 import ImageProyek from "../../assets/images/image 1.png";
 import { BiEdit, BiTrash, BiPlus } from "react-icons/bi";
 import Button from "../../components/Button";
+import { useNavigate } from "react-router-dom";
 
 interface CustomField {
   id: string;
@@ -12,50 +13,50 @@ interface CustomField {
 }
 
 export const CreateStepOne = () => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     projectName: "",
     owner: "",
     ppn: "",
-    notes: ""
+    notes: "",
   });
 
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [newFieldType, setNewFieldType] = useState("text");
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: value
+      [name]: value,
     }));
   };
 
   const handleCustomFieldChange = (id: string, value: string) => {
-    setCustomFields(prev =>
-      prev.map(field =>
-        field.id === id ? { ...field, value } : field
-      )
+    setCustomFields((prev) =>
+      prev.map((field) => (field.id === id ? { ...field, value } : field))
     );
   };
 
   const addCustomField = () => {
     if (!newFieldLabel.trim()) return;
-    
+
     const newField: CustomField = {
       id: Date.now().toString(),
       label: newFieldLabel,
       value: "",
-      type: newFieldType
+      type: newFieldType,
     };
 
-    setCustomFields(prev => [...prev, newField]);
+    setCustomFields((prev) => [...prev, newField]);
     setNewFieldLabel("");
     setNewFieldType("text");
   };
 
   const removeCustomField = (id: string) => {
-    setCustomFields(prev => prev.filter(field => field.id !== id));
+    setCustomFields((prev) => prev.filter((field) => field.id !== id));
   };
 
   const handleLog = () => {
@@ -64,9 +65,10 @@ export const CreateStepOne = () => {
       customFields: customFields.reduce((acc, field) => {
         acc[field.label] = field.value;
         return acc;
-      }, {} as Record<string, string>)
+      }, {} as Record<string, string>),
     };
     console.log(allData);
+    navigate("/estimation");
   };
 
   return (
@@ -76,7 +78,7 @@ export const CreateStepOne = () => {
         <p className="border-b-4 border-[#1814F3] w-fit rounded-t-md text-[#1814F3]">
           Profil Proyek
         </p>
-        
+
         <div className="flex flex-col lg:flex-row gap-8 mt-6">
           <div className="flex-1 space-y-6">
             <div className="space-y-4">
@@ -94,15 +96,15 @@ export const CreateStepOne = () => {
                 value={formData.owner}
                 onChange={handleInputChange}
               />
-              <Input 
-                label="PPN" 
-                name="ppn" 
-                type="number" 
+              <Input
+                label="PPN"
+                name="ppn"
+                type="number"
                 value={formData.ppn}
                 onChange={handleInputChange}
               />
             </div>
-            
+
             <div className="mt-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Notes
@@ -118,7 +120,7 @@ export const CreateStepOne = () => {
             </div>
 
             <div className="space-y-4">
-              {customFields.map(field => (
+              {customFields.map((field) => (
                 <div key={field.id} className="flex items-start gap-3">
                   <div className="flex-1">
                     <Input
@@ -126,7 +128,9 @@ export const CreateStepOne = () => {
                       name={`custom-${field.id}`}
                       type={field.type}
                       value={field.value}
-                      onChange={(e) => handleCustomFieldChange(field.id, e.target.value)}
+                      onChange={(e) =>
+                        handleCustomFieldChange(field.id, e.target.value)
+                      }
                     />
                   </div>
                   <button
@@ -139,7 +143,7 @@ export const CreateStepOne = () => {
                 </div>
               ))}
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-3 mt-8">
               <div className="flex-1">
                 <input
@@ -168,13 +172,13 @@ export const CreateStepOne = () => {
               </button>
             </div>
           </div>
-          
+
           <div className="lg:w-1/3 flex flex-col items-center mt-6 lg:mt-0">
             <div className="relative w-full max-w-xs">
-              <img 
-                src={ImageProyek} 
-                alt="Proyek" 
-                className="w-full h-auto rounded-md border-2 border-gray-200 object-cover" 
+              <img
+                src={ImageProyek}
+                alt="Proyek"
+                className="w-full h-auto rounded-md border-2 border-gray-200 object-cover"
               />
               <button className="absolute bottom-3 right-3 p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors">
                 <BiEdit className="text-blue-500" size={18} />
@@ -182,9 +186,9 @@ export const CreateStepOne = () => {
             </div>
           </div>
         </div>
-        
+
         <div className="mt-8 flex justify-end">
-          <Button onClick={handleLog} className="px-6 py-2.5">
+          <Button onClick={handleLog} className="px-6 py-2.5" >
             Save
           </Button>
         </div>
