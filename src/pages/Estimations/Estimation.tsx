@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 export const EstimationView = () => {
     const navigate = useNavigate()
   return (
-    <div className="p-4 md:p-6">
+    <div >
       <h1 className="mb-6 text-2xl font-bold text-gray-800">All Estimation</h1>
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
@@ -17,7 +17,7 @@ export const EstimationView = () => {
               </div>
               <input
                 type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black  placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Search..."
               />
             </div>
@@ -27,7 +27,7 @@ export const EstimationView = () => {
             <div className="relative">
               <input
                 type="date"
-                className="block w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md leading-5 bg-white text-gray-700 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                className="block w-full pl-3 pr-10 py-2 border border-gray-300 text-black rounded-md leading-5  focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               />
             </div>
             <button onClick={() => navigate("/estimation/create/stepOne")} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
