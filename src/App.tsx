@@ -6,6 +6,8 @@ import { CreateStepOne } from "./pages/Estimations/CreateStepOne";
 import { CreateStepTwo } from "./pages/Estimations/CreateStepTwo";
 import { HspView } from "./pages/HSP/HspView";
 import { CategoryView } from "./pages/category/CategoryView";
+import { ItemJobsView } from "./pages/ItemJobs/ItemJobsView";
+import { UserView } from "./pages/User/UserView";
 
 function App() {
   return (
@@ -18,9 +20,9 @@ function App() {
           <Route path="estimation/create/stepOne" element={<CreateStepOne />} />
           <Route path="estimation/create/stepTwo" element={<CreateStepTwo />} />
           <Route path="hsp" element={<HspView/>} />
-          <Route path="users" element={<h1>user</h1>} />
+          <Route path="users" element={<UserView/>} />
           <Route path="category-job" element={<CategoryView/>} />
-          <Route path="item-job" element={<h1>item-job</h1>} />
+          <Route path="item-job" element={<ItemJobsView/>} />
         </Route>
       </Routes>
     </BrowserRouter>

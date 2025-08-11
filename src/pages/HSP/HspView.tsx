@@ -1,7 +1,33 @@
+import { useState } from "react";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import { DummyAHP } from "../../stores/dummyAHP";
 
+type ItemType = {
+  kode: string;
+  deskripsi: string;
+  satuan: string;
+  harga: number;
+};
+
 export const HspView = () => {
+  const [search, setSearch] = useState("");
+
+  const filteredData = (
+    Object.entries(DummyAHP) as [keyof typeof DummyAHP, ItemType[]][]
+  ).reduce((acc, [kategori, items]) => {
+    const filteredItems = items.filter(
+      (item) =>
+        kategori.toLowerCase().includes(search.toLowerCase()) ||
+        item.kode.toLowerCase().includes(search.toLowerCase()) ||
+        item.deskripsi.toLowerCase().includes(search.toLowerCase()) ||
+        item.satuan.toLowerCase().includes(search.toLowerCase())
+    );
+    if (filteredItems.length > 0) {
+      acc[kategori] = filteredItems;
+    }
+    return acc;
+  }, {} as typeof DummyAHP);
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-gray-800">
@@ -28,14 +54,14 @@ export const HspView = () => {
                 type="text"
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                 placeholder="Search..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
             </div>
           </div>
 
           <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
-            <button
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
-            >
+            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
               Import
             </button>
           </div>
@@ -63,14 +89,17 @@ export const HspView = () => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {Object.entries(DummyAHP).map(([kategori, items]) => (
-                <>
-                  <tr key={kategori} className="bg-gray-100">
-                    <td colSpan={5} className="px-6 py-3 font-bold text-gray-700">
+              {Object.entries(filteredData).map(([kategori, items]) => {
+                return [
+                  <tr key={`${kategori}-header`} className="bg-gray-100">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-3 font-bold text-gray-700"
+                    >
                       {kategori}
                     </td>
-                  </tr>
-                  {items.map((item, index) => (
+                  </tr>,
+                  ...items.map((item, index) => (
                     <tr key={item.kode}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {index + 1}
@@ -88,9 +117,9 @@ export const HspView = () => {
                         Rp {item.harga.toLocaleString("id-ID")}
                       </td>
                     </tr>
-                  ))}
-                </>
-              ))}
+                  )),
+                ];
+              })}
             </tbody>
           </table>
         </div>

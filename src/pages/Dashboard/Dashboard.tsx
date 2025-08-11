@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TbReportAnalytics } from "react-icons/tb";
 import StatsCard from "../../components/Chart/Stats";
 import LineChart from "../../components/Chart/Line";
+import { RecentEstimation } from "./RecentEstimation";
 
 const fetchDashboardData = async () => {
   await new Promise((resolve) => setTimeout(resolve, 800));
@@ -57,6 +58,10 @@ const Dashboard = () => {
           </h2>
           <LineChart data={data?.stats || []} />
         </div>
+      </div>
+      <div className="mt-4">
+        <h2 className="mb-4 text-lg font-semibold text-black">Recent Estimation</h2>
+        <RecentEstimation />
       </div>
     </div>
   );
