@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
-import { DummyAHP } from "../../stores/dummyAHP";
+import { DummyHSP } from "../../stores/dummyAHP";
 
 type ItemType = {
   kode: string;
@@ -13,7 +13,7 @@ export const HspView = () => {
   const [search, setSearch] = useState("");
 
   const filteredData = (
-    Object.entries(DummyAHP) as [keyof typeof DummyAHP, ItemType[]][]
+    Object.entries(DummyHSP) as [keyof typeof DummyHSP, ItemType[]][]
   ).reduce((acc, [kategori, items]) => {
     const filteredItems = items.filter(
       (item) =>
@@ -26,7 +26,7 @@ export const HspView = () => {
       acc[kategori] = filteredItems;
     }
     return acc;
-  }, {} as typeof DummyAHP);
+  }, {} as typeof DummyHSP);
 
   return (
     <div>

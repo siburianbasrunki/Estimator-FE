@@ -1,11 +1,11 @@
 import { useState, useMemo } from "react";
-import { DummyAHP } from "../../stores/dummyAHP";
+import { DummyHSP } from "../../stores/dummyAHP";
 
 export const ItemJobsView = () => {
   const [search, setSearch] = useState("");
 
   const allItems = useMemo(() => {
-    return Object.entries(DummyAHP).flatMap(([category, items]) =>
+    return Object.entries(DummyHSP).flatMap(([category, items]) =>
       items.map((item) => ({
         category,
         ...item,

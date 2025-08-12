@@ -1,4 +1,4 @@
-export const DummyAHP = {
+export const DummyHSP = {
   "HARGA SATUAN PEKERJAAN PERSIAPAN": [
     {
       kode: "A.1.1.1.1",
@@ -188,7 +188,7 @@ export const DummyAHP = {
   ],
 };
 
-export const DropdownTitle = Object.keys(DummyAHP).map((key) => ({
+export const DropdownTitle = Object.keys(DummyHSP).map((key) => ({
   label: key,
   value: key,
 }));

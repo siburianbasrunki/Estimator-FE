@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { DummyAHP } from "../../stores/dummyAHP";
+import { DummyHSP } from "../../stores/dummyAHP";
 
 export const CategoryView = () => {
   const [search, setSearch] = useState("");
 
-  const filteredCategories = Object.entries(DummyAHP).filter(([category]) =>
+  const filteredCategories = Object.entries(DummyHSP).filter(([category]) =>
     category.toLowerCase().includes(search.toLowerCase())
   );
 

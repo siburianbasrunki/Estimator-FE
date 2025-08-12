@@ -3,7 +3,7 @@ import { BiEdit, BiPlus, BiSave, BiTrash } from "react-icons/bi";
 import Button from "../../components/Button";
 import {
   DropdownTitle,
-  DummyAHP,
+  DummyHSP,
   flattenToDropdown,
 } from "../../stores/dummyAHP";
 import { UnitList } from "../../stores/units";
@@ -30,7 +30,7 @@ export const CreateStepTwo = () => {
   const [isAddingTitle, setIsAddingTitle] = useState<boolean>(false);
   const [isManualTitle, setIsManualTitle] = useState<boolean>(false);
 
-  const DropdownPekerjaan = flattenToDropdown(DummyAHP);
+  const DropdownPekerjaan = flattenToDropdown(DummyHSP);
 
   const handleSaveAllData = () => {
     const formattedData: any[] = [];
