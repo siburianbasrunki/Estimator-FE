@@ -80,6 +80,17 @@ const AuthService = {
     const json = await res.json();
     return json.data;
   },
+    async getProfile(): Promise<User> {
+    const { auth} = getEndpoints();
+    const res = await fetch(`${auth}/profile`, {
+      headers: {
+        "Authorization": `Bearer ${localStorage.getItem("token")}`,
+      },
+    });
+    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+    const json = await res.json();
+    return json.data;
+  },
 };
 
 export default AuthService;
