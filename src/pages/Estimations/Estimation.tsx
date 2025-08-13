@@ -30,7 +30,7 @@ export const EstimationView = () => {
                 className="block w-full pl-3 pr-10 py-2 border border-gray-300 text-black rounded-md leading-5  focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
               />
             </div>
-            <button onClick={() => navigate("/estimation/create/stepOne")} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <button onClick={() => navigate("/estimation/create")} className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
               Create 
             </button>
           </div>
@@ -73,7 +73,7 @@ export const EstimationView = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium space-x-2">
-                  <button className="text-blue-600 hover:text-blue-900" onClick={() => navigate("/estimation/create/stepTwo")}>
+                  <button className="text-blue-600 hover:text-blue-900" onClick={() => navigate("/estimation/create")}>
                     Continue
                   </button>
                   <button className="text-gray-600 hover:text-gray-900">

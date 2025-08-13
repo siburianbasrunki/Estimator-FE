@@ -32,7 +32,7 @@ const Input = ({
         onChange={onChange}
         required={required}
         placeholder={placeholder}
-        className="block w-full p-2 mt-1 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black"
+        className="block w-full p-2 mt-1 border text-black border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm "
       />
     </div>
   )

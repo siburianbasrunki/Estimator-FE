@@ -19,8 +19,8 @@ const Header = ({ sidebarOpen, setSidebarOpen }: HeaderProps) => {
 
         <div className="flex items-center ml-auto">
           <button className="flex items-center space-x-2">
-            <span className="text-sm font-medium text-gray-700">Admin</span>
-            <div className="w-8 h-8 overflow-hidden bg-gray-100 rounded-full">
+            <span className="text-md font-medium text-gray-700">Admin</span>
+            <div className="w-10 h-10 overflow-hidden bg-gray-100 rounded-full">
               <FiUser className="w-full h-full p-2 text-gray-400" />
             </div>
           </button>

@@ -69,7 +69,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                     }
                   }}
                 >
-                  <item.icon className="w-6 h-6 mr-3" />
+                  <item.icon className="w-5 h-5 mr-3" />
                   <span>{item.name}</span>
                 </NavLink>
               </li>

@@ -1,0 +1,1006 @@
+import { useState } from "react";
+import Input from "../../components/input";
+import ImageProyek from "../../assets/images/image 1.png";
+import { BiEdit, BiTrash, BiPlus, BiSave } from "react-icons/bi";
+import Button from "../../components/Button";
+import {
+  DropdownTitle,
+  DummyHSP,
+  flattenToDropdown,
+} from "../../stores/dummyAHP";
+import { UnitList } from "../../stores/units";
+
+interface CustomField {
+  id: string;
+  label: string;
+  value: string;
+  type: string;
+}
+
+interface ProjectProfile {
+  projectName: string;
+  owner: string;
+  ppn: string;
+  notes: string;
+  customFields: Record<string, string>;
+}
+
+const CreateStepOne = ({
+  formData,
+  setFormData,
+  customFields,
+  setCustomFields,
+}: {
+  onSave: () => void;
+  formData: {
+    projectName: string;
+    owner: string;
+    ppn: string;
+    notes: string;
+  };
+  setFormData: React.Dispatch<
+    React.SetStateAction<{
+      projectName: string;
+      owner: string;
+      ppn: string;
+      notes: string;
+    }>
+  >;
+  customFields: CustomField[];
+  setCustomFields: React.Dispatch<React.SetStateAction<CustomField[]>>;
+}) => {
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState("text");
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleCustomFieldChange = (id: string, value: string) => {
+    setCustomFields((prev) =>
+      prev.map((field) => (field.id === id ? { ...field, value } : field))
+    );
+  };
+
+  const addCustomField = () => {
+    if (!newFieldLabel.trim()) return;
+
+    const newField: CustomField = {
+      id: Date.now().toString(),
+      label: newFieldLabel,
+      value: "",
+      type: newFieldType,
+    };
+
+    setCustomFields((prev) => [...prev, newField]);
+    setNewFieldLabel("");
+    setNewFieldType("text");
+  };
+
+  const removeCustomField = (id: string) => {
+    setCustomFields((prev) => prev.filter((field) => field.id !== id));
+  };
+
+  return (
+    <div className="bg-white rounded-md shadow p-6">
+      <p className="border-b-4 border-[#1814F3] w-fit rounded-t-md text-[#1814F3]">
+        Profil Proyek
+      </p>
+
+      <div className="flex flex-col lg:flex-row gap-8 mt-6">
+        <div className="flex-1 space-y-6">
+          <div className="space-y-4">
+            <Input
+              label="Nama Proyek"
+              placeholder="Masukan Nama Proyek"
+              name="projectName"
+              value={formData.projectName}
+              onChange={handleInputChange}
+            />
+            <Input
+              label="Pemilik Proyek"
+              placeholder="Masukan Nama Pemilik Proyek"
+              name="owner"
+              value={formData.owner}
+              onChange={handleInputChange}
+            />
+            <Input
+              label="PPN"
+              name="ppn"
+              type="number"
+              value={formData.ppn}
+              onChange={handleInputChange}
+            />
+          </div>
+
+          <div className="mt-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Notes
+            </label>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleInputChange}
+              className="block w-full p-3 border text-black border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              placeholder="Masukan Deskripsi Proyek"
+              rows={4}
+            />
+          </div>
+
+          <div className="space-y-4">
+            {customFields.map((field) => (
+              <div key={field.id} className="flex items-start gap-3">
+                <div className="flex-1">
+                  <Input
+                    label={field.label}
+                    name={`custom-${field.id}`}
+                    type={field.type}
+                    value={field.value}
+                    onChange={(e) =>
+                      handleCustomFieldChange(field.id, e.target.value)
+                    }
+                  />
+                </div>
+                <button
+                  onClick={() => removeCustomField(field.id)}
+                  className="mt-7 p-2 text-red-500 hover:text-red-700 transition-colors"
+                  aria-label="Remove field"
+                >
+                  <BiTrash size={18} />
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-3 mt-8">
+            <div className="flex-1">
+              <input
+                type="text"
+                value={newFieldLabel}
+                onChange={(e) => setNewFieldLabel(e.target.value)}
+                placeholder="Field Label"
+                className="block w-full p-2.5 border text-black border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+              />
+            </div>
+            <select
+              value={newFieldType}
+              onChange={(e) => setNewFieldType(e.target.value)}
+              className="block w-full sm:w-32 p-2.5 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black"
+            >
+              <option value="text" className="text-black">
+                Text
+              </option>
+              <option value="number" className="text-black">
+                Number
+              </option>
+              <option value="email" className="text-black">
+                Email
+              </option>
+              <option value="tel" className="text-black">
+                Phone
+              </option>
+            </select>
+            <button
+              onClick={addCustomField}
+              className="flex items-center justify-center gap-1 px-4 py-2.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
+            >
+              <BiPlus size={18} /> Add Field
+            </button>
+          </div>
+        </div>
+
+        <div className="lg:w-1/3 flex flex-col items-center mt-6 lg:mt-0">
+          <div className="relative w-full max-w-xs">
+            <img
+              src={ImageProyek}
+              alt="Proyek"
+              className="w-full h-auto rounded-md border-2 border-gray-200 object-cover"
+            />
+            <button className="absolute bottom-3 right-3 p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors">
+              <BiEdit className="text-blue-500" size={18} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface TableRow {
+  id: string;
+  type: "title" | "item";
+  title?: string;
+  item?: {
+    kode: string;
+    deskripsi: string;
+    volume: number;
+    satuan: string;
+    hargaSatuan: number;
+    hargaTotal: number;
+  };
+  isEditing?: boolean;
+}
+
+interface CreateStepTwoProps {
+  projectProfile: ProjectProfile;
+  onSave: (data: any) => void;
+}
+
+const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
+  const [rows, setRows] = useState<TableRow[]>([]);
+  const [selectedTitle, setSelectedTitle] = useState<string>("");
+  const [manualTitle, setManualTitle] = useState<string>("");
+  const [isAddingTitle, setIsAddingTitle] = useState<boolean>(false);
+  const [isManualTitle, setIsManualTitle] = useState<boolean>(false);
+
+  const DropdownPekerjaan = flattenToDropdown(DummyHSP);
+
+  const handleSaveAllData = () => {
+    const estimationItem = [];
+    let currentSection: any = null;
+
+    rows.forEach((row) => {
+      if (row.type === "title") {
+        if (currentSection) {
+          estimationItem.push(currentSection);
+        }
+        currentSection = {
+          title: row.title,
+          item: [],
+        };
+      } else if (row.type === "item" && row.item && currentSection) {
+        currentSection.item.push({
+          kode: row.item.kode,
+          nama: row.item.deskripsi,
+          satuan: row.item.satuan,
+          harga: row.item.hargaSatuan,
+          volume: row.item.volume,
+          hargaTotal: row.item.hargaTotal,
+        });
+      }
+    });
+
+    if (currentSection) {
+      estimationItem.push(currentSection);
+    }
+
+    const dataToSave = {
+      projectName: projectProfile.projectName,
+      owner: projectProfile.owner,
+      ppn: projectProfile.ppn,
+      notes: projectProfile.notes,
+      customFields: projectProfile.customFields,
+      estimationItem,
+    };
+
+    onSave(dataToSave);
+  };
+
+  const getItemNumber = (rowId: string) => {
+    let itemCount = 1;
+    for (const row of rows) {
+      if (row.id === rowId) break;
+      if (row.type === "item") itemCount++;
+      if (row.type === "title") itemCount = 1;
+    }
+    return itemCount;
+  };
+
+  const handleAddTitle = () => {
+    if (isManualTitle && manualTitle.trim()) {
+      const newRow: TableRow = {
+        id: `title-${Date.now()}`,
+        type: "title",
+        title: manualTitle,
+      };
+      setRows([...rows, newRow]);
+      setManualTitle("");
+      setIsManualTitle(false);
+      setIsAddingTitle(false);
+    } else if (selectedTitle) {
+      const newRow: TableRow = {
+        id: `title-${Date.now()}`,
+        type: "title",
+        title: selectedTitle,
+      };
+      setRows([...rows, newRow]);
+      setSelectedTitle("");
+      setIsAddingTitle(false);
+    }
+  };
+
+  const handleAddItem = (titleId: string) => {
+    const titleRow = rows.find((row) => row.id === titleId);
+    if (!titleRow) return;
+
+    const newRow: TableRow = {
+      id: `item-${Date.now()}`,
+      type: "item",
+      item: {
+        kode: "",
+        deskripsi: "",
+        volume: 0,
+        satuan: "",
+        hargaSatuan: 0,
+        hargaTotal: 0,
+      },
+      isEditing: true,
+    };
+
+    const titleIndex = rows.findIndex((row) => row.id === titleId);
+    const newRows = [...rows];
+    newRows.splice(titleIndex + 1, 0, newRow);
+    setRows(newRows);
+  };
+
+  const handleSaveItem = (id: string, selectedItem: any) => {
+    setRows(
+      rows.map((row) => {
+        if (row.id === id) {
+          return {
+            ...row,
+            item: {
+              kode: selectedItem.value,
+              deskripsi: selectedItem.detail.deskripsi,
+              volume: 1,
+              satuan: selectedItem.detail.satuan,
+              hargaSatuan: selectedItem.detail.harga,
+              hargaTotal: selectedItem.detail.harga,
+            },
+            isEditing: false,
+          };
+        }
+        return row;
+      })
+    );
+  };
+
+  const handleEditItem = (id: string) => {
+    setRows(
+      rows.map((row) => {
+        if (row.id === id) {
+          return { ...row, isEditing: true };
+        }
+        return row;
+      })
+    );
+  };
+
+  const handleDeleteRow = (id: string) => {
+    const rowToDelete = rows.find((row) => row.id === id);
+
+    if (rowToDelete?.type === "title") {
+      const titleIndex = rows.findIndex((row) => row.id === id);
+      let nextTitleIndex = -1;
+      for (let i = titleIndex + 1; i < rows.length; i++) {
+        if (rows[i].type === "title") {
+          nextTitleIndex = i;
+          break;
+        }
+      }
+
+      const start = titleIndex;
+      const end = nextTitleIndex === -1 ? rows.length : nextTitleIndex;
+
+      const newRows = [...rows.slice(0, start), ...rows.slice(end)];
+      setRows(newRows);
+    } else {
+      setRows(rows.filter((row) => row.id !== id));
+    }
+  };
+
+  const handleUpdateItem = (id: string, field: string, value: any) => {
+    setRows(
+      rows.map((row) => {
+        if (row.id === id && row.type === "item" && row.item) {
+          const updatedItem = { ...row.item, [field]: value };
+          if (field === "volume" || field === "hargaSatuan") {
+            updatedItem.hargaTotal =
+              updatedItem.volume * updatedItem.hargaSatuan;
+          }
+          return { ...row, item: updatedItem };
+        }
+        return row;
+      })
+    );
+  };
+
+  const calculateTotal = () => {
+    return rows.reduce((total, row) => {
+      if (row.type === "item" && row.item) {
+        return total + row.item.hargaTotal;
+      }
+      return total;
+    }, 0);
+  };
+
+  return (
+    <div className="bg-white p-2 sm:p-4 rounded-lg shadow">
+      <div className="flex bg-white p-3 sm:p-4 text-center rounded-lg shadow justify-center items-center mb-4">
+        <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
+          {projectProfile.projectName || "Nama Proyek"}
+        </h1>
+      </div>
+
+      <div className="hidden lg:block overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                No
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Uraian Pekerjaan
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Volume
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Satuan
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Harga Satuan
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Harga Total
+              </th>
+              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Aksi
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {rows.length === 0 && (
+              <tr>
+                <td
+                  colSpan={7}
+                  className="px-6 py-4 text-center text-sm text-gray-500"
+                >
+                  Tidak ada data. Tambahkan pekerjaan.
+                </td>
+              </tr>
+            )}
+
+            {rows.map((row) => (
+              <tr key={row.id}>
+                {row.type === "title" ? (
+                  <>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {String.fromCharCode(
+                        65 +
+                          rows
+                            .filter((r) => r.type === "title")
+                            .findIndex((r) => r.id === row.id)
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {row.title}
+                    </td>
+                    <td colSpan={4}></td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex gap-2">
+                      <button
+                        onClick={() => handleAddItem(row.id)}
+                        className="text-green-500 hover:text-green-700"
+                      >
+                        <BiPlus className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRow(row.id)}
+                        className="text-red-500 hover:text-red-700"
+                      >
+                        <BiTrash className="w-5 h-5" />
+                      </button>
+                    </td>
+                  </>
+                ) : (
+                  <>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {getItemNumber(row.id)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {row.isEditing ? (
+                        <select
+                          className="border rounded p-1 w-full bg-white text-gray-800"
+                          onChange={(e) => {
+                            const selected = DropdownPekerjaan.find(
+                              (item) => item.value === e.target.value
+                            );
+                            if (selected) {
+                              handleSaveItem(row.id, selected);
+                            }
+                          }}
+                        >
+                          <option value="">Pilih Pekerjaan</option>
+                          {DropdownPekerjaan.map((item) => (
+                            <option key={item.value} value={item.value}>
+                              {item.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        row.item?.deskripsi
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {row.isEditing ? (
+                        <input
+                          type="number"
+                          className="border rounded p-1 w-20"
+                          value={row.item?.volume || 0}
+                          onChange={(e) =>
+                            handleUpdateItem(
+                              row.id,
+                              "volume",
+                              parseFloat(e.target.value)
+                            )
+                          }
+                        />
+                      ) : (
+                        row.item?.volume
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {row.isEditing ? (
+                        <select
+                          className="border rounded p-1 w-24"
+                          value={row.item?.satuan || ""}
+                          onChange={(e) =>
+                            handleUpdateItem(row.id, "satuan", e.target.value)
+                          }
+                        >
+                          <option value="">Pilih Satuan</option>
+                          {UnitList.map((unit) => (
+                            <option key={unit.value} value={unit.value}>
+                              {unit.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        UnitList.find((u) => u.value === row.item?.satuan)
+                          ?.label || row.item?.satuan
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {row.isEditing ? (
+                        <input
+                          type="number"
+                          className="border rounded p-1 w-32"
+                          value={row.item?.hargaSatuan || 0}
+                          onChange={(e) =>
+                            handleUpdateItem(
+                              row.id,
+                              "hargaSatuan",
+                              parseFloat(e.target.value)
+                            )
+                          }
+                        />
+                      ) : (
+                        `Rp ${row.item?.hargaSatuan.toLocaleString("id-ID")}`
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      Rp {row.item?.hargaTotal.toLocaleString("id-ID")}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex gap-2">
+                      {!row.isEditing ? (
+                        <>
+                          <button
+                            onClick={() => handleEditItem(row.id)}
+                            className="text-blue-500 hover:text-blue-700"
+                          >
+                            <BiEdit className="w-5 h-5" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteRow(row.id)}
+                            className="text-red-500 hover:text-red-700"
+                          >
+                            <BiTrash className="w-5 h-5" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          onClick={() =>
+                            handleSaveItem(row.id, {
+                              value: row.item?.kode,
+                              detail: {
+                                deskripsi: row.item?.deskripsi,
+                                satuan: row.item?.satuan,
+                                harga: row.item?.hargaSatuan,
+                              },
+                            })
+                          }
+                          className="text-green-500 hover:text-green-700"
+                        >
+                          <BiSave className="w-5 h-5" />
+                        </button>
+                      )}
+                    </td>
+                  </>
+                )}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="lg:hidden">
+        {rows.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            Tidak ada data. Tambahkan pekerjaan.
+          </div>
+        )}
+
+        {rows.map((row) => (
+          <div
+            key={row.id}
+            className="mb-4 border border-gray-200 rounded-lg p-4"
+          >
+            {row.type === "title" ? (
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="text-sm font-medium text-gray-600 mb-1">
+                    Kategori{" "}
+                    {String.fromCharCode(
+                      65 +
+                        rows
+                          .filter((r) => r.type === "title")
+                          .findIndex((r) => r.id === row.id)
+                    )}
+                  </div>
+                  <div className="text-base font-semibold text-gray-900">
+                    {row.title}
+                  </div>
+                </div>
+                <div className="flex gap-2 ml-4">
+                  <button
+                    onClick={() => handleAddItem(row.id)}
+                    className="text-green-500 hover:text-green-700 p-1"
+                  >
+                    <BiPlus className="w-5 h-5" />
+                  </button>
+                  <button
+                    onClick={() => handleDeleteRow(row.id)}
+                    className="text-red-500 hover:text-red-700 p-1"
+                  >
+                    <BiTrash className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <div className="flex justify-between items-center mb-3">
+                  <div className="text-sm font-medium text-gray-600">
+                    Item #{getItemNumber(row.id)}
+                  </div>
+                  <div className="flex gap-2">
+                    {!row.isEditing ? (
+                      <>
+                        <button
+                          onClick={() => handleEditItem(row.id)}
+                          className="text-blue-500 hover:text-blue-700 p-1"
+                        >
+                          <BiEdit className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteRow(row.id)}
+                          className="text-red-500 hover:text-red-700 p-1"
+                        >
+                          <BiTrash className="w-4 h-4" />
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() =>
+                          handleSaveItem(row.id, {
+                            value: row.item?.kode,
+                            detail: {
+                              deskripsi: row.item?.deskripsi,
+                              satuan: row.item?.satuan,
+                              harga: row.item?.hargaSatuan,
+                            },
+                          })
+                        }
+                        className="text-green-500 hover:text-green-700 p-1"
+                      >
+                        <BiSave className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Uraian Pekerjaan
+                    </label>
+                    {row.isEditing ? (
+                      <select
+                        className="w-full border rounded p-2 text-sm bg-white text-gray-800"
+                        onChange={(e) => {
+                          const selected = DropdownPekerjaan.find(
+                            (item) => item.value === e.target.value
+                          );
+                          if (selected) {
+                            handleSaveItem(row.id, selected);
+                          }
+                        }}
+                      >
+                        <option value="">Pilih Pekerjaan</option>
+                        {DropdownPekerjaan.map((item) => (
+                          <option key={item.value} value={item.value}>
+                            {item.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <div className="text-sm text-gray-900">
+                        {row.item?.deskripsi}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Volume
+                      </label>
+                      {row.isEditing ? (
+                        <input
+                          type="number"
+                          className="w-full border rounded p-2 text-sm"
+                          value={row.item?.volume || 0}
+                          onChange={(e) =>
+                            handleUpdateItem(
+                              row.id,
+                              "volume",
+                              parseFloat(e.target.value)
+                            )
+                          }
+                        />
+                      ) : (
+                        <div className="text-sm text-gray-900">
+                          {row.item?.volume}
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">
+                        Satuan
+                      </label>
+                      {row.isEditing ? (
+                        <select
+                          className="w-full border rounded p-2 text-sm bg-white"
+                          value={row.item?.satuan || ""}
+                          onChange={(e) =>
+                            handleUpdateItem(row.id, "satuan", e.target.value)
+                          }
+                        >
+                          <option value="">Pilih Satuan</option>
+                          {UnitList.map((unit) => (
+                            <option key={unit.value} value={unit.value}>
+                              {unit.label}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="text-sm text-gray-900">
+                          {UnitList.find((u) => u.value === row.item?.satuan)
+                            ?.label || row.item?.satuan}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Harga Satuan
+                    </label>
+                    {row.isEditing ? (
+                      <input
+                        type="number"
+                        className="w-full border rounded p-2 text-sm"
+                        value={row.item?.hargaSatuan || 0}
+                        onChange={(e) =>
+                          handleUpdateItem(
+                            row.id,
+                            "hargaSatuan",
+                            parseFloat(e.target.value)
+                          )
+                        }
+                      />
+                    ) : (
+                      <div className="text-sm text-gray-900">
+                        Rp {row.item?.hargaSatuan.toLocaleString("id-ID")}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Harga Total
+                    </label>
+                    <div className="text-sm font-semibold text-gray-900">
+                      Rp {row.item?.hargaTotal.toLocaleString("id-ID")}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-4">
+        {isAddingTitle ? (
+          <div className="space-y-3">
+            <div>
+              {isManualTitle ? (
+                <input
+                  type="text"
+                  className="w-full border rounded p-2 bg-white text-gray-800 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Masukkan judul manual"
+                  value={manualTitle}
+                  onChange={(e) => setManualTitle(e.target.value)}
+                />
+              ) : (
+                <select
+                  className="w-full border rounded p-2 bg-white text-gray-800"
+                  value={selectedTitle}
+                  onChange={(e) => setSelectedTitle(e.target.value)}
+                >
+                  <option value="">Pilih Kategori Pekerjaan</option>
+                  {DropdownTitle.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={() => setIsManualTitle(!isManualTitle)}
+                className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm"
+              >
+                {isManualTitle ? "Pilih dari Daftar" : "Input Manual"}
+              </button>
+              <button
+                onClick={handleAddTitle}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm"
+                disabled={isManualTitle ? !manualTitle.trim() : !selectedTitle}
+              >
+                Tambah
+              </button>
+              <button
+                onClick={() => {
+                  setIsAddingTitle(false);
+                  setIsManualTitle(false);
+                  setSelectedTitle("");
+                  setManualTitle("");
+                }}
+                className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm"
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            onClick={() => setIsAddingTitle(true)}
+            className="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm"
+          >
+            Tambah Kategori Pekerjaan
+          </button>
+        )}
+      </div>
+
+      <div className="rounded-md shadow-sm p-4 mt-4 bg-white">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="text-center sm:text-right">
+            <p className="text-base sm:text-lg font-semibold text-black">
+              Total Harga: Rp {calculateTotal().toLocaleString("id-ID")}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center sm:justify-end">
+            <Button variant="default">Draft</Button>
+            <Button variant="success" onClick={handleSaveAllData}>
+              Simpan
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const CreateEstimation = () => {
+  const [activeAccordion, setActiveAccordion] = useState<string>("step1");
+  const [formData, setFormData] = useState({
+    projectName: "",
+    owner: "",
+    ppn: "",
+    notes: "",
+  });
+  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+
+  const toggleAccordion = (step: string) => {
+    setActiveAccordion(activeAccordion === step ? "" : step);
+  };
+
+  const handleStepOneSave = () => {
+    setActiveAccordion("step2");
+  };
+
+  const projectProfile = {
+    ...formData,
+    customFields: customFields.reduce((acc, field) => {
+      acc[field.label] = field.value;
+      return acc;
+    }, {} as Record<string, string>),
+  };
+
+  const handleSaveData = (data: any) => {
+    console.log("Data to save:", data);
+    // Here you can add your save logic (API call, etc.)
+    alert("Data berhasil disimpan! Lihat console untuk detail.");
+  };
+
+  return (
+    <div className="mx-auto bg-white p-4 rounded-lg">
+      <h1 className="mb-6 text-2xl font-bold text-gray-800">
+        Create Estimation
+      </h1>
+
+      <div className="join join-vertical w-full gap-4">
+        <div className="collapse collapse-arrow join-item rounded-md shadow-sm p-2 bg-white">
+          <input
+            type="radio"
+            name="my-accordion"
+            checked={activeAccordion === "step1"}
+            onChange={() => toggleAccordion("step1")}
+          />
+          <div className="collapse-title text-xl font-medium text-black">
+            Project Profile
+          </div>
+          <div className="collapse-content">
+            <CreateStepOne
+              onSave={handleStepOneSave}
+              formData={formData}
+              setFormData={setFormData}
+              customFields={customFields}
+              setCustomFields={setCustomFields}
+            />
+          </div>
+        </div>
+
+        <div className="collapse collapse-arrow join-item rounded-md shadow-sm p-2 bg-white">
+          <input
+            type="radio"
+            name="my-accordion"
+            checked={activeAccordion === "step2"}
+            onChange={() => toggleAccordion("step2")}
+          />
+          <div className="collapse-title text-xl font-medium text-black">
+            Estimation Items
+          </div>
+          <div className="collapse-content">
+            <CreateStepTwo
+              projectProfile={projectProfile}
+              onSave={handleSaveData}
+            />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default CreateEstimation;
