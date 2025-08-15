@@ -58,6 +58,7 @@ export const LoginPage = () => {
             </label>
             <input
               type="email"
+              name="email"
               className="w-full px-4 py-2 text-black border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="contoh@email.com"
               value={email}

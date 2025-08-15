@@ -1,20 +1,6 @@
 import { getEndpoints } from "../config/config";
+import type { AuthResponse, OtpResponse, User } from "../model/user";
 
-export interface User {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export interface AuthResponse {
-  token: string;
-  user: User;
-}
-
-export interface OtpResponse {
-  email: string;
-  otpExpiry: string;
-}
 
 const AuthService = {
   async register(name: string, email: string): Promise<User> {

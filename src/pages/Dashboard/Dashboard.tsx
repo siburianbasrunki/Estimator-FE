@@ -3,6 +3,8 @@ import { TbReportAnalytics } from "react-icons/tb";
 import StatsCard from "../../components/Chart/Stats";
 import LineChart from "../../components/Chart/Line";
 import { RecentEstimation } from "./RecentEstimation";
+import { useProfile } from "../../hooks/useProfile";
+import { useEstimations } from "../../hooks/useEstimation";
 
 const fetchDashboardData = async () => {
   await new Promise((resolve) => setTimeout(resolve, 800));
@@ -14,12 +16,17 @@ const fetchDashboardData = async () => {
 };
 
 const Dashboard = () => {
+  const { data: profile, isLoading: isLoadingProfile } = useProfile();
+  const { data: estimation } = useEstimations();
+
   const { data, isLoading, error } = useQuery({
     queryKey: ["dashboard"],
     queryFn: fetchDashboardData,
   });
 
+  if (isLoadingProfile) return <div>Loading...</div>;
   if (isLoading) return <div>Loading...</div>;
+
   if (error) return <div>Error loading data</div>;
 
   return (
@@ -30,12 +37,12 @@ const Dashboard = () => {
         <StatsCard
           title="Welcome👋,"
           fontSizeTitle="font-[900] text-2xl"
-          value="Basrunki Siburian"
+          value={profile?.name || ""}
         />
         <StatsCard
           title="All Estimation"
           fontSizeTitle="font-[900] text-lg"
-          value="20"
+          value={estimation?.pagination?.total || 0}
           icon={<TbReportAnalytics className="w-6 h-6 text-green-500" />}
         />
         <StatsCard
@@ -60,7 +67,9 @@ const Dashboard = () => {
         </div>
       </div>
       <div className="mt-4">
-        <h2 className="mb-4 text-lg font-semibold text-black">Recent Estimation</h2>
+        <h2 className="mb-4 text-lg font-semibold text-black">
+          Recent Estimation
+        </h2>
         <RecentEstimation />
       </div>
     </div>

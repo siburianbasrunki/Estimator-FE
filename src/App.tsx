@@ -11,6 +11,7 @@ import { OtpPage } from "./pages/otp";
 import { RegisterPage } from "./pages/register";
 import { LoginPage } from "./pages/login";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+import { DetailEstimation } from "./pages/Estimations/DetailEstimation";
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
           <Route index element={<Dashboard />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="estimation" element={<EstimationView />} />
+          <Route path="estimation/:id" element={<DetailEstimation />} />
           <Route path="estimation/create" element={<CreateEstimation />} />
           <Route path="hsp" element={<HspView />} />
           <Route path="users" element={<UserView />} />

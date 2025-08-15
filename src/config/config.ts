@@ -4,5 +4,8 @@ export function getEndpoints() {
   return {
     auth: `${BASE_URL}/auth`,
     user: `${BASE_URL}/users`,
+    estimation: `${BASE_URL}/estimation`,
+    hsp: `${BASE_URL}/hsp`,
+    importHsp: `${BASE_URL}/hsp/import`,
   };
 }

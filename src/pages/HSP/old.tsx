@@ -1,7 +1,7 @@
+// src/pages/HspView.tsx
 import { useRef, useState } from "react";
 import { BiChevronLeft, BiChevronRight, BiUpload } from "react-icons/bi";
-import { DummyHSP } from "../../stores/dummyAHP";
-import { useImportHsp } from "../../hooks/useHsp";
+import { useGetAllHsp, useImportHsp } from "../../hooks/useHsp";
 import toast from "react-hot-toast";
 
 type ItemType = {
@@ -12,13 +12,20 @@ type ItemType = {
 };
 
 export const HspView = () => {
+  const { data: hspData, isLoading, isError } = useGetAllHsp();
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
+  if (isError || !hspData?.data) {
+    return <div>Error loading HSP data or data structure is invalid</div>;
+  }
   const [search, setSearch] = useState("");
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { mutate: importHsp, isPending } = useImportHsp();
 
   const filteredData = (
-    Object.entries(DummyHSP) as [keyof typeof DummyHSP, ItemType[]][]
+    Object.entries(hspData?.data || {}) as [string, ItemType[]][]
   ).reduce((acc, [kategori, items]) => {
     const filteredItems = items.filter(
       (item) =>
@@ -31,7 +38,7 @@ export const HspView = () => {
       acc[kategori] = filteredItems;
     }
     return acc;
-  }, {} as typeof DummyHSP);
+  }, {} as Record<string, ItemType[]>);
 
   const onClickImport = () => fileInputRef.current?.click();
 
@@ -142,7 +149,10 @@ export const HspView = () => {
               {Object.entries(filteredData).map(([kategori, items]) => {
                 return [
                   <tr key={`${kategori}-header`} className="bg-gray-100">
-                    <td colSpan={5} className="px-6 py-3 font-bold text-gray-700">
+                    <td
+                      colSpan={5}
+                      className="px-6 py-3 font-bold text-gray-700"
+                    >
                       {kategori}
                     </td>
                   </tr>,
@@ -174,9 +184,9 @@ export const HspView = () => {
         <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
           <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
             <p className="text-sm text-gray-700">
-              Showing <span className="font-medium">1</span> to{" "}
+              {/* Showing <span className="font-medium">1</span> to{" "} */}
               <span className="font-medium">10</span> of{" "}
-              <span className="font-medium">97</span> results
+              <span className="font-medium">{hspData.meta.items}</span> results
             </p>
             <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
               <a className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50">

@@ -1,12 +1,11 @@
 import { useState } from "react";
-import { DummyHSP } from "../../stores/dummyAHP";
+import { useGetCategoryJob } from "../../hooks/useHsp";
 
 export const CategoryView = () => {
-  const [search, setSearch] = useState("");
+  const { data: categories, isLoading: isLoadingCategories } =
+    useGetCategoryJob();
 
-  const filteredCategories = Object.entries(DummyHSP).filter(([category]) =>
-    category.toLowerCase().includes(search.toLowerCase())
-  );
+  const [search, setSearch] = useState("");
 
   return (
     <div>
@@ -37,12 +36,6 @@ export const CategoryView = () => {
               />
             </div>
           </div>
-
-          <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
-            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
-              Create
-            </button>
-          </div>
         </div>
 
         <table className="min-w-full divide-y divide-gray-200">
@@ -60,20 +53,24 @@ export const CategoryView = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredCategories.map(([category, items], index) => (
-              <tr key={category}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                  {index + 1}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {category}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {items.length}
-                </td>
-              </tr>
-            ))}
-            {filteredCategories.length === 0 && (
+            {categories?.map((category, index) => {
+              return (
+                <tr key={index}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {index + 1}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {isLoadingCategories ? "Loading..." : category.name ?? "-"}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {isLoadingCategories
+                      ? "Loading..."
+                      : category?._count?.items ?? 0}
+                  </td>
+                </tr>
+              );
+            })}
+            {categories?.length === 0 && (
               <tr>
                 <td
                   colSpan={3}

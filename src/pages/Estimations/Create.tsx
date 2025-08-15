@@ -1,14 +1,11 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Input from "../../components/input";
 import ImageProyek from "../../assets/images/image 1.png";
 import { BiEdit, BiTrash, BiPlus, BiSave } from "react-icons/bi";
 import Button from "../../components/Button";
-import {
-  DropdownTitle,
-  DummyHSP,
-  flattenToDropdown,
-} from "../../stores/dummyAHP";
 import { UnitList } from "../../stores/units";
+import { useCreateEstimation } from "../../hooks/useEstimation";
+import { useGetCategoryJob, useGetItemJob } from "../../hooks/useHsp";
 
 interface CustomField {
   id: string;
@@ -239,10 +236,62 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   const [isAddingTitle, setIsAddingTitle] = useState<boolean>(false);
   const [isManualTitle, setIsManualTitle] = useState<boolean>(false);
 
-  const DropdownPekerjaan = flattenToDropdown(DummyHSP);
+  const { data: itemJob, isLoading: isLoadingItems } = useGetItemJob();
+  const { data: categories, isLoading: isLoadingCategories } =
+    useGetCategoryJob();
+
+  const DropdownTitleOptions = useMemo(
+    () =>
+      (categories ?? []).map((c: { name: string }) => ({
+        label: c.name,
+        value: c.name,
+      })),
+    [categories]
+  );
+
+  type PekerjaanDropdown = {
+    kode: string;
+    label: string;
+    value: string;
+    detail: {
+      deskripsi: string;
+      satuan: string;
+      harga: number;
+      categoryId?: string;
+      categoryName?: string;
+    };
+  };
+
+  const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
+    () =>
+      (itemJob ?? []).map(
+        (it: {
+          kode: string;
+          deskripsi: string;
+          satuan: string;
+          harga: number;
+          hspCategoryId?: string;
+          category?: { name?: string };
+        }) => ({
+          kode: it.kode,
+          label: `${it.deskripsi} - Rp${(it.harga ?? 0).toLocaleString(
+            "id-ID"
+          )}/${it.satuan}`,
+          value: it.kode,
+          detail: {
+            deskripsi: it.deskripsi,
+            satuan: it.satuan,
+            harga: it.harga ?? 0,
+            categoryId: it.hspCategoryId,
+            categoryName: it.category?.name,
+          },
+        })
+      ),
+    [itemJob]
+  );
 
   const handleSaveAllData = () => {
-    const estimationItem = [];
+    const estimationItem: any[] = [];
     let currentSection: any = null;
 
     rows.forEach((row) => {
@@ -266,9 +315,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
       }
     });
 
-    if (currentSection) {
-      estimationItem.push(currentSection);
-    }
+    if (currentSection) estimationItem.push(currentSection);
 
     const dataToSave = {
       projectName: projectProfile.projectName,
@@ -339,36 +386,48 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     setRows(newRows);
   };
 
-  const handleSaveItem = (id: string, selectedItem: any) => {
+  // PATCH: jangan overwrite volume jadi 1; pertahankan yang sudah diinput user (default 1 jika belum ada)
+  const handleSaveItem = (
+    id: string,
+    selectedItem: { value?: string; detail?: any }
+  ) => {
+    const safeDetail = selectedItem.detail ?? {};
     setRows(
       rows.map((row) => {
-        if (row.id === id) {
-          return {
-            ...row,
-            item: {
-              kode: selectedItem.value,
-              deskripsi: selectedItem.detail.deskripsi,
-              volume: 1,
-              satuan: selectedItem.detail.satuan,
-              hargaSatuan: selectedItem.detail.harga,
-              hargaTotal: selectedItem.detail.harga,
-            },
-            isEditing: false,
-          };
-        }
-        return row;
+        if (row.id !== id) return row;
+
+        const prevVolRaw = Number(row.item?.volume);
+        const prevVolume =
+          Number.isFinite(prevVolRaw) && prevVolRaw > 0 ? prevVolRaw : 1;
+
+        const harga =
+          Number(
+            safeDetail.harga ??
+              (row.item ? row.item.hargaSatuan : undefined) ??
+              0
+          ) || 0;
+
+        return {
+          ...row,
+          item: {
+            kode: selectedItem.value ?? row.item?.kode ?? "",
+            deskripsi: String(
+              safeDetail.deskripsi ?? row.item?.deskripsi ?? ""
+            ),
+            volume: prevVolume, // <- keep user volume
+            satuan: String(safeDetail.satuan ?? row.item?.satuan ?? ""),
+            hargaSatuan: harga,
+            hargaTotal: harga * prevVolume,
+          },
+          isEditing: false,
+        };
       })
     );
   };
 
   const handleEditItem = (id: string) => {
     setRows(
-      rows.map((row) => {
-        if (row.id === id) {
-          return { ...row, isEditing: true };
-        }
-        return row;
-      })
+      rows.map((row) => (row.id === id ? { ...row, isEditing: true } : row))
     );
   };
 
@@ -395,30 +454,62 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     }
   };
 
+  // PATCH: normalisasi volume/hargaSatuan & hitung total
   const handleUpdateItem = (id: string, field: string, value: any) => {
     setRows(
       rows.map((row) => {
-        if (row.id === id && row.type === "item" && row.item) {
-          const updatedItem = { ...row.item, [field]: value };
-          if (field === "volume" || field === "hargaSatuan") {
-            updatedItem.hargaTotal =
-              updatedItem.volume * updatedItem.hargaSatuan;
-          }
-          return { ...row, item: updatedItem };
+        if (row.id !== id || row.type !== "item" || !row.item) return row;
+
+        const updatedItem = { ...row.item, [field]: value };
+
+        const volRaw = Number(updatedItem.volume ?? 0);
+        const hsRaw = Number(updatedItem.hargaSatuan ?? 0);
+        const vol = Number.isFinite(volRaw) && volRaw > 0 ? volRaw : 0;
+        const hs = Number.isFinite(hsRaw) && hsRaw >= 0 ? hsRaw : 0;
+
+        if (field === "volume" || field === "hargaSatuan") {
+          updatedItem.volume = vol;
+          updatedItem.hargaSatuan = hs;
+          updatedItem.hargaTotal = vol * hs;
         }
-        return row;
+
+        return { ...row, item: updatedItem };
       })
     );
   };
 
-  const calculateTotal = () => {
-    return rows.reduce((total, row) => {
+  // PATCH: commit tanpa mengubah nilai yang sudah diinput user
+  const handleCommitItem = (id: string) => {
+    setRows(
+      rows.map((row) => {
+        if (row.id !== id || row.type !== "item" || !row.item) return row;
+
+        const volRaw = Number(row.item.volume ?? 0);
+        const hsRaw = Number(row.item.hargaSatuan ?? 0);
+        const vol = Number.isFinite(volRaw) && volRaw > 0 ? volRaw : 1; // default 1 kalau kosong/invalid
+        const hs = Number.isFinite(hsRaw) && hsRaw >= 0 ? hsRaw : 0;
+
+        return {
+          ...row,
+          item: {
+            ...row.item,
+            volume: vol,
+            hargaSatuan: hs,
+            hargaTotal: vol * hs,
+          },
+          isEditing: false,
+        };
+      })
+    );
+  };
+
+  const calculateTotal = () =>
+    rows.reduce((total, row) => {
       if (row.type === "item" && row.item) {
-        return total + row.item.hargaTotal;
+        return total + Number(row.item.hargaTotal ?? 0);
       }
       return total;
     }, 0);
-  };
 
   return (
     <div className="bg-white p-2 sm:p-4 rounded-lg shadow">
@@ -487,12 +578,14 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                       <button
                         onClick={() => handleAddItem(row.id)}
                         className="text-green-500 hover:text-green-700"
+                        title="Tambah Item"
                       >
                         <BiPlus className="w-5 h-5" />
                       </button>
                       <button
                         onClick={() => handleDeleteRow(row.id)}
                         className="text-red-500 hover:text-red-700"
+                        title="Hapus Kategori"
                       >
                         <BiTrash className="w-5 h-5" />
                       </button>
@@ -507,16 +600,17 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                       {row.isEditing ? (
                         <select
                           className="border rounded p-1 w-full bg-white text-gray-800"
+                          disabled={isLoadingItems}
                           onChange={(e) => {
                             const selected = DropdownPekerjaan.find(
                               (item) => item.value === e.target.value
                             );
-                            if (selected) {
-                              handleSaveItem(row.id, selected);
-                            }
+                            if (selected) handleSaveItem(row.id, selected);
                           }}
                         >
-                          <option value="">Pilih Pekerjaan</option>
+                          <option value="">
+                            {isLoadingItems ? "Memuat..." : "Pilih Pekerjaan"}
+                          </option>
                           {DropdownPekerjaan.map((item) => (
                             <option key={item.value} value={item.value}>
                               {item.label}
@@ -532,7 +626,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                         <input
                           type="number"
                           className="border rounded p-1 w-20"
-                          value={row.item?.volume || 0}
+                          value={row.item?.volume ?? 0}
                           onChange={(e) =>
                             handleUpdateItem(
                               row.id,
@@ -549,7 +643,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                       {row.isEditing ? (
                         <select
                           className="border rounded p-1 w-24"
-                          value={row.item?.satuan || ""}
+                          value={row.item?.satuan ?? ""}
                           onChange={(e) =>
                             handleUpdateItem(row.id, "satuan", e.target.value)
                           }
@@ -571,7 +665,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                         <input
                           type="number"
                           className="border rounded p-1 w-32"
-                          value={row.item?.hargaSatuan || 0}
+                          value={row.item?.hargaSatuan ?? 0}
                           onChange={(e) =>
                             handleUpdateItem(
                               row.id,
@@ -581,11 +675,13 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                           }
                         />
                       ) : (
-                        `Rp ${row.item?.hargaSatuan.toLocaleString("id-ID")}`
+                        `Rp ${(row.item?.hargaSatuan ?? 0).toLocaleString(
+                          "id-ID"
+                        )}`
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      Rp {row.item?.hargaTotal.toLocaleString("id-ID")}
+                      Rp {(row.item?.hargaTotal ?? 0).toLocaleString("id-ID")}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex gap-2">
                       {!row.isEditing ? (
@@ -593,29 +689,23 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                           <button
                             onClick={() => handleEditItem(row.id)}
                             className="text-blue-500 hover:text-blue-700"
+                            title="Edit"
                           >
                             <BiEdit className="w-5 h-5" />
                           </button>
                           <button
                             onClick={() => handleDeleteRow(row.id)}
                             className="text-red-500 hover:text-red-700"
+                            title="Hapus"
                           >
                             <BiTrash className="w-5 h-5" />
                           </button>
                         </>
                       ) : (
                         <button
-                          onClick={() =>
-                            handleSaveItem(row.id, {
-                              value: row.item?.kode,
-                              detail: {
-                                deskripsi: row.item?.deskripsi,
-                                satuan: row.item?.satuan,
-                                harga: row.item?.hargaSatuan,
-                              },
-                            })
-                          }
+                          onClick={() => handleCommitItem(row.id)}
                           className="text-green-500 hover:text-green-700"
+                          title="Simpan"
                         >
                           <BiSave className="w-5 h-5" />
                         </button>
@@ -629,6 +719,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         </table>
       </div>
 
+      {/* Mobile / small screen */}
       <div className="lg:hidden">
         {rows.length === 0 && (
           <div className="text-center py-8 text-gray-500">
@@ -661,12 +752,14 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                   <button
                     onClick={() => handleAddItem(row.id)}
                     className="text-green-500 hover:text-green-700 p-1"
+                    title="Tambah Item"
                   >
                     <BiPlus className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => handleDeleteRow(row.id)}
                     className="text-red-500 hover:text-red-700 p-1"
+                    title="Hapus Kategori"
                   >
                     <BiTrash className="w-5 h-5" />
                   </button>
@@ -684,29 +777,23 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                         <button
                           onClick={() => handleEditItem(row.id)}
                           className="text-blue-500 hover:text-blue-700 p-1"
+                          title="Edit"
                         >
                           <BiEdit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDeleteRow(row.id)}
                           className="text-red-500 hover:text-red-700 p-1"
+                          title="Hapus"
                         >
                           <BiTrash className="w-4 h-4" />
                         </button>
                       </>
                     ) : (
                       <button
-                        onClick={() =>
-                          handleSaveItem(row.id, {
-                            value: row.item?.kode,
-                            detail: {
-                              deskripsi: row.item?.deskripsi,
-                              satuan: row.item?.satuan,
-                              harga: row.item?.hargaSatuan,
-                            },
-                          })
-                        }
+                        onClick={() => handleCommitItem(row.id)}
                         className="text-green-500 hover:text-green-700 p-1"
+                        title="Simpan"
                       >
                         <BiSave className="w-4 h-4" />
                       </button>
@@ -722,16 +809,17 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                     {row.isEditing ? (
                       <select
                         className="w-full border rounded p-2 text-sm bg-white text-gray-800"
+                        disabled={isLoadingItems}
                         onChange={(e) => {
                           const selected = DropdownPekerjaan.find(
                             (item) => item.value === e.target.value
                           );
-                          if (selected) {
-                            handleSaveItem(row.id, selected);
-                          }
+                          if (selected) handleSaveItem(row.id, selected);
                         }}
                       >
-                        <option value="">Pilih Pekerjaan</option>
+                        <option value="">
+                          {isLoadingItems ? "Memuat..." : "Pilih Pekerjaan"}
+                        </option>
                         {DropdownPekerjaan.map((item) => (
                           <option key={item.value} value={item.value}>
                             {item.label}
@@ -754,7 +842,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                         <input
                           type="number"
                           className="w-full border rounded p-2 text-sm"
-                          value={row.item?.volume || 0}
+                          value={row.item?.volume ?? 0}
                           onChange={(e) =>
                             handleUpdateItem(
                               row.id,
@@ -777,7 +865,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                       {row.isEditing ? (
                         <select
                           className="w-full border rounded p-2 text-sm bg-white"
-                          value={row.item?.satuan || ""}
+                          value={row.item?.satuan ?? ""}
                           onChange={(e) =>
                             handleUpdateItem(row.id, "satuan", e.target.value)
                           }
@@ -806,7 +894,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                       <input
                         type="number"
                         className="w-full border rounded p-2 text-sm"
-                        value={row.item?.hargaSatuan || 0}
+                        value={row.item?.hargaSatuan ?? 0}
                         onChange={(e) =>
                           handleUpdateItem(
                             row.id,
@@ -817,7 +905,8 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                       />
                     ) : (
                       <div className="text-sm text-gray-900">
-                        Rp {row.item?.hargaSatuan.toLocaleString("id-ID")}
+                        Rp{" "}
+                        {(row.item?.hargaSatuan ?? 0).toLocaleString("id-ID")}
                       </div>
                     )}
                   </div>
@@ -827,7 +916,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                       Harga Total
                     </label>
                     <div className="text-sm font-semibold text-gray-900">
-                      Rp {row.item?.hargaTotal.toLocaleString("id-ID")}
+                      Rp {(row.item?.hargaTotal ?? 0).toLocaleString("id-ID")}
                     </div>
                   </div>
                 </div>
@@ -854,9 +943,14 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                   className="w-full border rounded p-2 bg-white text-gray-800"
                   value={selectedTitle}
                   onChange={(e) => setSelectedTitle(e.target.value)}
+                  disabled={isLoadingCategories}
                 >
-                  <option value="">Pilih Kategori Pekerjaan</option>
-                  {DropdownTitle.map((item) => (
+                  <option value="">
+                    {isLoadingCategories
+                      ? "Memuat..."
+                      : "Pilih Kategori Pekerjaan"}
+                  </option>
+                  {DropdownTitleOptions.map((item) => (
                     <option key={item.value} value={item.value}>
                       {item.label}
                     </option>
@@ -868,7 +962,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
             <div className="flex flex-col sm:flex-row gap-2">
               <button
                 onClick={() => setIsManualTitle(!isManualTitle)}
-                className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm"
+                className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm text-black"
               >
                 {isManualTitle ? "Pilih dari Daftar" : "Input Manual"}
               </button>
@@ -926,10 +1020,11 @@ const CreateEstimation = () => {
   const [formData, setFormData] = useState({
     projectName: "",
     owner: "",
-    ppn: "",
+    ppn: "11",
     notes: "",
   });
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const createMutation = useCreateEstimation();
 
   const toggleAccordion = (step: string) => {
     setActiveAccordion(activeAccordion === step ? "" : step);
@@ -948,9 +1043,18 @@ const CreateEstimation = () => {
   };
 
   const handleSaveData = (data: any) => {
-    console.log("Data to save:", data);
-    // Here you can add your save logic (API call, etc.)
-    alert("Data berhasil disimpan! Lihat console untuk detail.");
+    createMutation.mutate(data, {
+      onSuccess: () => {
+        setFormData({
+          projectName: "",
+          owner: "",
+          ppn: "11",
+          notes: "",
+        });
+        setCustomFields([]);
+        setActiveAccordion("step1");
+      },
+    });
   };
 
   return (

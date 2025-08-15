@@ -18,10 +18,34 @@ export const OtpPage = () => {
     newOtp[index] = value;
     setOtp(newOtp);
 
-    // Auto focus to next input
     if (value && index < 3) {
       const nextInput = document.getElementById(`otp-${index + 1}`);
       if (nextInput) nextInput.focus();
+    }
+    
+    if (!value && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      if (prevInput) prevInput.focus();
+    }
+  };
+
+  const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+      const prevInput = document.getElementById(`otp-${index - 1}`);
+      if (prevInput) prevInput.focus();
+    }
+  };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pasteData = e.clipboardData.getData('text/plain').replace(/\D/g, ''); 
+    
+    if (pasteData.length === 4) {
+      const newOtp = pasteData.split('').slice(0, 4);
+      setOtp(newOtp);
+      
+      const lastInput = document.getElementById(`otp-3`);
+      if (lastInput) lastInput.focus();
     }
   };
 
@@ -88,6 +112,8 @@ export const OtpPage = () => {
                   maxLength={1}
                   value={digit}
                   onChange={(e) => handleChange(index, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(index, e)}
+                  onPaste={handlePaste}
                   required
                 />
               ))}

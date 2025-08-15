@@ -1,32 +1,15 @@
-import { useState, useMemo } from "react";
-import { DummyHSP } from "../../stores/dummyAHP";
+import { useState } from "react";
+import { useGetItemJob } from "../../hooks/useHsp";
 
 export const ItemJobsView = () => {
   const [search, setSearch] = useState("");
 
-  const allItems = useMemo(() => {
-    return Object.entries(DummyHSP).flatMap(([category, items]) =>
-      items.map((item) => ({
-        category,
-        ...item,
-      }))
-    );
-  }, []);
-
-  const filteredItems = allItems.filter(
-    (item) =>
-      item.category.toLowerCase().includes(search.toLowerCase()) ||
-      item.kode.toLowerCase().includes(search.toLowerCase()) ||
-      item.deskripsi.toLowerCase().includes(search.toLowerCase()) ||
-      item.satuan.toLowerCase().includes(search.toLowerCase())
-  );
-
+  const { data: itemJob } = useGetItemJob();
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-gray-800">Item Jobs</h1>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        {/* Search & Create Header */}
         <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
           <div className="w-full md:w-auto">
             <div className="relative">
@@ -53,11 +36,7 @@ export const ItemJobsView = () => {
             </div>
           </div>
 
-          <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
-            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none">
-              Create
-            </button>
-          </div>
+          
         </div>
 
         <table className="min-w-full divide-y divide-gray-200">
@@ -84,13 +63,13 @@ export const ItemJobsView = () => {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredItems.map((item, index) => (
+            {itemJob?.map((item, index) => (
               <tr key={`${item.category}-${item.kode}`}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                   {index + 1}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {item.category}
+                  {item.category.name}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {item.kode}
@@ -106,7 +85,7 @@ export const ItemJobsView = () => {
                 </td>
               </tr>
             ))}
-            {filteredItems.length === 0 && (
+            {itemJob?.length === 0 && (
               <tr>
                 <td
                   colSpan={6}

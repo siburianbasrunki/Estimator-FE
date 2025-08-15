@@ -35,6 +35,18 @@ const Header = ({ sidebarOpen, setSidebarOpen }: HeaderProps) => {
     navigate("/login");
   };
 
+  const getInitials = (name?: string) => {
+    if (!name) return null;
+    const names = name.split(" ");
+    let initials = names[0].substring(0, 1).toUpperCase();
+
+    if (names.length > 1) {
+      initials += names[names.length - 1].substring(0, 1).toUpperCase();
+    }
+
+    return initials;
+  };
+  const initials = getInitials(profile?.name);
   return (
     <header className="sticky top-0 z-10 bg-white border-b border-gray-200">
       <div className="flex items-center justify-between px-4 py-3">
@@ -50,13 +62,26 @@ const Header = ({ sidebarOpen, setSidebarOpen }: HeaderProps) => {
           <div className="relative" ref={dropdownRef}>
             <button
               className="flex items-center space-x-2 cursor-pointer"
+              // onMouseEnter={() => setDropdownOpen(true)}
+              // onMouseLeave={() => setDropdownOpen(false)}
               onClick={() => setDropdownOpen(!dropdownOpen)}
             >
-              <span className="text-md font-medium text-gray-700">
-                {isLoading ? "Loading..." : profile?.name}
-              </span>
-              <div className="w-10 h-10 overflow-hidden bg-gray-100 rounded-full">
-                <FiUser className="w-full h-full p-2 text-gray-400" />
+              <div className="flex flex-col items-end">
+                <span className="text-md font-medium text-gray-700">
+                  {isLoading
+                    ? "Loading..."
+                    : profile?.name.toUpperCase() || "-"}
+                </span>
+                <span className="text-sm font-medium text-gray-700">
+                  {isLoading ? "Loading..." : profile?.email || "-"}
+                </span>
+              </div>
+              <div className="flex items-center justify-center w-10 h-10 overflow-hidden bg-blue-400 rounded-full">
+                {initials ? (
+                  <span className="font-medium text-black ">{initials}</span>
+                ) : (
+                  <FiUser className="w-full h-full p-2 text-gray-400" />
+                )}
               </div>
             </button>
 

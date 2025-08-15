@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { href, NavLink } from "react-router-dom";
 import { FiHome } from "react-icons/fi";
 
 interface SidebarProps {
@@ -7,9 +7,10 @@ interface SidebarProps {
 }
 
 import Logo from "../assets/icon/Logo.svg";
-import { FaUserTie, FaSitemap } from "react-icons/fa6";
+import { FaUserTie, FaSitemap, FaPeopleCarryBox } from "react-icons/fa6";
 import { MdOutlinePriceChange, MdOutlineSubtitles } from "react-icons/md";
 import { PiProjectorScreenChartDuotone } from "react-icons/pi";
+import { GiStakeHammer } from "react-icons/gi";
 const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: FiHome },
@@ -28,6 +29,16 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       name: "Item Job",
       href: "/item-job",
       icon: FaSitemap,
+    },
+    {
+      name: "Upah",
+      href: "/labor",
+      icon: FaPeopleCarryBox,
+    },
+    {
+      name: "Bahan",
+      href: "/material",
+      icon: GiStakeHammer,
     },
     { name: "User", href: "/users", icon: FaUserTie },
   ];
