@@ -1,4 +1,4 @@
-import { href, NavLink } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 import { FiHome } from "react-icons/fi";
 
 interface SidebarProps {
@@ -6,7 +6,7 @@ interface SidebarProps {
   setSidebarOpen: (arg: boolean) => void;
 }
 
-import Logo from "../assets/icon/Logo.svg";
+import Logo from "../assets/icon/LogoWithText.png";
 import { FaUserTie, FaSitemap, FaPeopleCarryBox } from "react-icons/fa6";
 import { MdOutlinePriceChange, MdOutlineSubtitles } from "react-icons/md";
 import { PiProjectorScreenChartDuotone } from "react-icons/pi";
@@ -32,12 +32,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
     },
     {
       name: "Upah",
-      href: "/labor",
+      href: "/master/upah",
       icon: FaPeopleCarryBox,
     },
     {
       name: "Bahan",
-      href: "/material",
+      href: "/master/bahan",
       icon: GiStakeHammer,
     },
     { name: "User", href: "/users", icon: FaUserTie },
@@ -58,8 +58,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         } md:translate-x-0`}
       >
         <div className="flex items-center flex-row justify-center h-16 px-4 bg-white">
-          <img src={Logo} alt="Logo" className="w-10 h-10 mr-2" />
-          <h1 className="text-2xl font-bold text-black">Estimator</h1>
+          <img src={Logo} alt="Logo" className="w-55 h-55 mr-2 mt-1" />
         </div>
         <nav className="px-4 py-6">
           <ul className="space-y-2">

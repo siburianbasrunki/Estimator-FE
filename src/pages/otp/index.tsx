@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import AuthService from "../../service/auth";
 import BgLogin from "../../assets/images/bgLogin.png";
+import { Clock } from "../../components/Clock";
 
 export const OtpPage = () => {
   const navigate = useNavigate();
@@ -84,6 +85,7 @@ export const OtpPage = () => {
         backgroundAttachment: "fixed",
       }}
     >
+      <Clock/>
       <div className="max-w-xl w-full bg-gradient-to-b from-white to-[#70A9D7] p-8 rounded-xl shadow-md">
         <h2 className="text-2xl font-bold text-black text-center mb-6">
           OTP Verification

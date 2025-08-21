@@ -4,7 +4,6 @@ export interface Estimation {
   projectOwner: string;
   ppn: number;
   notes: string;
-  status: string;
   createdAt: string;
   updatedAt: string;
   authorId: string;
@@ -16,7 +15,7 @@ export interface Estimation {
     limit: number;
     total: number;
     totalPage: number;
-  }
+  };
 }
 
 export interface Author {
@@ -50,8 +49,6 @@ export interface EstimationDetail {
   hargaTotal: number;
   estimationItemId: string;
 }
-
-
 
 export interface EstimationCreateModel {
   projectName: string;

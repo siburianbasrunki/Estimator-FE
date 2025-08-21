@@ -6,14 +6,12 @@ const EstimationService = {
   async getEstimations(
     page: number = 1,
     limit: number = 10,
-    status?: string,
     search?: string
   ): Promise<{ data: Estimation[]; pagination: any }> {
     const { estimation } = getEndpoints();
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
-      ...(status && { status }),
       ...(search && { search }),
     });
 
@@ -147,7 +145,7 @@ const EstimationService = {
       throw new Error(msg);
     }
     const safe = sanitizeFileName(projectName || "estimation");
-    const fallback = `${safe}_estimation.xlsx`;
+    const fallback = `RAB_${safe}_estimation.xlsx`;
     await triggerBrowserDownload(res, fallback);
   },
 };

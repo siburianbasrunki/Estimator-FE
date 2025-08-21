@@ -6,13 +6,12 @@ import { useNavigate } from "react-router-dom";
 export const useEstimations = (
   page: number = 1,
   limit: number = 10,
-  status?: string,
   search?: string
 ) => {
   return useQuery({
-    queryKey: ["estimations", { page, limit, status, search }],
+    queryKey: ["estimations", { page, limit, search }],
     queryFn: () =>
-      EstimationService.getEstimations(page, limit, status, search),
+      EstimationService.getEstimations(page, limit, search),
   });
 };
 

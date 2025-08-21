@@ -1,7 +1,12 @@
 @import "tailwindcss";
 @plugin "daisyui" {
-  themas: [ "light"];
+  themes: light --default, dark --prefersdark;
 }
 body {
   overflow-x: hidden;
+}
+
+.skeleton {
+  background-color: #e5e7eb; 
+  
 }

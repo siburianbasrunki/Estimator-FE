@@ -1,11 +1,11 @@
 import React, { useMemo, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import { useEstimation } from "../../hooks/useEstimation";
-import { statusBadgeClass } from "../../helper/status";
 import { formatDateTimeID } from "../../helper/date";
 import { formatIDR } from "../../helper/rupiah";
 import EstimationService from "../../service/estimation";
 import toast from "react-hot-toast";
+import { BackButton } from "../../components/BackButton";
 
 const FieldCard = ({
   label,
@@ -23,6 +23,7 @@ const FieldCard = ({
 );
 
 export const DetailEstimation: React.FC = () => {
+  const navigate = useNavigate();
   const { id } = useParams();
   const {
     data: estimation,
@@ -86,7 +87,7 @@ export const DetailEstimation: React.FC = () => {
   };
   if (isLoading) {
     return (
-      <div className="max-w-6xl mx-auto p-4 space-y-4">
+      <div className="max-w mx-auto p-4 space-y-4">
         <div className="skeleton h-24 w-full" />
         <div className="skeleton h-40 w-full" />
         <div className="skeleton h-40 w-full" />
@@ -121,7 +122,8 @@ export const DetailEstimation: React.FC = () => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-4 space-y-6 text-black">
+    <div className="max-w mx-auto p-4 space-y-6 text-black">
+      <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
       {/* Header */}
       <div className="card bg-white border border-gray-200 shadow-sm">
         <div className="card-body gap-4">
@@ -131,13 +133,6 @@ export const DetailEstimation: React.FC = () => {
                 {estimation.projectName}
               </h1>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm">
-                <div
-                  className={`badge ${statusBadgeClass(
-                    estimation.status
-                  )} gap-1`}
-                >
-                  {estimation.status}
-                </div>
                 <div className="hidden md:block w-px h-4 bg-gray-300" />
                 <span>
                   Owner:{" "}

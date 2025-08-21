@@ -1,1 +1,1299 @@
-// export const 
+// src/pages/estimation/UpdateEstimation.tsx
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  BiEdit,
+  BiTrash,
+  BiPlus,
+  BiSave,
+  BiCalculator,
+  BiCopy,
+} from "react-icons/bi";
+import { useParams, useNavigate } from "react-router-dom";
+
+/* dnd-kit */
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  useDroppable,
+  defaultDropAnimation,
+  DragOverlay,
+  type DragEndEvent,
+  type DragOverEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
+/* App components & hooks */
+import Input from "../../components/input";
+import Button from "../../components/Button";
+import ImageProyek from "../../assets/images/image 1.png";
+import { UnitList } from "../../stores/units";
+
+import VolModal from "./VolumeModal";
+import type { VolumeDetailRow } from "./VolumeModal";
+
+import { useEstimation, useUpdateEstimation } from "../../hooks/useEstimation";
+import { useGetCategoryJob, useGetItemJob } from "../../hooks/useHsp";
+import { BackButton } from "../../components/BackButton";
+
+/* ------------------------------ Helpers ------------------------------ */
+const uid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const formatIDR = (n: number = 0) =>
+  `Rp ${Math.max(0, Number(n || 0)).toLocaleString("id-ID")}`;
+
+const mapJenisApiToUi = (v?: string): "penjumlahan" | "pengurangan" =>
+  v === "SUB" ? "pengurangan" : "penjumlahan";
+
+/* ------------------------------ Types ------------------------------ */
+interface CustomFieldUI {
+  id: string;
+  label: string;
+  value: string;
+  type: string;
+}
+interface ProjectProfile {
+  projectName: string;
+  owner: string;
+  ppn: string; // string untuk binding input
+  notes: string;
+  customFields: Record<string, string>;
+}
+type ItemRow = {
+  id: string;
+  kode: string;
+  deskripsi: string;
+  volume: number; // auto dari modal
+  volumeDetails?: VolumeDetailRow[];
+  satuan: string;
+  hargaSatuan: number;
+  hargaTotal: number;
+  isEditing?: boolean;
+};
+type Section = {
+  id: string;
+  title: string;
+  items: ItemRow[];
+};
+
+/* -------------------------- Step 1 (Profil) -------------------------- */
+const UpdateStepOne = ({
+  onSave,
+  formData,
+  setFormData,
+  customFields,
+  setCustomFields,
+}: {
+  onSave: () => void;
+  formData: {
+    projectName: string;
+    owner: string;
+    ppn: string;
+    notes: string;
+  };
+  setFormData: React.Dispatch<
+    React.SetStateAction<{
+      projectName: string;
+      owner: string;
+      ppn: string;
+      notes: string;
+    }>
+  >;
+  customFields: CustomFieldUI[];
+  setCustomFields: React.Dispatch<React.SetStateAction<CustomFieldUI[]>>;
+}) => {
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const [newFieldType, setNewFieldType] = useState("text");
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleCustomFieldChange = (id: string, value: string) => {
+    setCustomFields((prev) =>
+      prev.map((f) => (f.id === id ? { ...f, value } : f))
+    );
+  };
+
+  const addCustomField = () => {
+    if (!newFieldLabel.trim()) return;
+    setCustomFields((prev) => [
+      ...prev,
+      { id: uid(), label: newFieldLabel.trim(), value: "", type: newFieldType },
+    ]);
+    setNewFieldLabel("");
+    setNewFieldType("text");
+  };
+
+  const removeCustomField = (id: string) =>
+    setCustomFields((prev) => prev.filter((f) => f.id !== id));
+
+  return (
+    <div className="bg-white rounded-xl shadow p-6">
+      <div className="flex items-center gap-2">
+        <div className="h-6 w-1.5 bg-blue-600 rounded" />
+        <p className="text-blue-700 font-semibold">Profil Proyek</p>
+      </div>
+
+      <div className="flex flex-col lg:flex-row gap-8 mt-6">
+        {/* Left form */}
+        <div className="flex-1 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input
+              label="Nama Proyek"
+              placeholder="Masukkan nama proyek"
+              name="projectName"
+              value={formData.projectName}
+              onChange={handleInputChange}
+            />
+            <Input
+              label="Pemilik Proyek"
+              placeholder="Masukkan pemilik proyek"
+              name="owner"
+              value={formData.owner}
+              onChange={handleInputChange}
+            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                PPN (%)
+              </label>
+              <input
+                name="ppn"
+                type="number"
+                min={0}
+                className="input input-bordered w-full text-black bg-white border-black"
+                value={formData.ppn}
+                onChange={handleInputChange}
+                placeholder="11"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Notes
+            </label>
+            <textarea
+              name="notes"
+              value={formData.notes}
+              onChange={handleInputChange}
+              className="textarea textarea-bordered w-full text-black bg-white border-black"
+              placeholder="Masukkan deskripsi / catatan proyek"
+              rows={4}
+            />
+          </div>
+
+          {/* Custom fields */}
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-gray-700">
+              Custom Fields
+            </div>
+            {!!customFields.length && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {customFields.map((field) => (
+                  <div key={field.id} className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <Input
+                        label={field.label}
+                        name={`custom-${field.id}`}
+                        type={field.type}
+                        value={field.value}
+                        onChange={(e) =>
+                          handleCustomFieldChange(field.id, e.target.value)
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomField(field.id)}
+                      className="btn btn-ghost btn-sm text-red-600"
+                      aria-label="Hapus field"
+                      title="Hapus field"
+                    >
+                      <BiTrash size={18} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add custom field */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              <input
+                type="text"
+                value={newFieldLabel}
+                onChange={(e) => setNewFieldLabel(e.target.value)}
+                placeholder="Label field (mis. Lokasi, Deadline, dll)"
+                className="input input-bordered w-full text-black bg-white border-black"
+              />
+              <select
+                value={newFieldType}
+                onChange={(e) => setNewFieldType(e.target.value)}
+                className="select select-bordered w-full sm:w-44 text-black bg-white border-black"
+              >
+                <option value="text">Text</option>
+                <option value="number">Number</option>
+                <option value="email">Email</option>
+                <option value="tel">Phone</option>
+                <option value="date">Date</option>
+              </select>
+              <button
+                onClick={addCustomField}
+                className="btn btn-primary text-white"
+              >
+                <BiPlus size={18} /> Tambah Field
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-2">
+            <button onClick={onSave} className="btn btn-success text-white">
+              Lanjut ke Estimation Items
+            </button>
+          </div>
+        </div>
+
+        {/* Right preview image */}
+        <div className="lg:w-1/3">
+          <div className="card bg-base-100 border border-gray-200 shadow-sm">
+            <figure className="px-4 pt-4">
+              <img
+                src={ImageProyek}
+                alt="Preview Proyek"
+                className="rounded-lg border border-gray-200 object-cover"
+              />
+            </figure>
+            <div className="card-body p-4">
+              <button className="btn btn-outline btn-sm">
+                <BiEdit className="mr-1" /> Ganti Gambar
+              </button>
+              <div className="text-xs text-gray-500">
+                Format disarankan: JPG/PNG, rasio 4:3.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ---------------------- Table utilities / rows ---------------------- */
+function DroppableRow({
+  droppableId,
+  colSpan,
+  showHint = false,
+}: {
+  droppableId: string;
+  colSpan: number;
+  showHint?: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId });
+  return (
+    <tr ref={setNodeRef}>
+      <td colSpan={colSpan}>
+        <div
+          className={`h-8 transition-all rounded ${
+            isOver ? "border-2 border-dashed border-primary/70" : "border-0"
+          } ${showHint ? "text-xs text-gray-400 italic py-1" : ""}`}
+        >
+          {isOver ? "Lepas di sini" : showHint ? "Drop di sini" : null}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+function SortableItemRow({
+  idxInSection,
+  item,
+  onEditToggle,
+  onDelete,
+  onCopy,
+  onUpdateField,
+  onOpenVolumeModal,
+}: {
+  idxInSection: number;
+  item: ItemRow;
+  onEditToggle: (id: string, editing: boolean) => void;
+  onDelete: (id: string) => void;
+  onCopy: (id: string) => void;
+  onUpdateField: (id: string, field: keyof ItemRow, value: any) => void;
+  onOpenVolumeModal: (item: ItemRow) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`align-top ${isDragging ? "bg-blue-50" : ""}`}
+    >
+      <td className="px-4 py-3 text-sm text-gray-500">{idxInSection + 1}</td>
+
+      {/* Uraian */}
+      <td className="px-4 py-3 text-sm text-gray-800 min-w-[280px]">
+        {item.isEditing ? (
+          <input
+            className="input input-bordered input-sm w-full text-black bg-white border-black"
+            value={item.deskripsi}
+            onChange={(e) =>
+              onUpdateField(item.id, "deskripsi", e.target.value)
+            }
+            placeholder="Nama / deskripsi pekerjaan"
+          />
+        ) : (
+          <span className="break-words">{item.deskripsi || "-"}</span>
+        )}
+      </td>
+
+      {/* Volume */}
+      <td className="px-4 py-3 text-sm text-gray-800">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{(item.volume ?? 0).toFixed(2)}</span>
+          <button
+            className="btn btn-ghost btn-xs text-blue-600 bg-white"
+            title="Detail Volume"
+            onClick={() => onOpenVolumeModal(item)}
+          >
+            <BiCalculator className="mr-1" /> Detail
+          </button>
+        </div>
+      </td>
+
+      {/* Satuan */}
+      <td className="px-4 py-3 text-sm text-gray-800">
+        {item.isEditing ? (
+          <select
+            className="select select-bordered select-sm w-28 text-black bg-white border-black"
+            value={item.satuan ?? ""}
+            onChange={(e) => onUpdateField(item.id, "satuan", e.target.value)}
+          >
+            <option value="">Pilih Satuan</option>
+            {UnitList.map((u) => (
+              <option key={u.value} value={u.value}>
+                {u.value}
+              </option>
+            ))}
+          </select>
+        ) : (
+          UnitList.find((u) => u.value === item.satuan)?.label || item.satuan
+        )}
+      </td>
+
+      {/* Harga Satuan */}
+      <td className="px-4 py-3 text-sm text-gray-800">
+        {item.isEditing ? (
+          <input
+            type="number"
+            min={0}
+            className="input input-bordered input-sm w-36 text-black bg-white border-black"
+            value={item.hargaSatuan ?? 0}
+            onChange={(e) =>
+              onUpdateField(item.id, "hargaSatuan", Number(e.target.value))
+            }
+          />
+        ) : (
+          formatIDR(item.hargaSatuan)
+        )}
+      </td>
+
+      {/* Harga Total */}
+      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+        {formatIDR(item.hargaTotal)}
+      </td>
+
+      {/* Aksi + drag handle */}
+      <td className="px-4 py-3 text-sm">
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-gray-600 text-xl bg-white"
+            title="Drag"
+            aria-label="Drag untuk memindahkan"
+            {...attributes}
+            {...listeners}
+          >
+            ≡
+          </button>
+
+          <button
+            onClick={() => onCopy(item.id)}
+            className="btn btn-ghost btn-xs text-indigo-600 text-lg bg-white"
+            title="Salin item"
+            aria-label="Salin item"
+          >
+            <BiCopy />
+          </button>
+
+          {!item.isEditing ? (
+            <button
+              onClick={() => onEditToggle(item.id, true)}
+              className="btn btn-ghost btn-xs text-blue-600 text-lg bg-white"
+              title="Edit"
+              aria-label="Edit baris"
+            >
+              <BiEdit />
+            </button>
+          ) : (
+            <button
+              onClick={() => onEditToggle(item.id, false)}
+              className="btn btn-ghost btn-xs text-green-600 text-lg bg-white"
+              title="Simpan"
+              aria-label="Simpan baris"
+            >
+              <BiSave />
+            </button>
+          )}
+
+          <button
+            onClick={() => onDelete(item.id)}
+            className="btn btn-ghost btn-xs text-red-600 text-lg bg-white"
+            title="Hapus"
+            aria-label="Hapus baris"
+          >
+            <BiTrash />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+/* ----------------------- Step 2 (Items + DnD) ----------------------- */
+type UpdateStepTwoProps = {
+  projectProfile: ProjectProfile;
+  onSave: (data: any) => void;
+  initialSections: Section[];
+};
+
+const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
+  projectProfile,
+  onSave,
+  initialSections,
+}) => {
+  const [sections, setSections] = useState<Section[]>([]);
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [isManualSection, setIsManualSection] = useState(false);
+  const [selectedSectionFromList, setSelectedSectionFromList] = useState("");
+  const [manualSectionTitle, setManualSectionTitle] = useState("");
+
+  // Volume modal state
+  const [volModalOpen, setVolModalOpen] = useState(false);
+  const [volTargetItemId, setVolTargetItemId] = useState<string | null>(null);
+  const [volTargetItemLabel, setVolTargetItemLabel] = useState<
+    string | undefined
+  >(undefined);
+  const [volInitialRows, setVolInitialRows] = useState<
+    VolumeDetailRow[] | undefined
+  >(undefined);
+
+  /* ====== NEW: sumber data dropdown kategori & item HSP ====== */
+  const { data: itemJob, isLoading: isLoadingItems } = useGetItemJob();
+  const { data: categories, isLoading: isLoadingCategories } =
+    useGetCategoryJob();
+
+  const DropdownTitleOptions = useMemo(
+    () =>
+      (categories ?? []).map((c: { name: string }) => ({
+        label: c.name,
+        value: c.name,
+      })),
+    [categories]
+  );
+
+  type PekerjaanDropdown = {
+    kode: string;
+    label: string;
+    value: string;
+    detail: {
+      deskripsi: string;
+      satuan: string;
+      harga: number;
+      categoryId?: string;
+      categoryName?: string;
+    };
+  };
+
+  const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
+    () =>
+      (itemJob ?? []).map(
+        (it: {
+          kode: string;
+          deskripsi: string;
+          satuan: string;
+          harga: number;
+          hspCategoryId?: string;
+          category?: { name?: string };
+        }) => ({
+          kode: it.kode,
+          label: `${it.deskripsi} - ${formatIDR(it.harga)}/${it.satuan}`,
+          value: it.kode,
+          detail: {
+            deskripsi: it.deskripsi,
+            satuan: it.satuan,
+            harga: it.harga ?? 0,
+            categoryId: it.hspCategoryId,
+            categoryName: it.category?.name,
+          },
+        })
+      ),
+    [itemJob]
+  );
+
+  /* seed data dari server */
+  useEffect(() => {
+    setSections(initialSections || []);
+  }, [initialSections]);
+
+  /* ----------------------------- Add / Remove ----------------------------- */
+  const addSection = () => {
+    const title = isManualSection
+      ? manualSectionTitle.trim()
+      : selectedSectionFromList;
+    if (!title) return;
+    setSections((prev) => [...prev, { id: uid(), title, items: [] }]);
+    setIsAddingSection(false);
+    setIsManualSection(false);
+    setSelectedSectionFromList("");
+    setManualSectionTitle("");
+  };
+
+  const deleteSection = (sectionId: string) =>
+    setSections((prev) => prev.filter((s) => s.id !== sectionId));
+
+  const addItemToSection = (sectionId: string, source?: PekerjaanDropdown) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const base: ItemRow = {
+          id: uid(),
+          kode: source?.value || "",
+          deskripsi: source?.detail.deskripsi || "",
+          volume: 0, // start from 0 (computed by modal)
+          volumeDetails: [],
+          satuan: source?.detail.satuan || "",
+          hargaSatuan: source?.detail.harga ?? 0,
+          hargaTotal: 0,
+          isEditing: true,
+        };
+        return { ...s, items: [base, ...s.items] };
+      })
+    );
+  };
+
+  const deleteItem = (itemId: string) => {
+    setSections((prev) =>
+      prev.map((s) => ({ ...s, items: s.items.filter((i) => i.id !== itemId) }))
+    );
+  };
+
+  const toggleEditItem = (id: string, editing: boolean) => {
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((i) =>
+          i.id === id
+            ? {
+                ...i,
+                isEditing: editing,
+                hargaSatuan:
+                  Number.isFinite(i.hargaSatuan) && i.hargaSatuan >= 0
+                    ? i.hargaSatuan
+                    : 0,
+                hargaTotal:
+                  (Number(i.volume) || 0) * (Number(i.hargaSatuan) || 0),
+              }
+            : i
+        ),
+      }))
+    );
+  };
+
+  const updateItemField = (id: string, field: keyof ItemRow, value: any) => {
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((i) => {
+          if (i.id !== id) return i;
+          const next = { ...i, [field]: value };
+          const vol = Number(next.volume || 0);
+          const hs =
+            field === "hargaSatuan"
+              ? Number(value)
+              : Number(next.hargaSatuan || 0);
+          next.hargaTotal = vol * (Number.isFinite(hs) && hs >= 0 ? hs : 0);
+          return next;
+        }),
+      }))
+    );
+  };
+
+  /* -------------------------- Copy item -------------------------- */
+  const copyItem = (itemId: string) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        const idx = s.items.findIndex((i) => i.id === itemId);
+        if (idx === -1) return s;
+        const src = s.items[idx];
+        const clone: ItemRow = {
+          ...src,
+          id: uid(),
+          isEditing: true,
+          volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
+          hargaTotal:
+            (Number(src.volume) || 0) * (Number(src.hargaSatuan) || 0),
+        };
+        const items = [...s.items];
+        items.splice(idx + 1, 0, clone);
+        return { ...s, items };
+      })
+    );
+  };
+
+  /* --------------------- Volume Modal handlers --------------------- */
+  const openVolumeModal = (item: ItemRow) => {
+    setVolTargetItemId(item.id);
+    setVolTargetItemLabel(item.deskripsi || item.kode);
+    setVolInitialRows(item.volumeDetails || []);
+    setVolModalOpen(true);
+  };
+
+  const applyVolumeFromModal = (
+    itemId: string,
+    rows: VolumeDetailRow[],
+    totalVol: number
+  ) => {
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((i) => {
+          if (i.id !== itemId) return i;
+          const volume = Number(totalVol || 0);
+          const hargaTotal = volume * (Number(i.hargaSatuan) || 0);
+          return { ...i, volume, volumeDetails: rows, hargaTotal };
+        }),
+      }))
+    );
+  };
+
+  /* --------------------------- Drag & Drop -------------------------- */
+  const findSectionIdByItemId = (itemId: string) => {
+    for (const s of sections)
+      if (s.items.some((i) => i.id === itemId)) return s.id;
+    return null;
+  };
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (activeId === overId) return;
+
+    const fromSectionId = findSectionIdByItemId(activeId);
+    if (!fromSectionId) return;
+
+    const isOverItem = sections.some((s) =>
+      s.items.some((i) => i.id === overId)
+    );
+    const isOverSectionTop = overId.startsWith("section-");
+    const isOverSectionBottom = overId.startsWith("dropzone-");
+
+    const toSectionId = isOverItem
+      ? findSectionIdByItemId(overId)!
+      : isOverSectionTop
+      ? overId.replace("section-", "")
+      : isOverSectionBottom
+      ? overId.replace("dropzone-", "")
+      : null;
+
+    if (!toSectionId) return;
+
+    setSections((prev) => {
+      const next = prev.map((s) => ({ ...s, items: [...s.items] }));
+      const from = next.find((s) => s.id === fromSectionId)!;
+      const to = next.find((s) => s.id === toSectionId)!;
+
+      const fromIdx = from.items.findIndex((i) => i.id === activeId);
+      const [moved] = from.items.splice(fromIdx, 1);
+
+      if (isOverItem) {
+        const overIdx = to.items.findIndex((i) => i.id === overId);
+        to.items.splice(overIdx, 0, moved);
+      } else if (isOverSectionTop) {
+        to.items.unshift(moved);
+      } else if (isOverSectionBottom) {
+        to.items.push(moved);
+      }
+      return next;
+    });
+  };
+
+  const handleDragOver = (_e: DragOverEvent) => {};
+
+  /* ------------------------------ Aggregations ----------------------------- */
+  const subtotal = sections.reduce(
+    (acc, s) =>
+      acc + s.items.reduce((t, i) => t + Number(i.hargaTotal ?? 0), 0),
+    0
+  );
+  const ppnPct = Math.max(0, Number(projectProfile.ppn || "0"));
+  const ppnAmount = (subtotal * ppnPct) / 100;
+  const grandTotal = subtotal + ppnAmount;
+
+  const handleSaveAllData = () => {
+    const estimationItem = sections.map((s) => ({
+      title: s.title,
+      item: s.items.map((i) => ({
+        kode: i.kode,
+        nama: i.deskripsi,
+        satuan: i.satuan,
+        harga: i.hargaSatuan,
+        volume: i.volume,
+        hargaTotal: i.hargaTotal,
+        details: (i.volumeDetails || []).map((d) => ({
+          nama: d.uraian,
+          jenis: d.jenis, // "penjumlahan" | "pengurangan"
+          panjang: d.panjang,
+          lebar: d.lebar,
+          tinggi: d.tinggi,
+          jumlah: d.jumlah,
+          volume: Number(d.volume), // sudah dihitung di modal
+        })),
+      })),
+    }));
+
+    const dataToSave = {
+      projectName: projectProfile.projectName,
+      owner: projectProfile.owner,
+      ppn: projectProfile.ppn,
+      notes: projectProfile.notes,
+      customFields: projectProfile.customFields,
+      estimationItem,
+    };
+    onSave(dataToSave);
+  };
+
+  return (
+    <div className="bg-white rounded-xl shadow p-4 sm:p-6">
+      {/* Title Bar */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-900">
+          {projectProfile.projectName || "Nama Proyek"}
+        </h2>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="badge">
+            {projectProfile.owner ? `Owner: ${projectProfile.owner}` : "Owner"}
+          </span>
+          <span className="badge">PPN {ppnPct || 0}%</span>
+        </div>
+      </div>
+
+      {/* Tambah Kategori */}
+      <div className="mb-4">
+        {isAddingSection ? (
+          <div className="space-y-3">
+            {isManualSection ? (
+              <input
+                className="input input-bordered w-full text-black bg-white border-black"
+                placeholder="Masukkan nama kategori"
+                value={manualSectionTitle}
+                onChange={(e) => setManualSectionTitle(e.target.value)}
+              />
+            ) : (
+              <select
+                className="select select-bordered w-full text-black bg-white border-black"
+                value={selectedSectionFromList}
+                onChange={(e) => setSelectedSectionFromList(e.target.value)}
+                disabled={isLoadingCategories}
+              >
+                <option value="">
+                  {isLoadingCategories ? "Memuat..." : "Pilih Kategori"}
+                </option>
+                {DropdownTitleOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="btn btn-soft"
+                onClick={() => setIsManualSection((v) => !v)}
+              >
+                {isManualSection ? "Pilih dari Daftar" : "Input Manual"}
+              </button>
+              <button
+                className="btn btn-primary text-white"
+                onClick={addSection}
+                disabled={
+                  isManualSection
+                    ? !manualSectionTitle.trim()
+                    : !selectedSectionFromList
+                }
+              >
+                Tambah
+              </button>
+              <button
+                className="btn btn-warning"
+                onClick={() => {
+                  setIsAddingSection(false);
+                  setIsManualSection(false);
+                  setSelectedSectionFromList("");
+                  setManualSectionTitle("");
+                }}
+              >
+                Batal
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="btn btn-success text-white"
+            onClick={() => setIsAddingSection(true)}
+          >
+            <BiPlus className="mr-1" /> Tambah Kategori Pekerjaan
+          </button>
+        )}
+      </div>
+
+      {/* TABLE + DnD */}
+      <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <DndContext
+          sensors={useSensors(
+            useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
+          )}
+          onDragEnd={handleDragEnd}
+          onDragOver={handleDragOver}
+          collisionDetection={closestCorners}
+        >
+          <table className="table min-w-[1100px]">
+            <thead className="bg-gray-50 sticky top-0 z-[1]">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  No
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Uraian Pekerjaan
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Vol (M³)
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Satuan
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Harga Satuan
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Harga Total
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                  Aksi
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="bg-white">
+              {sections.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={7}
+                    className="px-6 py-8 text-center text-sm text-gray-500"
+                  >
+                    Belum ada kategori.
+                  </td>
+                </tr>
+              )}
+
+              {sections.map((section, sIdx) => (
+                <SortableContext
+                  key={section.id}
+                  items={section.items.map((i) => i.id)}
+                  strategy={rectSortingStrategy}
+                >
+                  {/* Header Kategori */}
+                  <tr className="bg-blue-50/70">
+                    <td className="px-4 py-3 text-sm font-semibold text-blue-700">
+                      {String.fromCharCode(65 + sIdx)}
+                    </td>
+                    <td className="px-4 py-3 text-sm font-bold text-blue-800">
+                      {section.title}
+                    </td>
+                    <td colSpan={4}></td>
+                    <td className="">
+                      <div className="flex gap-2 items-center ">
+                        {/* Tambah dari HSP */}
+                        <select
+                          className="select select-bordered select-sm w-60 text-black bg-white border-black"
+                          defaultValue=""
+                          disabled={isLoadingItems}
+                          onChange={(e) => {
+                            const sel = DropdownPekerjaan.find(
+                              (it) => it.value === e.target.value
+                            );
+                            if (sel) {
+                              addItemToSection(section.id, sel);
+                              e.currentTarget.value = "";
+                            }
+                          }}
+                        >
+                          <option value="">
+                            {isLoadingItems ? "Memuat..." : "Tambah dari HSP"}
+                          </option>
+                          {DropdownPekerjaan.map((it) => (
+                            <option key={it.value} value={it.value}>
+                              {it.label}
+                            </option>
+                          ))}
+                        </select>
+
+                        {/* Tambah manual */}
+                        <button
+                          onClick={() => addItemToSection(section.id)}
+                          className="btn btn-solid btn-sm"
+                          title="Tambah Manual"
+                        >
+                          <BiPlus className="mr-1" /> Manual
+                        </button>
+
+                        {/* Hapus kategori */}
+                        <button
+                          onClick={() => deleteSection(section.id)}
+                          className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
+                          title="Hapus Kategori"
+                        >
+                          <BiTrash className="text-lg" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* DROPPABLE: header (drop ke atas) */}
+                  <DroppableRow
+                    droppableId={`section-${section.id}`}
+                    colSpan={7}
+                  />
+
+                  {/* Items */}
+                  {section.items.map((item, idxInSection) => (
+                    <SortableItemRow
+                      key={item.id}
+                      idxInSection={idxInSection}
+                      item={item}
+                      onEditToggle={toggleEditItem}
+                      onDelete={deleteItem}
+                      onCopy={copyItem}
+                      onUpdateField={updateItemField}
+                      onOpenVolumeModal={openVolumeModal}
+                    />
+                  ))}
+
+                  {/* DROPPABLE: bawah (akhir list) */}
+                  <DroppableRow
+                    droppableId={`dropzone-${section.id}`}
+                    colSpan={7}
+                    showHint={section.items.length === 0}
+                  />
+
+                  {/* Subtotal per kategori */}
+                  {!!section.items.length && (
+                    <tr className="bg-gray-50">
+                      <td
+                        colSpan={5}
+                        className="px-4 py-3 text-sm text-right text-gray-700"
+                      >
+                        Subtotal {section.title}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                        {formatIDR(
+                          section.items.reduce(
+                            (a, b) => a + (b.hargaTotal ?? 0),
+                            0
+                          )
+                        )}
+                      </td>
+                      <td />
+                    </tr>
+                  )}
+                </SortableContext>
+              ))}
+            </tbody>
+          </table>
+
+          {/* Overlay (optional) */}
+          <DragOverlay dropAnimation={defaultDropAnimation} />
+        </DndContext>
+      </div>
+
+      {/* Footer total & actions */}
+      <div className="rounded-lg border border-gray-200 p-4 mt-5 bg-white">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm">
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-gray-600">Subtotal</span>
+              <span className="font-semibold text-gray-900">
+                {formatIDR(subtotal)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-gray-600">PPN ({ppnPct}%)</span>
+              <span className="font-semibold text-gray-900">
+                {formatIDR(ppnAmount)}
+              </span>
+            </div>
+            <div className="divider my-2" />
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-gray-800 font-semibold">Grand Total</span>
+              <span className="text-lg font-bold text-gray-900">
+                {formatIDR(grandTotal)}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 justify-end">
+            <Button variant="success" onClick={handleSaveAllData}>
+              Simpan Perubahan
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Volume Modal */}
+      <VolModal
+        open={volModalOpen}
+        onClose={() => setVolModalOpen(false)}
+        itemLabel={volTargetItemLabel}
+        initialRows={volInitialRows}
+        onSave={(rows, total) => {
+          if (volTargetItemId) {
+            applyVolumeFromModal(volTargetItemId, rows, total);
+          }
+        }}
+      />
+    </div>
+  );
+};
+
+/* ----------------------------- Root Update ----------------------------- */
+const UpdateEstimation: React.FC = () => {
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const {
+    data: detailEstimation,
+    isLoading,
+    isError,
+  } = useEstimation(id || "");
+  const updateMutation = useUpdateEstimation();
+
+  // Step accordion
+  const [activeAccordion, setActiveAccordion] = useState<string>("step1");
+  const toggleAccordion = (step: string) =>
+    setActiveAccordion((prev) => (prev === step ? "" : step));
+
+  // Controlled form states
+  const [formData, setFormData] = useState({
+    projectName: "",
+    owner: "",
+    ppn: "11",
+    notes: "",
+  });
+  const [customFields, setCustomFields] = useState<CustomFieldUI[]>([]);
+  const [seedSections, setSeedSections] = useState<Section[]>([]);
+
+  // Seed dari API
+  useEffect(() => {
+    if (!detailEstimation) return;
+
+    // profil
+    setFormData({
+      projectName: detailEstimation.projectName || "",
+      owner: detailEstimation.projectOwner || "",
+      ppn: String(detailEstimation.ppn ?? "11"),
+      notes: detailEstimation.notes || "",
+    });
+
+    // custom fields
+    const cf = (detailEstimation.customFields || []).map((f) => ({
+      id: f.id,
+      label: f.label,
+      value: f.value,
+      type: f.type || "text",
+    }));
+    setCustomFields(cf);
+
+    // sections + items
+    const sections: Section[] = (detailEstimation.items || []).map((sec) => {
+      const items: ItemRow[] = (sec.details || []).map((d: any) => {
+        // map volumeDetails API -> UI
+        const vds: VolumeDetailRow[] = d.volumeDetails
+          ? d.volumeDetails.map((vd: any) => ({
+              id: vd.id || uid(),
+              uraian: vd.nama || "",
+              jenis: mapJenisApiToUi(vd.jenis),
+              // string supaya input bisa kosong & tak jadi "02"
+              panjang: String(vd.panjang ?? ""),
+              lebar: String(vd.lebar ?? ""),
+              tinggi: String(vd.tinggi ?? ""),
+              jumlah: String(vd.jumlah ?? ""),
+              volume: Number(vd.volume ?? 0),
+            }))
+          : [];
+
+        const volumeNumber = Number(d.volume ?? 0);
+        const hargaSatuan = Number(d.hargaSatuan ?? 0);
+        return {
+          id: d.id,
+          kode: d.kode || "",
+          deskripsi: d.deskripsi || "",
+          volume: volumeNumber,
+          volumeDetails: vds,
+          satuan: d.satuan || "",
+          hargaSatuan,
+          hargaTotal: Number(d.hargaTotal ?? volumeNumber * hargaSatuan),
+          isEditing: false,
+        };
+      });
+
+      return {
+        id: sec.id,
+        title: sec.title,
+        items,
+      };
+    });
+
+    setSeedSections(sections);
+  }, [detailEstimation]);
+
+  // Bentuk projectProfile untuk Step 2
+  const projectProfile: ProjectProfile = useMemo(
+    () => ({
+      ...formData,
+      customFields: customFields.reduce((acc, field) => {
+        acc[field.label] = field.value;
+        return acc;
+      }, {} as Record<string, string>),
+    }),
+    [formData, customFields]
+  );
+
+  const handleStepOneSave = () => setActiveAccordion("step2");
+
+  const handleSaveData = (data: any) => {
+    if (!id) return;
+    updateMutation.mutate({ id, data });
+  };
+
+  if (!id) {
+    navigate("/estimation");
+    return null;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="p-4">
+        <div className="skeleton h-8 w-56 mb-4" />
+        <div className="skeleton h-48 w-full mb-4" />
+        <div className="skeleton h-96 w-full" />
+      </div>
+    );
+  }
+
+  if (isError || !detailEstimation) {
+    return (
+      <div className="p-4">
+        <h1 className="text-lg font-semibold text-red-600 mb-2">
+          Gagal memuat estimasi
+        </h1>
+        <Button onClick={() => navigate("/estimation")}>Kembali</Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto p-3 sm:p-4">
+      <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
+
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-gray-900">Update Estimation</h1>
+        <p className="text-sm text-gray-600">
+          Perbarui profil proyek dan item pekerjaan di bawah ini.
+        </p>
+      </div>
+
+      <div className="join join-vertical w/full gap-4">
+        {/* Step 1 */}
+        <div className="collapse collapse-arrow join-item rounded-xl border border-gray-200 bg-white">
+          <input
+            type="radio"
+            name="wizard-update-estimation"
+            checked={activeAccordion === "step1"}
+            onChange={() => toggleAccordion("step1")}
+          />
+          <div className="collapse-title text-lg font-semibold text-gray-900">
+            {`1) Project Profile`}
+          </div>
+          <div className="collapse-content p-4 sm:p-5">
+            <UpdateStepOne
+              onSave={handleStepOneSave}
+              formData={formData}
+              setFormData={setFormData}
+              customFields={customFields}
+              setCustomFields={setCustomFields}
+            />
+          </div>
+        </div>
+
+        {/* Step 2 */}
+        <div className="collapse collapse-arrow join-item rounded-xl border border-gray-200 bg-white">
+          <input
+            type="radio"
+            name="wizard-update-estimation"
+            checked={activeAccordion === "step2"}
+            onChange={() => toggleAccordion("step2")}
+          />
+          <div className="collapse-title text-lg font-semibold text-gray-900">
+            {`2) Estimation Items`}
+          </div>
+          <div className="collapse-content p-0">
+            <div className="p-4 sm:p-5">
+              <UpdateStepTwo
+                projectProfile={projectProfile}
+                onSave={handleSaveData}
+                initialSections={seedSections}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default UpdateEstimation;

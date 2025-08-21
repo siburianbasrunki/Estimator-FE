@@ -1,28 +1,86 @@
 import { useMemo, useState } from "react";
 import Input from "../../components/input";
 import ImageProyek from "../../assets/images/image 1.png";
-import { BiEdit, BiTrash, BiPlus, BiSave } from "react-icons/bi";
+import {
+  BiEdit,
+  BiTrash,
+  BiPlus,
+  BiSave,
+  BiCalculator,
+  BiCopy,
+} from "react-icons/bi";
 import Button from "../../components/Button";
 import { UnitList } from "../../stores/units";
 import { useCreateEstimation } from "../../hooks/useEstimation";
 import { useGetCategoryJob, useGetItemJob } from "../../hooks/useHsp";
 
+// dnd-kit
+import {
+  DndContext,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  closestCorners,
+  useDroppable,
+  defaultDropAnimation,
+  DragOverlay,
+  type DragEndEvent,
+  type DragOverEvent,
+} from "@dnd-kit/core";
+import {
+  SortableContext,
+  useSortable,
+  rectSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import type { VolumeDetailRow } from "./VolumeModal";
+import VolModal from "./VolumeModal";
+import { BackButton } from "../../components/BackButton";
+import { useNavigate } from "react-router-dom";
+
+/* ------------------------------ Helpers ------------------------------ */
+const uid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+
+const formatIDR = (n: number = 0) =>
+  `Rp ${Math.max(0, Number(n || 0)).toLocaleString("id-ID")}`;
+
+/* ------------------------------ Types ------------------------------ */
 interface CustomField {
   id: string;
   label: string;
   value: string;
   type: string;
 }
-
 interface ProjectProfile {
   projectName: string;
   owner: string;
-  ppn: string;
+  ppn: string; // keep string for easy input bind
   notes: string;
   customFields: Record<string, string>;
 }
+type ItemRow = {
+  id: string;
+  kode: string;
+  deskripsi: string;
+  volume: number; // auto from modal
+  volumeDetails?: VolumeDetailRow[]; // stores detail rows
+  satuan: string;
+  hargaSatuan: number;
+  hargaTotal: number;
+  isEditing?: boolean;
+};
+type Section = {
+  id: string;
+  title: string;
+  items: ItemRow[];
+};
 
+/* --------------------------- Step 1: Profile --------------------------- */
 const CreateStepOne = ({
+  onSave,
   formData,
   setFormData,
   customFields,
@@ -53,70 +111,70 @@ const CreateStepOne = ({
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
   const handleCustomFieldChange = (id: string, value: string) => {
     setCustomFields((prev) =>
-      prev.map((field) => (field.id === id ? { ...field, value } : field))
+      prev.map((f) => (f.id === id ? { ...f, value } : f))
     );
   };
 
   const addCustomField = () => {
     if (!newFieldLabel.trim()) return;
-
-    const newField: CustomField = {
-      id: Date.now().toString(),
-      label: newFieldLabel,
-      value: "",
-      type: newFieldType,
-    };
-
-    setCustomFields((prev) => [...prev, newField]);
+    setCustomFields((prev) => [
+      ...prev,
+      { id: uid(), label: newFieldLabel.trim(), value: "", type: newFieldType },
+    ]);
     setNewFieldLabel("");
     setNewFieldType("text");
   };
 
-  const removeCustomField = (id: string) => {
-    setCustomFields((prev) => prev.filter((field) => field.id !== id));
-  };
+  const removeCustomField = (id: string) =>
+    setCustomFields((prev) => prev.filter((f) => f.id !== id));
 
   return (
-    <div className="bg-white rounded-md shadow p-6">
-      <p className="border-b-4 border-[#1814F3] w-fit rounded-t-md text-[#1814F3]">
-        Profil Proyek
-      </p>
+    <div className="bg-white rounded-xl shadow p-6">
+      <div className="flex items-center gap-2">
+        <div className="h-6 w-1.5 bg-blue-600 rounded" />
+        <p className="text-blue-700 font-semibold">Profil Proyek</p>
+      </div>
 
       <div className="flex flex-col lg:flex-row gap-8 mt-6">
-        <div className="flex-1 space-y-6">
-          <div className="space-y-4">
+        {/* Left form */}
+        <div className="flex-1 space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Input
               label="Nama Proyek"
-              placeholder="Masukan Nama Proyek"
+              placeholder="Masukkan nama proyek"
               name="projectName"
               value={formData.projectName}
               onChange={handleInputChange}
             />
             <Input
               label="Pemilik Proyek"
-              placeholder="Masukan Nama Pemilik Proyek"
+              placeholder="Masukkan pemilik proyek"
               name="owner"
               value={formData.owner}
               onChange={handleInputChange}
             />
-            <Input
-              label="PPN"
-              name="ppn"
-              type="number"
-              value={formData.ppn}
-              onChange={handleInputChange}
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                PPN (%)
+              </label>
+              <input
+                name="ppn"
+                type="number"
+                min={0}
+                className="input input-bordered w-full text-black bg-white border-black"
+                value={formData.ppn}
+                onChange={handleInputChange}
+                placeholder="11"
+              />
+            </div>
           </div>
 
-          <div className="mt-6">
+          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Notes
             </label>
@@ -124,84 +182,100 @@ const CreateStepOne = ({
               name="notes"
               value={formData.notes}
               onChange={handleInputChange}
-              className="block w-full p-3 border text-black border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-              placeholder="Masukan Deskripsi Proyek"
+              className="textarea textarea-bordered w-full text-black bg-white border-black"
+              placeholder="Masukkan deskripsi / catatan proyek"
               rows={4}
             />
           </div>
 
-          <div className="space-y-4">
-            {customFields.map((field) => (
-              <div key={field.id} className="flex items-start gap-3">
-                <div className="flex-1">
-                  <Input
-                    label={field.label}
-                    name={`custom-${field.id}`}
-                    type={field.type}
-                    value={field.value}
-                    onChange={(e) =>
-                      handleCustomFieldChange(field.id, e.target.value)
-                    }
-                  />
-                </div>
-                <button
-                  onClick={() => removeCustomField(field.id)}
-                  className="mt-7 p-2 text-red-500 hover:text-red-700 transition-colors"
-                  aria-label="Remove field"
-                >
-                  <BiTrash size={18} />
-                </button>
+          {/* Custom fields */}
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-gray-700">
+              Custom Fields
+            </div>
+            {!!customFields.length && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {customFields.map((field) => (
+                  <div key={field.id} className="flex items-start gap-2">
+                    <div className="flex-1">
+                      <Input
+                        label={field.label}
+                        name={`custom-${field.id}`}
+                        type={field.type}
+                        value={field.value}
+                        onChange={(e) =>
+                          handleCustomFieldChange(field.id, e.target.value)
+                        }
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeCustomField(field.id)}
+                      className="btn btn-ghost btn-sm text-red-600"
+                      aria-label="Hapus field"
+                      title="Hapus field"
+                    >
+                      <BiTrash size={18} />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
 
-          <div className="flex flex-col sm:flex-row gap-3 mt-8">
-            <div className="flex-1">
+            {/* Add custom field */}
+            <div className="flex flex-col sm:flex-row gap-3">
               <input
                 type="text"
                 value={newFieldLabel}
                 onChange={(e) => setNewFieldLabel(e.target.value)}
-                placeholder="Field Label"
-                className="block w-full p-2.5 border text-black border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                placeholder="Label field (mis. Lokasi, Deadline, dll)"
+                className="input input-bordered w-full text-black bg-white border-black"
               />
+              <select
+                value={newFieldType}
+                onChange={(e) => setNewFieldType(e.target.value)}
+                className="select select-bordered w-full sm:w-44 text-black bg-white border-black"
+              >
+                <option value="text">Text</option>
+                <option value="number">Number</option>
+                <option value="email">Email</option>
+                <option value="tel">Phone</option>
+                <option value="date">Date</option>
+              </select>
+              <button
+                onClick={addCustomField}
+                className="btn btn-primary text-white"
+              >
+                <BiPlus size={18} /> Tambah Field
+              </button>
             </div>
-            <select
-              value={newFieldType}
-              onChange={(e) => setNewFieldType(e.target.value)}
-              className="block w-full sm:w-32 p-2.5 border border-gray-300 rounded-md shadow-sm focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-black"
-            >
-              <option value="text" className="text-black">
-                Text
-              </option>
-              <option value="number" className="text-black">
-                Number
-              </option>
-              <option value="email" className="text-black">
-                Email
-              </option>
-              <option value="tel" className="text-black">
-                Phone
-              </option>
-            </select>
-            <button
-              onClick={addCustomField}
-              className="flex items-center justify-center gap-1 px-4 py-2.5 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
-            >
-              <BiPlus size={18} /> Add Field
+          </div>
+
+          <div className="pt-2">
+            <button onClick={onSave} className="btn btn-success text-white">
+              Lanjut ke Estimation Items
             </button>
           </div>
         </div>
 
-        <div className="lg:w-1/3 flex flex-col items-center mt-6 lg:mt-0">
-          <div className="relative w-full max-w-xs">
-            <img
-              src={ImageProyek}
-              alt="Proyek"
-              className="w-full h-auto rounded-md border-2 border-gray-200 object-cover"
-            />
-            <button className="absolute bottom-3 right-3 p-2 bg-white rounded-full shadow-md hover:bg-gray-100 transition-colors">
-              <BiEdit className="text-blue-500" size={18} />
-            </button>
+        {/* Right preview image */}
+        <div className="lg:w-1/3">
+          <div className="card bg-base-100 border border-gray-200 shadow-sm">
+            <figure className="px-4 pt-4">
+              <img
+                src={ImageProyek}
+                alt="Preview Proyek"
+                className="rounded-lg border border-gray-200 object-cover"
+              />
+            </figure>
+            <div className="card-body p-4">
+              <button className="btn btn-outline btn-sm">
+                <BiEdit className="mr-1" /> Ganti Gambar
+              </button>
+              <div className="text-xs text-gray-500">
+                Format disarankan: JPG/PNG, rasio 4:3.
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -209,32 +283,222 @@ const CreateStepOne = ({
   );
 };
 
-interface TableRow {
-  id: string;
-  type: "title" | "item";
-  title?: string;
-  item?: {
-    kode: string;
-    deskripsi: string;
-    volume: number;
-    satuan: string;
-    hargaSatuan: number;
-    hargaTotal: number;
-  };
-  isEditing?: boolean;
+/* -------------------------- Table Utilities/Rows -------------------------- */
+function DroppableRow({
+  droppableId,
+  colSpan,
+  showHint = false,
+}: {
+  droppableId: string;
+  colSpan: number;
+  showHint?: boolean;
+}) {
+  const { setNodeRef, isOver } = useDroppable({ id: droppableId });
+  return (
+    <tr ref={setNodeRef}>
+      <td colSpan={colSpan}>
+        <div
+          className={`h-8 transition-all rounded ${
+            isOver ? "border-2 border-dashed border-primary/70" : "border-0"
+          } ${showHint ? "text-xs text-gray-400 italic py-1" : ""}`}
+        >
+          {isOver ? "Lepas di sini" : showHint ? "Drop di sini" : null}
+        </div>
+      </td>
+    </tr>
+  );
 }
 
-interface CreateStepTwoProps {
+function SortableItemRow({
+  idxInSection,
+  item,
+  onEditToggle,
+  onDelete,
+  onCopy,
+  onUpdateField,
+  onOpenVolumeModal,
+}: {
+  idxInSection: number;
+  item: ItemRow;
+  onEditToggle: (id: string, editing: boolean) => void;
+  onDelete: (id: string) => void;
+  onCopy: (id: string) => void;
+  onUpdateField: (id: string, field: keyof ItemRow, value: any) => void;
+  onOpenVolumeModal: (item: ItemRow) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`align-top ${isDragging ? "bg-blue-50" : ""}`}
+    >
+      <td className="px-4 py-3 text-sm text-gray-500">{idxInSection + 1}</td>
+
+      {/* Uraian */}
+      <td className="px-4 py-3 text-sm text-gray-800 min-w-[280px]">
+        {item.isEditing ? (
+          <input
+            className="input input-bordered input-sm w-full text-black bg-white border-black"
+            value={item.deskripsi}
+            onChange={(e) =>
+              onUpdateField(item.id, "deskripsi", e.target.value)
+            }
+            placeholder="Nama / deskripsi pekerjaan"
+          />
+        ) : (
+          <span className="break-words">{item.deskripsi || "-"}</span>
+        )}
+      </td>
+
+      {/* Volume (read-only + tombol detail) */}
+      <td className="px-4 py-3 text-sm text-gray-800">
+        <div className="flex items-center gap-2">
+          <span className="font-medium">{(item.volume ?? 0).toFixed(2)}</span>
+          <button
+            className="btn btn-ghost btn-xs text-blue-600 bg-white"
+            title="Detail Volume"
+            onClick={() => onOpenVolumeModal(item)}
+          >
+            <BiCalculator className="mr-1" /> Detail
+          </button>
+        </div>
+      </td>
+
+      {/* Satuan */}
+      <td className="px-4 py-3 text-sm text-gray-800">
+        {item.isEditing ? (
+          <select
+            className="select select-bordered select-sm w-28 text-black bg-white border-black"
+            value={item.satuan ?? ""}
+            onChange={(e) => onUpdateField(item.id, "satuan", e.target.value)}
+          >
+            <option value="">Pilih Satuan</option>
+            {UnitList.map((u) => (
+              <option key={u.value} value={u.value}>
+                {u.value}
+              </option>
+            ))}
+          </select>
+        ) : (
+          UnitList.find((u) => u.value === item.satuan)?.label || item.satuan
+        )}
+      </td>
+
+      {/* Harga Satuan */}
+      <td className="px-4 py-3 text-sm text-gray-800">
+        {item.isEditing ? (
+          <input
+            type="number"
+            min={0}
+            className="input input-bordered input-sm w-36 text-black bg-white border-black"
+            value={item.hargaSatuan ?? 0}
+            onChange={(e) =>
+              onUpdateField(item.id, "hargaSatuan", Number(e.target.value))
+            }
+          />
+        ) : (
+          formatIDR(item.hargaSatuan)
+        )}
+      </td>
+
+      {/* Harga Total */}
+      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+        {formatIDR(item.hargaTotal)}
+      </td>
+
+      {/* Aksi + drag handle */}
+      <td className="px-4 py-3 text-sm">
+        <div className="flex items-center gap-2">
+          <button
+            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-gray-600 text-xl bg-white"
+            title="Drag"
+            aria-label="Drag untuk memindahkan"
+            {...attributes}
+            {...listeners}
+          >
+            ≡
+          </button>
+
+          {/* Salin */}
+          <button
+            onClick={() => onCopy(item.id)}
+            className="btn btn-ghost btn-xs text-indigo-600 text-lg bg-white"
+            title="Salin item"
+            aria-label="Salin item"
+          >
+            <BiCopy />
+          </button>
+
+          {!item.isEditing ? (
+            <button
+              onClick={() => onEditToggle(item.id, true)}
+              className="btn btn-ghost btn-xs text-blue-600 text-lg bg-white"
+              title="Edit"
+              aria-label="Edit baris"
+            >
+              <BiEdit />
+            </button>
+          ) : (
+            <button
+              onClick={() => onEditToggle(item.id, false)}
+              className="btn btn-ghost btn-xs text-green-600 text-lg bg-white"
+              title="Simpan"
+              aria-label="Simpan baris"
+            >
+              <BiSave />
+            </button>
+          )}
+
+          <button
+            onClick={() => onDelete(item.id)}
+            className="btn btn-ghost btn-xs text-red-600 text-lg bg-white"
+            title="Hapus"
+            aria-label="Hapus baris"
+          >
+            <BiTrash />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+/* --------------------------- Step 2: Items Table --------------------------- */
+type CreateStepTwoProps = {
   projectProfile: ProjectProfile;
   onSave: (data: any) => void;
-}
+};
 
 const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
-  const [rows, setRows] = useState<TableRow[]>([]);
-  const [selectedTitle, setSelectedTitle] = useState<string>("");
-  const [manualTitle, setManualTitle] = useState<string>("");
-  const [isAddingTitle, setIsAddingTitle] = useState<boolean>(false);
-  const [isManualTitle, setIsManualTitle] = useState<boolean>(false);
+  const [sections, setSections] = useState<Section[]>([]);
+  const [isAddingSection, setIsAddingSection] = useState(false);
+  const [isManualSection, setIsManualSection] = useState(false);
+  const [selectedSectionFromList, setSelectedSectionFromList] = useState("");
+  const [manualSectionTitle, setManualSectionTitle] = useState("");
+
+  // Volume modal state
+  const [volModalOpen, setVolModalOpen] = useState(false);
+  const [volTargetItemId, setVolTargetItemId] = useState<string | null>(null);
+  const [volTargetItemLabel, setVolTargetItemLabel] = useState<
+    string | undefined
+  >(undefined);
+  const [volInitialRows, setVolInitialRows] = useState<
+    VolumeDetailRow[] | undefined
+  >(undefined);
 
   const { data: itemJob, isLoading: isLoadingItems } = useGetItemJob();
   const { data: categories, isLoading: isLoadingCategories } =
@@ -274,9 +538,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           category?: { name?: string };
         }) => ({
           kode: it.kode,
-          label: `${it.deskripsi} - Rp${(it.harga ?? 0).toLocaleString(
-            "id-ID"
-          )}/${it.satuan}`,
+          label: `${it.deskripsi} - ${formatIDR(it.harga)}/${it.satuan}`,
           value: it.kode,
           detail: {
             deskripsi: it.deskripsi,
@@ -290,32 +552,223 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     [itemJob]
   );
 
-  const handleSaveAllData = () => {
-    const estimationItem: any[] = [];
-    let currentSection: any = null;
+  /* ----------------------------- Add / Remove ----------------------------- */
+  const addSection = () => {
+    const title = isManualSection
+      ? manualSectionTitle.trim()
+      : selectedSectionFromList;
+    if (!title) return;
+    setSections((prev) => [...prev, { id: uid(), title, items: [] }]);
+    setIsAddingSection(false);
+    setIsManualSection(false);
+    setSelectedSectionFromList("");
+    setManualSectionTitle("");
+  };
 
-    rows.forEach((row) => {
-      if (row.type === "title") {
-        if (currentSection) {
-          estimationItem.push(currentSection);
-        }
-        currentSection = {
-          title: row.title,
-          item: [],
+  const deleteSection = (sectionId: string) =>
+    setSections((prev) => prev.filter((s) => s.id !== sectionId));
+
+  const addItemToSection = (sectionId: string, source?: PekerjaanDropdown) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const base: ItemRow = {
+          id: uid(),
+          kode: source?.value || "",
+          deskripsi: source?.detail.deskripsi || "",
+          volume: 0, // start from 0 (computed by modal)
+          volumeDetails: [],
+          satuan: source?.detail.satuan || "",
+          hargaSatuan: source?.detail.harga ?? 0,
+          hargaTotal: 0,
+          isEditing: true,
         };
-      } else if (row.type === "item" && row.item && currentSection) {
-        currentSection.item.push({
-          kode: row.item.kode,
-          nama: row.item.deskripsi,
-          satuan: row.item.satuan,
-          harga: row.item.hargaSatuan,
-          volume: row.item.volume,
-          hargaTotal: row.item.hargaTotal,
-        });
-      }
-    });
+        return { ...s, items: [base, ...s.items] };
+      })
+    );
+  };
 
-    if (currentSection) estimationItem.push(currentSection);
+  const deleteItem = (itemId: string) => {
+    setSections((prev) =>
+      prev.map((s) => ({ ...s, items: s.items.filter((i) => i.id !== itemId) }))
+    );
+  };
+
+  const toggleEditItem = (id: string, editing: boolean) => {
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((i) =>
+          i.id === id
+            ? {
+                ...i,
+                isEditing: editing,
+                hargaSatuan:
+                  Number.isFinite(i.hargaSatuan) && i.hargaSatuan >= 0
+                    ? i.hargaSatuan
+                    : 0,
+                hargaTotal:
+                  (Number(i.volume) || 0) * (Number(i.hargaSatuan) || 0),
+              }
+            : i
+        ),
+      }))
+    );
+  };
+
+  const updateItemField = (id: string, field: keyof ItemRow, value: any) => {
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((i) => {
+          if (i.id !== id) return i;
+          const next = { ...i, [field]: value };
+          const vol = Number(next.volume || 0);
+          const hs =
+            field === "hargaSatuan"
+              ? Number(value)
+              : Number(next.hargaSatuan || 0);
+          next.hargaTotal = vol * (Number.isFinite(hs) && hs >= 0 ? hs : 0);
+          return next;
+        }),
+      }))
+    );
+  };
+
+  /* -------------------------- Copy item (NEW) -------------------------- */
+  const copyItem = (itemId: string) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        const idx = s.items.findIndex((i) => i.id === itemId);
+        if (idx === -1) return s;
+        const src = s.items[idx];
+        const clone: ItemRow = {
+          ...src,
+          id: uid(),
+          isEditing: true, // buka langsung agar mudah ubah
+          volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
+          hargaTotal:
+            (Number(src.volume) || 0) * (Number(src.hargaSatuan) || 0),
+        };
+        const items = [...s.items];
+        items.splice(idx + 1, 0, clone); // sisipkan tepat setelah sumber
+        return { ...s, items };
+      })
+    );
+  };
+
+  /* --------------------- Volume Modal: open/save handlers --------------------- */
+  const openVolumeModal = (item: ItemRow) => {
+    setVolTargetItemId(item.id);
+    setVolTargetItemLabel(item.deskripsi || item.kode);
+    setVolInitialRows(item.volumeDetails || []);
+    setVolModalOpen(true);
+  };
+
+  const applyVolumeFromModal = (
+    itemId: string,
+    rows: VolumeDetailRow[],
+    totalVol: number
+  ) => {
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((i) => {
+          if (i.id !== itemId) return i;
+          const volume = Number(totalVol || 0);
+          const hargaTotal = volume * (Number(i.hargaSatuan) || 0);
+          return { ...i, volume, volumeDetails: rows, hargaTotal };
+        }),
+      }))
+    );
+  };
+
+  /* --------------------------- Drag & Drop Logic -------------------------- */
+  const findSectionIdByItemId = (itemId: string) => {
+    for (const s of sections)
+      if (s.items.some((i) => i.id === itemId)) return s.id;
+    return null;
+  };
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over) return;
+    const activeId = String(active.id);
+    const overId = String(over.id);
+    if (activeId === overId) return;
+
+    const fromSectionId = findSectionIdByItemId(activeId);
+    if (!fromSectionId) return;
+
+    const isOverItem = sections.some((s) =>
+      s.items.some((i) => i.id === overId)
+    );
+    const isOverSectionTop = overId.startsWith("section-");
+    const isOverSectionBottom = overId.startsWith("dropzone-");
+
+    const toSectionId = isOverItem
+      ? findSectionIdByItemId(overId)!
+      : isOverSectionTop
+      ? overId.replace("section-", "")
+      : isOverSectionBottom
+      ? overId.replace("dropzone-", "")
+      : null;
+
+    if (!toSectionId) return;
+
+    setSections((prev) => {
+      const next = prev.map((s) => ({ ...s, items: [...s.items] }));
+      const from = next.find((s) => s.id === fromSectionId)!;
+      const to = next.find((s) => s.id === toSectionId)!;
+
+      const fromIdx = from.items.findIndex((i) => i.id === activeId);
+      const [moved] = from.items.splice(fromIdx, 1);
+
+      if (isOverItem) {
+        const overIdx = to.items.findIndex((i) => i.id === overId);
+        to.items.splice(overIdx, 0, moved);
+      } else if (isOverSectionTop) {
+        to.items.unshift(moved);
+      } else if (isOverSectionBottom) {
+        to.items.push(moved);
+      }
+      return next;
+    });
+  };
+
+  const handleDragOver = (_e: DragOverEvent) => {};
+
+  /* ------------------------------ Aggregations ----------------------------- */
+  const subtotal = sections.reduce(
+    (acc, s) =>
+      acc + s.items.reduce((t, i) => t + Number(i.hargaTotal ?? 0), 0),
+    0
+  );
+  const ppnPct = Math.max(0, Number(projectProfile.ppn || "0"));
+  const ppnAmount = (subtotal * ppnPct) / 100;
+  const grandTotal = subtotal + ppnAmount;
+
+  const handleSaveAllData = () => {
+    const estimationItem = sections.map((s) => ({
+      title: s.title,
+      item: s.items.map((i) => ({
+        kode: i.kode,
+        nama: i.deskripsi,
+        satuan: i.satuan,
+        harga: i.hargaSatuan,
+        volume: i.volume,
+        hargaTotal: i.hargaTotal,
+        details: (i.volumeDetails || []).map((d) => ({
+          nama: d.uraian,
+          jenis: d.jenis, // "penjumlahan" | "pengurangan"
+          panjang: d.panjang,
+          lebar: d.lebar,
+          tinggi: d.tinggi,
+          jumlah: d.jumlah,
+          volume: Number(d.volume.toFixed(2)),
+        })),
+      })),
+    }));
 
     const dataToSave = {
       projectName: projectProfile.projectName,
@@ -325,662 +778,77 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
       customFields: projectProfile.customFields,
       estimationItem,
     };
-
     onSave(dataToSave);
   };
 
-  const getItemNumber = (rowId: string) => {
-    let itemCount = 1;
-    for (const row of rows) {
-      if (row.id === rowId) break;
-      if (row.type === "item") itemCount++;
-      if (row.type === "title") itemCount = 1;
-    }
-    return itemCount;
-  };
-
-  const handleAddTitle = () => {
-    if (isManualTitle && manualTitle.trim()) {
-      const newRow: TableRow = {
-        id: `title-${Date.now()}`,
-        type: "title",
-        title: manualTitle,
-      };
-      setRows([...rows, newRow]);
-      setManualTitle("");
-      setIsManualTitle(false);
-      setIsAddingTitle(false);
-    } else if (selectedTitle) {
-      const newRow: TableRow = {
-        id: `title-${Date.now()}`,
-        type: "title",
-        title: selectedTitle,
-      };
-      setRows([...rows, newRow]);
-      setSelectedTitle("");
-      setIsAddingTitle(false);
-    }
-  };
-
-  const handleAddItem = (titleId: string) => {
-    const titleRow = rows.find((row) => row.id === titleId);
-    if (!titleRow) return;
-
-    const newRow: TableRow = {
-      id: `item-${Date.now()}`,
-      type: "item",
-      item: {
-        kode: "",
-        deskripsi: "",
-        volume: 0,
-        satuan: "",
-        hargaSatuan: 0,
-        hargaTotal: 0,
-      },
-      isEditing: true,
-    };
-
-    const titleIndex = rows.findIndex((row) => row.id === titleId);
-    const newRows = [...rows];
-    newRows.splice(titleIndex + 1, 0, newRow);
-    setRows(newRows);
-  };
-
-  // PATCH: jangan overwrite volume jadi 1; pertahankan yang sudah diinput user (default 1 jika belum ada)
-  const handleSaveItem = (
-    id: string,
-    selectedItem: { value?: string; detail?: any }
-  ) => {
-    const safeDetail = selectedItem.detail ?? {};
-    setRows(
-      rows.map((row) => {
-        if (row.id !== id) return row;
-
-        const prevVolRaw = Number(row.item?.volume);
-        const prevVolume =
-          Number.isFinite(prevVolRaw) && prevVolRaw > 0 ? prevVolRaw : 1;
-
-        const harga =
-          Number(
-            safeDetail.harga ??
-              (row.item ? row.item.hargaSatuan : undefined) ??
-              0
-          ) || 0;
-
-        return {
-          ...row,
-          item: {
-            kode: selectedItem.value ?? row.item?.kode ?? "",
-            deskripsi: String(
-              safeDetail.deskripsi ?? row.item?.deskripsi ?? ""
-            ),
-            volume: prevVolume, // <- keep user volume
-            satuan: String(safeDetail.satuan ?? row.item?.satuan ?? ""),
-            hargaSatuan: harga,
-            hargaTotal: harga * prevVolume,
-          },
-          isEditing: false,
-        };
-      })
-    );
-  };
-
-  const handleEditItem = (id: string) => {
-    setRows(
-      rows.map((row) => (row.id === id ? { ...row, isEditing: true } : row))
-    );
-  };
-
-  const handleDeleteRow = (id: string) => {
-    const rowToDelete = rows.find((row) => row.id === id);
-
-    if (rowToDelete?.type === "title") {
-      const titleIndex = rows.findIndex((row) => row.id === id);
-      let nextTitleIndex = -1;
-      for (let i = titleIndex + 1; i < rows.length; i++) {
-        if (rows[i].type === "title") {
-          nextTitleIndex = i;
-          break;
-        }
-      }
-
-      const start = titleIndex;
-      const end = nextTitleIndex === -1 ? rows.length : nextTitleIndex;
-
-      const newRows = [...rows.slice(0, start), ...rows.slice(end)];
-      setRows(newRows);
-    } else {
-      setRows(rows.filter((row) => row.id !== id));
-    }
-  };
-
-  // PATCH: normalisasi volume/hargaSatuan & hitung total
-  const handleUpdateItem = (id: string, field: string, value: any) => {
-    setRows(
-      rows.map((row) => {
-        if (row.id !== id || row.type !== "item" || !row.item) return row;
-
-        const updatedItem = { ...row.item, [field]: value };
-
-        const volRaw = Number(updatedItem.volume ?? 0);
-        const hsRaw = Number(updatedItem.hargaSatuan ?? 0);
-        const vol = Number.isFinite(volRaw) && volRaw > 0 ? volRaw : 0;
-        const hs = Number.isFinite(hsRaw) && hsRaw >= 0 ? hsRaw : 0;
-
-        if (field === "volume" || field === "hargaSatuan") {
-          updatedItem.volume = vol;
-          updatedItem.hargaSatuan = hs;
-          updatedItem.hargaTotal = vol * hs;
-        }
-
-        return { ...row, item: updatedItem };
-      })
-    );
-  };
-
-  // PATCH: commit tanpa mengubah nilai yang sudah diinput user
-  const handleCommitItem = (id: string) => {
-    setRows(
-      rows.map((row) => {
-        if (row.id !== id || row.type !== "item" || !row.item) return row;
-
-        const volRaw = Number(row.item.volume ?? 0);
-        const hsRaw = Number(row.item.hargaSatuan ?? 0);
-        const vol = Number.isFinite(volRaw) && volRaw > 0 ? volRaw : 1; // default 1 kalau kosong/invalid
-        const hs = Number.isFinite(hsRaw) && hsRaw >= 0 ? hsRaw : 0;
-
-        return {
-          ...row,
-          item: {
-            ...row.item,
-            volume: vol,
-            hargaSatuan: hs,
-            hargaTotal: vol * hs,
-          },
-          isEditing: false,
-        };
-      })
-    );
-  };
-
-  const calculateTotal = () =>
-    rows.reduce((total, row) => {
-      if (row.type === "item" && row.item) {
-        return total + Number(row.item.hargaTotal ?? 0);
-      }
-      return total;
-    }, 0);
-
+  /* --------------------------------- Render -------------------------------- */
   return (
-    <div className="bg-white p-2 sm:p-4 rounded-lg shadow">
-      <div className="flex bg-white p-3 sm:p-4 text-center rounded-lg shadow justify-center items-center mb-4">
-        <h1 className="text-lg sm:text-2xl font-bold text-gray-800">
+    <div className="bg-white rounded-xl shadow p-4 sm:p-6">
+      {/* Title Bar */}
+      <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 mb-4 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg sm:text-xl font-bold text-gray-900">
           {projectProfile.projectName || "Nama Proyek"}
-        </h1>
+        </h2>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <span className="badge  ">{projectProfile.owner || "Owner: "}</span>
+          <span className="badge ">PPN {ppnPct || 0}%</span>
+        </div>
       </div>
 
-      <div className="hidden lg:block overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                No
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Uraian Pekerjaan
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Volume
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Satuan
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Harga Satuan
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Harga Total
-              </th>
-              <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Aksi
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {rows.length === 0 && (
-              <tr>
-                <td
-                  colSpan={7}
-                  className="px-6 py-4 text-center text-sm text-gray-500"
-                >
-                  Tidak ada data. Tambahkan pekerjaan.
-                </td>
-              </tr>
-            )}
-
-            {rows.map((row) => (
-              <tr key={row.id}>
-                {row.type === "title" ? (
-                  <>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {String.fromCharCode(
-                        65 +
-                          rows
-                            .filter((r) => r.type === "title")
-                            .findIndex((r) => r.id === row.id)
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {row.title}
-                    </td>
-                    <td colSpan={4}></td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex gap-2">
-                      <button
-                        onClick={() => handleAddItem(row.id)}
-                        className="text-green-500 hover:text-green-700"
-                        title="Tambah Item"
-                      >
-                        <BiPlus className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRow(row.id)}
-                        className="text-red-500 hover:text-red-700"
-                        title="Hapus Kategori"
-                      >
-                        <BiTrash className="w-5 h-5" />
-                      </button>
-                    </td>
-                  </>
-                ) : (
-                  <>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {getItemNumber(row.id)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {row.isEditing ? (
-                        <select
-                          className="border rounded p-1 w-full bg-white text-gray-800"
-                          disabled={isLoadingItems}
-                          onChange={(e) => {
-                            const selected = DropdownPekerjaan.find(
-                              (item) => item.value === e.target.value
-                            );
-                            if (selected) handleSaveItem(row.id, selected);
-                          }}
-                        >
-                          <option value="">
-                            {isLoadingItems ? "Memuat..." : "Pilih Pekerjaan"}
-                          </option>
-                          {DropdownPekerjaan.map((item) => (
-                            <option key={item.value} value={item.value}>
-                              {item.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        row.item?.deskripsi
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {row.isEditing ? (
-                        <input
-                          type="number"
-                          className="border rounded p-1 w-20"
-                          value={row.item?.volume ?? 0}
-                          onChange={(e) =>
-                            handleUpdateItem(
-                              row.id,
-                              "volume",
-                              parseFloat(e.target.value)
-                            )
-                          }
-                        />
-                      ) : (
-                        row.item?.volume
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {row.isEditing ? (
-                        <select
-                          className="border rounded p-1 w-24"
-                          value={row.item?.satuan ?? ""}
-                          onChange={(e) =>
-                            handleUpdateItem(row.id, "satuan", e.target.value)
-                          }
-                        >
-                          <option value="">Pilih Satuan</option>
-                          {UnitList.map((unit) => (
-                            <option key={unit.value} value={unit.value}>
-                              {unit.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        UnitList.find((u) => u.value === row.item?.satuan)
-                          ?.label || row.item?.satuan
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {row.isEditing ? (
-                        <input
-                          type="number"
-                          className="border rounded p-1 w-32"
-                          value={row.item?.hargaSatuan ?? 0}
-                          onChange={(e) =>
-                            handleUpdateItem(
-                              row.id,
-                              "hargaSatuan",
-                              parseFloat(e.target.value)
-                            )
-                          }
-                        />
-                      ) : (
-                        `Rp ${(row.item?.hargaSatuan ?? 0).toLocaleString(
-                          "id-ID"
-                        )}`
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      Rp {(row.item?.hargaTotal ?? 0).toLocaleString("id-ID")}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 flex gap-2">
-                      {!row.isEditing ? (
-                        <>
-                          <button
-                            onClick={() => handleEditItem(row.id)}
-                            className="text-blue-500 hover:text-blue-700"
-                            title="Edit"
-                          >
-                            <BiEdit className="w-5 h-5" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteRow(row.id)}
-                            className="text-red-500 hover:text-red-700"
-                            title="Hapus"
-                          >
-                            <BiTrash className="w-5 h-5" />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          onClick={() => handleCommitItem(row.id)}
-                          className="text-green-500 hover:text-green-700"
-                          title="Simpan"
-                        >
-                          <BiSave className="w-5 h-5" />
-                        </button>
-                      )}
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Mobile / small screen */}
-      <div className="lg:hidden">
-        {rows.length === 0 && (
-          <div className="text-center py-8 text-gray-500">
-            Tidak ada data. Tambahkan pekerjaan.
-          </div>
-        )}
-
-        {rows.map((row) => (
-          <div
-            key={row.id}
-            className="mb-4 border border-gray-200 rounded-lg p-4"
-          >
-            {row.type === "title" ? (
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="text-sm font-medium text-gray-600 mb-1">
-                    Kategori{" "}
-                    {String.fromCharCode(
-                      65 +
-                        rows
-                          .filter((r) => r.type === "title")
-                          .findIndex((r) => r.id === row.id)
-                    )}
-                  </div>
-                  <div className="text-base font-semibold text-gray-900">
-                    {row.title}
-                  </div>
-                </div>
-                <div className="flex gap-2 ml-4">
-                  <button
-                    onClick={() => handleAddItem(row.id)}
-                    className="text-green-500 hover:text-green-700 p-1"
-                    title="Tambah Item"
-                  >
-                    <BiPlus className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteRow(row.id)}
-                    className="text-red-500 hover:text-red-700 p-1"
-                    title="Hapus Kategori"
-                  >
-                    <BiTrash className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="flex justify-between items-center mb-3">
-                  <div className="text-sm font-medium text-gray-600">
-                    Item #{getItemNumber(row.id)}
-                  </div>
-                  <div className="flex gap-2">
-                    {!row.isEditing ? (
-                      <>
-                        <button
-                          onClick={() => handleEditItem(row.id)}
-                          className="text-blue-500 hover:text-blue-700 p-1"
-                          title="Edit"
-                        >
-                          <BiEdit className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDeleteRow(row.id)}
-                          className="text-red-500 hover:text-red-700 p-1"
-                          title="Hapus"
-                        >
-                          <BiTrash className="w-4 h-4" />
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => handleCommitItem(row.id)}
-                        className="text-green-500 hover:text-green-700 p-1"
-                        title="Simpan"
-                      >
-                        <BiSave className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Uraian Pekerjaan
-                    </label>
-                    {row.isEditing ? (
-                      <select
-                        className="w-full border rounded p-2 text-sm bg-white text-gray-800"
-                        disabled={isLoadingItems}
-                        onChange={(e) => {
-                          const selected = DropdownPekerjaan.find(
-                            (item) => item.value === e.target.value
-                          );
-                          if (selected) handleSaveItem(row.id, selected);
-                        }}
-                      >
-                        <option value="">
-                          {isLoadingItems ? "Memuat..." : "Pilih Pekerjaan"}
-                        </option>
-                        {DropdownPekerjaan.map((item) => (
-                          <option key={item.value} value={item.value}>
-                            {item.label}
-                          </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <div className="text-sm text-gray-900">
-                        {row.item?.deskripsi}
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Volume
-                      </label>
-                      {row.isEditing ? (
-                        <input
-                          type="number"
-                          className="w-full border rounded p-2 text-sm"
-                          value={row.item?.volume ?? 0}
-                          onChange={(e) =>
-                            handleUpdateItem(
-                              row.id,
-                              "volume",
-                              parseFloat(e.target.value)
-                            )
-                          }
-                        />
-                      ) : (
-                        <div className="text-sm text-gray-900">
-                          {row.item?.volume}
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">
-                        Satuan
-                      </label>
-                      {row.isEditing ? (
-                        <select
-                          className="w-full border rounded p-2 text-sm bg-white"
-                          value={row.item?.satuan ?? ""}
-                          onChange={(e) =>
-                            handleUpdateItem(row.id, "satuan", e.target.value)
-                          }
-                        >
-                          <option value="">Pilih Satuan</option>
-                          {UnitList.map((unit) => (
-                            <option key={unit.value} value={unit.value}>
-                              {unit.label}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <div className="text-sm text-gray-900">
-                          {UnitList.find((u) => u.value === row.item?.satuan)
-                            ?.label || row.item?.satuan}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Harga Satuan
-                    </label>
-                    {row.isEditing ? (
-                      <input
-                        type="number"
-                        className="w-full border rounded p-2 text-sm"
-                        value={row.item?.hargaSatuan ?? 0}
-                        onChange={(e) =>
-                          handleUpdateItem(
-                            row.id,
-                            "hargaSatuan",
-                            parseFloat(e.target.value)
-                          )
-                        }
-                      />
-                    ) : (
-                      <div className="text-sm text-gray-900">
-                        Rp{" "}
-                        {(row.item?.hargaSatuan ?? 0).toLocaleString("id-ID")}
-                      </div>
-                    )}
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-gray-500 mb-1">
-                      Harga Total
-                    </label>
-                    <div className="text-sm font-semibold text-gray-900">
-                      Rp {(row.item?.hargaTotal ?? 0).toLocaleString("id-ID")}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div className="mt-4">
-        {isAddingTitle ? (
+      {/* Tambah Kategori */}
+      <div className="mb-4">
+        {isAddingSection ? (
           <div className="space-y-3">
-            <div>
-              {isManualTitle ? (
-                <input
-                  type="text"
-                  className="w-full border rounded p-2 bg-white text-gray-800 border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Masukkan judul manual"
-                  value={manualTitle}
-                  onChange={(e) => setManualTitle(e.target.value)}
-                />
-              ) : (
-                <select
-                  className="w-full border rounded p-2 bg-white text-gray-800"
-                  value={selectedTitle}
-                  onChange={(e) => setSelectedTitle(e.target.value)}
-                  disabled={isLoadingCategories}
-                >
-                  <option value="">
-                    {isLoadingCategories
-                      ? "Memuat..."
-                      : "Pilih Kategori Pekerjaan"}
-                  </option>
-                  {DropdownTitleOptions.map((item) => (
-                    <option key={item.value} value={item.value}>
-                      {item.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-2">
-              <button
-                onClick={() => setIsManualTitle(!isManualTitle)}
-                className="bg-gray-200 hover:bg-gray-300 px-3 py-2 rounded text-sm text-black"
+            {isManualSection ? (
+              <input
+                className="input input-bordered w-full text-black bg-white border-black"
+                placeholder="Masukkan nama kategori"
+                value={manualSectionTitle}
+                onChange={(e) => setManualSectionTitle(e.target.value)}
+              />
+            ) : (
+              <select
+                className="select select-bordered w-full text-black bg-white border-black"
+                value={selectedSectionFromList}
+                onChange={(e) => setSelectedSectionFromList(e.target.value)}
+                disabled={isLoadingCategories}
               >
-                {isManualTitle ? "Pilih dari Daftar" : "Input Manual"}
+                <option value="">
+                  {isLoadingCategories ? "Memuat..." : "Pilih Kategori"}
+                </option>
+                {DropdownTitleOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            )}
+            <div className="flex flex-wrap gap-2">
+              <button
+                className="btn btn-soft"
+                onClick={() => setIsManualSection((v) => !v)}
+              >
+                {isManualSection ? "Pilih dari Daftar" : "Input Manual"}
               </button>
               <button
-                onClick={handleAddTitle}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded text-sm"
-                disabled={isManualTitle ? !manualTitle.trim() : !selectedTitle}
+                className="btn btn-primary text-white"
+                onClick={addSection}
+                disabled={
+                  isManualSection
+                    ? !manualSectionTitle.trim()
+                    : !selectedSectionFromList
+                }
               >
                 Tambah
               </button>
               <button
+                className="btn btn-warning"
                 onClick={() => {
-                  setIsAddingTitle(false);
-                  setIsManualTitle(false);
-                  setSelectedTitle("");
-                  setManualTitle("");
+                  setIsAddingSection(false);
+                  setIsManualSection(false);
+                  setSelectedSectionFromList("");
+                  setManualSectionTitle("");
                 }}
-                className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded text-sm"
               >
                 Batal
               </button>
@@ -988,33 +856,238 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           </div>
         ) : (
           <button
-            onClick={() => setIsAddingTitle(true)}
-            className="w-full sm:w-auto bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded text-sm"
+            className="btn btn-success text-white"
+            onClick={() => setIsAddingSection(true)}
           >
-            Tambah Kategori Pekerjaan
+            <BiPlus className="mr-1" /> Tambah Kategori Pekerjaan
           </button>
         )}
       </div>
 
-      <div className="rounded-md shadow-sm p-4 mt-4 bg-white">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="text-center sm:text-right">
-            <p className="text-base sm:text-lg font-semibold text-black">
-              Total Harga: Rp {calculateTotal().toLocaleString("id-ID")}
-            </p>
+      {/* TABLE + DnD */}
+      <div className="collapse bg-transparent shadow-none">
+        <div className="overflow-x-auto rounded-lg border border-gray-200">
+          <DndContext
+            sensors={useSensors(
+              useSensor(PointerSensor, {
+                activationConstraint: { distance: 5 },
+              })
+            )}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            collisionDetection={closestCorners}
+          >
+            <table className="table min-w-[1100px]">
+              <thead className="bg-gray-50 sticky top-0 z-[1]">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    No
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Uraian Pekerjaan
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Vol (M³)
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Satuan
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Harga Satuan
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Harga Total
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Aksi
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody className="bg-white">
+                {sections.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-6 py-8 text-center text-sm text-gray-500"
+                    >
+                      Belum ada kategori. Tambahkan kategori pekerjaan terlebih
+                      dahulu.
+                    </td>
+                  </tr>
+                )}
+
+                {sections.map((section, sIdx) => (
+                  <SortableContext
+                    key={section.id}
+                    items={section.items.map((i) => i.id)}
+                    strategy={rectSortingStrategy}
+                  >
+                    {/* Header Kategori */}
+                    <tr className="bg-blue-50/70">
+                      <td className="px-4 py-3 text-sm font-semibold text-blue-700">
+                        {String.fromCharCode(65 + sIdx)}
+                      </td>
+                      <td className="px-4 py-3 text-sm font-bold text-blue-800">
+                        {section.title}
+                      </td>
+                      <td colSpan={4}></td>
+                      <td className="">
+                        <div className="flex gap-2 items-center ">
+                          {/* Add dari HSP */}
+                          <select
+                            className="select select-bordered select-sm w-60 text-black bg-white border-black"
+                            defaultValue=""
+                            disabled={isLoadingItems}
+                            onChange={(e) => {
+                              const sel = DropdownPekerjaan.find(
+                                (it) => it.value === e.target.value
+                              );
+                              if (sel) {
+                                addItemToSection(section.id, sel);
+                                e.currentTarget.value = "";
+                              }
+                            }}
+                          >
+                            <option value="">
+                              {isLoadingItems ? "Memuat..." : "Tambah dari HSP"}
+                            </option>
+                            {DropdownPekerjaan.map((it) => (
+                              <option key={it.value} value={it.value}>
+                                {it.label}
+                              </option>
+                            ))}
+                          </select>
+
+                          {/* Tambah manual */}
+                          <button
+                            onClick={() => addItemToSection(section.id)}
+                            className="btn btn-solid btn-sm"
+                            title="Tambah Manual"
+                          >
+                            <BiPlus className="mr-1" /> Manual
+                          </button>
+
+                          {/* Hapus kategori */}
+                          <button
+                            onClick={() => deleteSection(section.id)}
+                            className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
+                            title="Hapus Kategori"
+                          >
+                            <BiTrash className="text-lg" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* DROPPABLE: header (drop ke atas) */}
+                    <DroppableRow
+                      droppableId={`section-${section.id}`}
+                      colSpan={7}
+                    />
+
+                    {/* Items */}
+                    {section.items.map((item, idxInSection) => (
+                      <SortableItemRow
+                        key={item.id}
+                        idxInSection={idxInSection}
+                        item={item}
+                        onEditToggle={toggleEditItem}
+                        onDelete={deleteItem}
+                        onCopy={copyItem}
+                        onUpdateField={updateItemField}
+                        onOpenVolumeModal={openVolumeModal}
+                      />
+                    ))}
+
+                    {/* DROPPABLE: bawah (akhir list) */}
+                    <DroppableRow
+                      droppableId={`dropzone-${section.id}`}
+                      colSpan={7}
+                      showHint={section.items.length === 0}
+                    />
+
+                    {/* Subtotal per kategori */}
+                    {!!section.items.length && (
+                      <tr className="bg-gray-50">
+                        <td
+                          colSpan={5}
+                          className="px-4 py-3 text-sm text-right text-gray-700"
+                        >
+                          Subtotal {section.title}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                          {formatIDR(
+                            section.items.reduce(
+                              (a, b) => a + (b.hargaTotal ?? 0),
+                              0
+                            )
+                          )}
+                        </td>
+                        <td />
+                      </tr>
+                    )}
+                  </SortableContext>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Overlay (optional) */}
+            <DragOverlay dropAnimation={defaultDropAnimation} />
+          </DndContext>
+        </div>
+      </div>
+
+      {/* Footer total & actions */}
+      <div className="rounded-lg border border-gray-200 p-4 mt-5 bg-white">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="text-sm">
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-gray-600">Subtotal</span>
+              <span className="font-semibold text-gray-900">
+                {formatIDR(subtotal)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-gray-600">PPN ({ppnPct}%)</span>
+              <span className="font-semibold text-gray-900">
+                {formatIDR(ppnAmount)}
+              </span>
+            </div>
+            <div className="divider my-2" />
+            <div className="flex items-center justify-between gap-8">
+              <span className="text-gray-800 font-semibold">Grand Total</span>
+              <span className="text-lg font-bold text-gray-900">
+                {formatIDR(grandTotal)}
+              </span>
+            </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-2 justify-center sm:justify-end">
-            <Button variant="default">Draft</Button>
+
+          <div className="flex flex-wrap gap-2 justify-end">
             <Button variant="success" onClick={handleSaveAllData}>
-              Simpan
+              Simpan Estimation
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Volume Modal */}
+      <VolModal
+        open={volModalOpen}
+        onClose={() => setVolModalOpen(false)}
+        itemLabel={volTargetItemLabel}
+        initialRows={volInitialRows}
+        onSave={(rows, total) => {
+          if (volTargetItemId) {
+            applyVolumeFromModal(volTargetItemId, rows, total);
+          }
+        }}
+      />
     </div>
   );
 };
 
+/* ------------------------------- Root Create ------------------------------- */
 const CreateEstimation = () => {
   const [activeAccordion, setActiveAccordion] = useState<string>("step1");
   const [formData, setFormData] = useState({
@@ -1026,55 +1099,56 @@ const CreateEstimation = () => {
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const createMutation = useCreateEstimation();
 
-  const toggleAccordion = (step: string) => {
-    setActiveAccordion(activeAccordion === step ? "" : step);
-  };
+  const toggleAccordion = (step: string) =>
+    setActiveAccordion((prev) => (prev === step ? "" : step));
 
-  const handleStepOneSave = () => {
-    setActiveAccordion("step2");
-  };
+  const handleStepOneSave = () => setActiveAccordion("step2");
 
-  const projectProfile = {
-    ...formData,
-    customFields: customFields.reduce((acc, field) => {
-      acc[field.label] = field.value;
-      return acc;
-    }, {} as Record<string, string>),
-  };
+  const projectProfile: ProjectProfile = useMemo(
+    () => ({
+      ...formData,
+      customFields: customFields.reduce((acc, field) => {
+        acc[field.label] = field.value;
+        return acc;
+      }, {} as Record<string, string>),
+    }),
+    [formData, customFields]
+  );
 
   const handleSaveData = (data: any) => {
     createMutation.mutate(data, {
       onSuccess: () => {
-        setFormData({
-          projectName: "",
-          owner: "",
-          ppn: "11",
-          notes: "",
-        });
+        setFormData({ projectName: "", owner: "", ppn: "11", notes: "" });
         setCustomFields([]);
         setActiveAccordion("step1");
       },
     });
   };
-
+  const navigate = useNavigate();
   return (
-    <div className="mx-auto bg-white p-4 rounded-lg">
-      <h1 className="mb-6 text-2xl font-bold text-gray-800">
-        Create Estimation
-      </h1>
+    <div className="mx-auto  p-3 sm:p-4">
+      <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
+
+      <div className="mb-5">
+        <h1 className="text-2xl font-bold text-gray-900">Create Estimation</h1>
+        <p className="text-sm text-gray-600">
+          Lengkapi profil proyek, lalu tambahkan item pekerjaan pada tabel di
+          bawah.
+        </p>
+      </div>
 
       <div className="join join-vertical w-full gap-4">
-        <div className="collapse collapse-arrow join-item rounded-md shadow-sm p-2 bg-white">
+        <div className="collapse collapse-arrow join-item rounded-xl border border-gray-200 bg-white">
           <input
             type="radio"
-            name="my-accordion"
+            name="wizard-create-estimation"
             checked={activeAccordion === "step1"}
             onChange={() => toggleAccordion("step1")}
           />
-          <div className="collapse-title text-xl font-medium text-black">
-            Project Profile
+          <div className="collapse-title text-lg font-semibold text-gray-900">
+            {`1) Project Profile`}
           </div>
-          <div className="collapse-content">
+          <div className="collapse-content p-4 sm:p-5">
             <CreateStepOne
               onSave={handleStepOneSave}
               formData={formData}
@@ -1085,21 +1159,24 @@ const CreateEstimation = () => {
           </div>
         </div>
 
-        <div className="collapse collapse-arrow join-item rounded-md shadow-sm p-2 bg-white">
+        {/* ACCORDION: Step 2 */}
+        <div className="collapse collapse-arrow join-item rounded-xl border border-gray-200 bg-white">
           <input
             type="radio"
-            name="my-accordion"
+            name="wizard-create-estimation"
             checked={activeAccordion === "step2"}
             onChange={() => toggleAccordion("step2")}
           />
-          <div className="collapse-title text-xl font-medium text-black">
-            Estimation Items
+          <div className="collapse-title text-lg font-semibold text-gray-900">
+            {`  2) Estimation Items`}
           </div>
-          <div className="collapse-content">
-            <CreateStepTwo
-              projectProfile={projectProfile}
-              onSave={handleSaveData}
-            />
+          <div className="collapse-content p-0">
+            <div className="p-4 sm:p-5">
+              <CreateStepTwo
+                projectProfile={projectProfile}
+                onSave={handleSaveData}
+              />
+            </div>
           </div>
         </div>
       </div>

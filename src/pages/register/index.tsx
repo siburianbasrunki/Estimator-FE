@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import AuthService from "../../service/auth";
 import BgLogin from "../../assets/images/bgLogin.png";
+import { Clock } from "../../components/Clock";
 
 export const RegisterPage = () => {
   const navigate = useNavigate();
@@ -36,6 +37,7 @@ export const RegisterPage = () => {
         backgroundAttachment: "fixed",
       }}
     >
+      <Clock/>
       <div className="max-w-xl w-full bg-gradient-to-b from-white to-[#70A9D7] p-8 rounded-xl shadow-md">
         <h2 className="text-2xl font-bold text-black text-center ">
           Register
