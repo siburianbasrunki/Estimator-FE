@@ -1,13 +1,31 @@
+// src/pages/estimation/EstimationView.tsx
 import { BiChevronLeft, BiChevronRight, BiEdit, BiTrash } from "react-icons/bi";
-import { useNavigate } from "react-router-dom";
-import { useEstimations } from "../../hooks/useEstimation";
-import { formatDateTime } from "../../helper/date";
 import { IoDocument } from "react-icons/io5";
+import { useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useEstimations, useDeleteEstimation } from "../../hooks/useEstimation";
+import { formatDateTime } from "../../helper/date";
 import EmptyState from "../../components/EmptyState";
+import { useConfirm } from "../../components/ConfirmDialog";
+import useDebounce from "../../hooks/useDebunce";
 
 export const EstimationView = () => {
   const navigate = useNavigate();
-  const { data: estimation, isLoading } = useEstimations();
+  const confirm = useConfirm();
+
+  const [search, setSearch] = useState("");
+  const debouncedSearch = useDebounce(search, 400);
+
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(10);
+
+  const {
+    data: estimation,
+    isLoading,
+    isFetching,
+  } = useEstimations(page, limit, debouncedSearch);
+
+  const { mutateAsync: deleteEstimation, isPending } = useDeleteEstimation();
 
   const isEmpty =
     !isLoading &&
@@ -15,13 +33,45 @@ export const EstimationView = () => {
       !Array.isArray(estimation.data) ||
       estimation.data.length === 0);
 
+  const total = estimation?.pagination?.total ?? 0;
+  const totalPages = estimation?.pagination?.totalPages ?? 1;
+
+  const rangeText = useMemo(() => {
+    if (!estimation?.data?.length) return "Showing 0 of 0 results";
+    const start = (page - 1) * limit + 1;
+    const end = Math.min(page * limit, total);
+    return `Showing ${start}–${end} of ${total} results`;
+    // atau tampilkan array panjang
+  }, [estimation?.data?.length, page, limit, total]);
+
+  const onDelete = async (id: string, name?: string) => {
+    const ok = await confirm({
+      title: "Hapus Estimation?",
+      description: `Estimation "${
+        name || "-"
+      }" akan dihapus secara permanen beserta semua itemnya. Lanjutkan?`,
+      confirmText: "Hapus",
+      cancelText: "Batal",
+      variant: "danger",
+    });
+    if (!ok) return;
+
+    await deleteEstimation(id);
+  };
+
+  // Reset ke page 1 saat ganti search
+  useEffect(() => {
+    setPage(1);
+  }, [debouncedSearch]);
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-gray-800">All Estimation</h1>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* Toolbar */}
         <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-          <div className="w-full md:w-auto">
+          <div className="w-full md:w-[380px]">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg
@@ -38,18 +88,27 @@ export const EstimationView = () => {
               </div>
               <input
                 type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Search..."
+                placeholder="Search by title or owner..."
               />
             </div>
           </div>
 
           <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
             <div className="relative">
-              <input
-                type="date"
+              <select
+                value={limit}
+                onChange={(e) => setLimit(Number(e.target.value))}
                 className="block w-full pl-3 pr-10 py-2 border border-gray-300 text-black rounded-md leading-5 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
+              >
+                {[5, 10, 20, 50].map((n) => (
+                  <option key={n} value={n}>
+                    {n} / page
+                  </option>
+                ))}
+              </select>
             </div>
             <button
               onClick={() => navigate("/estimation/create")}
@@ -60,10 +119,12 @@ export const EstimationView = () => {
           </div>
         </div>
 
-        {isLoading && (
-          <div className="skeleton h-[400px] w-full bg-gray-50"></div>
+        {/* Loading */}
+        {(isLoading || isFetching) && (
+          <div className="skeleton h-[300px] w-full bg-gray-50"></div>
         )}
 
+        {/* Empty */}
         {!isLoading && isEmpty && (
           <div className="p-4">
             <EmptyState
@@ -130,14 +191,22 @@ export const EstimationView = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex gap-2 justify-end">
+                        <div className="flex gap-3 justify-end">
                           <IoDocument
                             className="text-blue-600 h-5 w-5 cursor-pointer"
+                            title="Detail"
                             onClick={() => navigate(`/estimation/${item.id}`)}
                           />
-                          <BiTrash className="text-red-600 h-5 w-5 cursor-pointer" />
+                          <BiTrash
+                            className={`h-5 w-5 cursor-pointer ${
+                              isPending ? "text-red-300" : "text-red-600"
+                            }`}
+                            title="Delete"
+                            onClick={() => onDelete(item.id, item.projectName)}
+                          />
                           <BiEdit
                             className="text-blue-600 h-5 w-5 cursor-pointer"
+                            title="Edit"
                             onClick={() =>
                               navigate(`/estimation/update/${item.id}`)
                             }
@@ -150,61 +219,32 @@ export const EstimationView = () => {
               </table>
             </div>
 
-            {/* Pagination (tetap sama) */}
+            {/* Footer & Pagination */}
             <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="flex-1 flex justify-between sm:hidden">
-                <a
-                  href="#"
-                  className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              <p className="text-sm text-gray-700">{rangeText}</p>
+
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
-                  Previous
-                </a>
-                <a
-                  href="#"
-                  className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  <span className="sr-only">Previous</span>
+                  <BiChevronLeft className="w-5 h-5" aria-hidden="true" />
+                </button>
+                <span className="text-sm text-gray-600">
+                  Page {page} of {totalPages || 1}
+                </span>
+                <button
+                  disabled={page >= (totalPages || 1)}
+                  onClick={() =>
+                    setPage((p) => Math.min(totalPages || 1, p + 1))
+                  }
+                  className="relative inline-flex items-center px-2 py-2 rounded-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                 >
-                  Next
-                </a>
-              </div>
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <div>
-                  <p className="text-sm text-gray-700">
-                    Showing{" "}
-                    <span className="font-medium">
-                      {estimation?.pagination.total}
-                    </span>{" "}
-                    to{" "}
-                    <span className="font-medium">
-                      {estimation?.pagination.limit}
-                    </span>{" "}
-                    of{" "}
-                    <span className="font-medium">
-                      {estimation?.pagination.total}
-                    </span>{" "}
-                    results
-                  </p>
-                </div>
-                <div>
-                  <nav
-                    className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
-                    aria-label="Pagination"
-                  >
-                    <a
-                      href="#"
-                      className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                    >
-                      <span className="sr-only">Previous</span>
-                      <BiChevronLeft className="w-5 h-5" aria-hidden="true" />
-                    </a>
-                    <a
-                      href="#"
-                      className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50"
-                    >
-                      <span className="sr-only">Next</span>
-                      <BiChevronRight className="w-5 h-5" aria-hidden="true" />
-                    </a>
-                  </nav>
-                </div>
+                  <span className="sr-only">Next</span>
+                  <BiChevronRight className="w-5 h-5" aria-hidden="true" />
+                </button>
               </div>
             </div>
           </>

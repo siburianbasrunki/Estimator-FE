@@ -43,6 +43,11 @@ import { useEstimation, useUpdateEstimation } from "../../hooks/useEstimation";
 import { useGetCategoryJob, useGetItemJob } from "../../hooks/useHsp";
 import { BackButton } from "../../components/BackButton";
 
+/* Searchable select */
+import SearchableSelect, {
+  type Option,
+} from "../../components/SearchableSelect";
+
 /* ------------------------------ Helpers ------------------------------ */
 const uid = () =>
   typeof crypto !== "undefined" && "randomUUID" in crypto
@@ -54,6 +59,17 @@ const formatIDR = (n: number = 0) =>
 
 const mapJenisApiToUi = (v?: string): "penjumlahan" | "pengurangan" =>
   v === "SUB" ? "pengurangan" : "penjumlahan";
+
+// Normalisasi input angka uang (biar gak jadi 03 / gak auto 0 saat kosong)
+const sanitizeMoneyInput = (v: string) => {
+  const cleaned = v.replace(/[^\d.,]/g, "").replace(/,/g, ".");
+  return cleaned.replace(/^0+(?=\d)/, ""); // hapus leading zero kecuali "0.xxx"
+};
+const toNumber = (v?: string) => {
+  if (v == null || v.trim() === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
 
 /* ------------------------------ Types ------------------------------ */
 interface CustomFieldUI {
@@ -76,7 +92,8 @@ type ItemRow = {
   volume: number; // auto dari modal
   volumeDetails?: VolumeDetailRow[];
   satuan: string;
-  hargaSatuan: number;
+  hargaSatuan: number; // nilai final (number)
+  hargaSatuanInput?: string; // nilai saat editing (string)
   hargaTotal: number;
   isEditing?: boolean;
 };
@@ -348,6 +365,15 @@ function SortableItemRow({
     transition,
   };
 
+  const unitOptions: Option[] = useMemo(
+    () =>
+      (UnitList ?? []).map((u: { label: string; value: string }) => ({
+        label: u.label ?? u.value,
+        value: u.value,
+      })),
+    []
+  );
+
   return (
     <tr
       ref={setNodeRef}
@@ -386,37 +412,40 @@ function SortableItemRow({
         </div>
       </td>
 
-      {/* Satuan */}
-      <td className="px-4 py-3 text-sm text-gray-800">
+      {/* Satuan (Searchable) */}
+      <td className="px-4 py-3 text-sm text-gray-800 w-36">
         {item.isEditing ? (
-          <select
-            className="select select-bordered select-sm w-28 text-black bg-white border-black"
+          <SearchableSelect
+            options={unitOptions}
             value={item.satuan ?? ""}
-            onChange={(e) => onUpdateField(item.id, "satuan", e.target.value)}
-          >
-            <option value="">Pilih Satuan</option>
-            {UnitList.map((u) => (
-              <option key={u.value} value={u.value}>
-                {u.value}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onUpdateField(item.id, "satuan", v ?? "")}
+            placeholder="Pilih Satuan"
+            size="sm"
+          />
         ) : (
-          UnitList.find((u) => u.value === item.satuan)?.label || item.satuan
+          UnitList.find((u) => u.value === item.satuan)?.label ||
+          item.satuan ||
+          "-"
         )}
       </td>
 
-      {/* Harga Satuan */}
+      {/* Harga Satuan (string saat edit) */}
       <td className="px-4 py-3 text-sm text-gray-800">
         {item.isEditing ? (
           <input
-            type="number"
-            min={0}
+            type="text"
+            inputMode="decimal"
             className="input input-bordered input-sm w-36 text-black bg-white border-black"
-            value={item.hargaSatuan ?? 0}
+            value={item.hargaSatuanInput ?? ""}
             onChange={(e) =>
-              onUpdateField(item.id, "hargaSatuan", Number(e.target.value))
+              onUpdateField(item.id, "hargaSatuanInput", e.target.value)
             }
+            onBlur={() => onEditToggle(item.id, false)} // finalize parse
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape")
+                onEditToggle(item.id, false);
+            }}
+            placeholder="0"
           />
         ) : (
           formatIDR(item.hargaSatuan)
@@ -512,12 +541,12 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     VolumeDetailRow[] | undefined
   >(undefined);
 
-  /* ====== NEW: sumber data dropdown kategori & item HSP ====== */
+  /* Data dropdown kategori & item HSP */
   const { data: itemJob, isLoading: isLoadingItems } = useGetItemJob();
   const { data: categories, isLoading: isLoadingCategories } =
     useGetCategoryJob();
 
-  const DropdownTitleOptions = useMemo(
+  const CategoryOptions: Option[] = useMemo(
     () =>
       (categories ?? []).map((c: { name: string }) => ({
         label: c.name,
@@ -565,6 +594,11 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     [itemJob]
   );
 
+  const PekerjaanOptions: Option[] = useMemo(
+    () => DropdownPekerjaan.map((p) => ({ label: p.label, value: p.value })),
+    [DropdownPekerjaan]
+  );
+
   /* seed data dari server */
   useEffect(() => {
     setSections(initialSections || []);
@@ -594,10 +628,14 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           id: uid(),
           kode: source?.value || "",
           deskripsi: source?.detail.deskripsi || "",
-          volume: 0, // start from 0 (computed by modal)
+          volume: 0,
           volumeDetails: [],
           satuan: source?.detail.satuan || "",
           hargaSatuan: source?.detail.harga ?? 0,
+          hargaSatuanInput:
+            source?.detail.harga && source.detail.harga > 0
+              ? String(source.detail.harga)
+              : "",
           hargaTotal: 0,
           isEditing: true,
         };
@@ -616,20 +654,27 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) =>
-          i.id === id
-            ? {
-                ...i,
-                isEditing: editing,
-                hargaSatuan:
-                  Number.isFinite(i.hargaSatuan) && i.hargaSatuan >= 0
-                    ? i.hargaSatuan
-                    : 0,
-                hargaTotal:
-                  (Number(i.volume) || 0) * (Number(i.hargaSatuan) || 0),
-              }
-            : i
-        ),
+        items: s.items.map((i) => {
+          if (i.id !== id) return i;
+
+          if (editing) {
+            const hsInput =
+              i.hargaSatuan > 0
+                ? String(i.hargaSatuan)
+                : i.hargaSatuanInput ?? "";
+            return { ...i, isEditing: true, hargaSatuanInput: hsInput };
+          } else {
+            const hs = toNumber(i.hargaSatuanInput);
+            const hargaTotal = (Number(i.volume) || 0) * hs;
+            return {
+              ...i,
+              isEditing: false,
+              hargaSatuan: hs,
+              hargaSatuanInput: undefined,
+              hargaTotal,
+            };
+          }
+        }),
       }))
     );
   };
@@ -640,13 +685,22 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         ...s,
         items: s.items.map((i) => {
           if (i.id !== id) return i;
-          const next = { ...i, [field]: value };
-          const vol = Number(next.volume || 0);
+
+          if (field === "hargaSatuanInput") {
+            const input = sanitizeMoneyInput(String(value));
+            const hs = toNumber(input);
+            const next = { ...i, hargaSatuanInput: input };
+            next.hargaTotal = (Number(next.volume) || 0) * hs;
+            return next;
+          }
+
+          const next: ItemRow = { ...i, [field]: value } as ItemRow;
           const hs =
-            field === "hargaSatuan"
-              ? Number(value)
+            typeof next.hargaSatuanInput === "string"
+              ? toNumber(next.hargaSatuanInput)
               : Number(next.hargaSatuan || 0);
-          next.hargaTotal = vol * (Number.isFinite(hs) && hs >= 0 ? hs : 0);
+          const vol = Number(next.volume || 0);
+          next.hargaTotal = vol * hs;
           return next;
         }),
       }))
@@ -664,6 +718,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           ...src,
           id: uid(),
           isEditing: true,
+          hargaSatuanInput: src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
           volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
           hargaTotal:
             (Number(src.volume) || 0) * (Number(src.hargaSatuan) || 0),
@@ -694,7 +749,11 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         items: s.items.map((i) => {
           if (i.id !== itemId) return i;
           const volume = Number(totalVol || 0);
-          const hargaTotal = volume * (Number(i.hargaSatuan) || 0);
+          const hs =
+            typeof i.hargaSatuanInput === "string"
+              ? toNumber(i.hargaSatuanInput)
+              : Number(i.hargaSatuan || 0);
+          const hargaTotal = volume * hs;
           return { ...i, volume, volumeDetails: rows, hargaTotal };
         }),
       }))
@@ -826,21 +885,15 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                 onChange={(e) => setManualSectionTitle(e.target.value)}
               />
             ) : (
-              <select
-                className="select select-bordered w-full text-black bg-white border-black"
+              <SearchableSelect
+                options={CategoryOptions}
                 value={selectedSectionFromList}
-                onChange={(e) => setSelectedSectionFromList(e.target.value)}
-                disabled={isLoadingCategories}
-              >
-                <option value="">
-                  {isLoadingCategories ? "Memuat..." : "Pilih Kategori"}
-                </option>
-                {DropdownTitleOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setSelectedSectionFromList(v || "")}
+                placeholder={
+                  isLoadingCategories ? "Memuat..." : "Pilih Kategori"
+                }
+                loading={isLoadingCategories}
+              />
             )}
             <div className="flex flex-wrap gap-2">
               <button
@@ -949,30 +1002,26 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                     <td colSpan={4}></td>
                     <td className="">
                       <div className="flex gap-2 items-center ">
-                        {/* Tambah dari HSP */}
-                        <select
-                          className="select select-bordered select-sm w-60 text-black bg-white border-black"
-                          defaultValue=""
-                          disabled={isLoadingItems}
-                          onChange={(e) => {
-                            const sel = DropdownPekerjaan.find(
-                              (it) => it.value === e.target.value
-                            );
-                            if (sel) {
-                              addItemToSection(section.id, sel);
-                              e.currentTarget.value = "";
+                        {/* Tambah dari HSP (Searchable) */}
+                        <div className="w-72">
+                          <SearchableSelect
+                            options={PekerjaanOptions}
+                            value={""}
+                            onChange={(v) => {
+                              if (!v) return;
+                              const sel = DropdownPekerjaan.find(
+                                (it) => it.value === v
+                              );
+                              if (sel) addItemToSection(section.id, sel);
+                            }}
+                            placeholder={
+                              isLoadingItems ? "Memuat..." : "Tambah dari HSP"
                             }
-                          }}
-                        >
-                          <option value="">
-                            {isLoadingItems ? "Memuat..." : "Tambah dari HSP"}
-                          </option>
-                          {DropdownPekerjaan.map((it) => (
-                            <option key={it.value} value={it.value}>
-                              {it.label}
-                            </option>
-                          ))}
-                        </select>
+                            loading={isLoadingItems}
+                            size="sm"
+                            clearable={false}
+                          />
+                        </div>
 
                         {/* Tambah manual */}
                         <button
@@ -1140,7 +1189,7 @@ const UpdateEstimation: React.FC = () => {
     });
 
     // custom fields
-    const cf = (detailEstimation.customFields || []).map((f) => ({
+    const cf = (detailEstimation.customFields || []).map((f: any) => ({
       id: f.id,
       label: f.label,
       value: f.value,
@@ -1149,44 +1198,46 @@ const UpdateEstimation: React.FC = () => {
     setCustomFields(cf);
 
     // sections + items
-    const sections: Section[] = (detailEstimation.items || []).map((sec) => {
-      const items: ItemRow[] = (sec.details || []).map((d: any) => {
-        // map volumeDetails API -> UI
-        const vds: VolumeDetailRow[] = d.volumeDetails
-          ? d.volumeDetails.map((vd: any) => ({
-              id: vd.id || uid(),
-              uraian: vd.nama || "",
-              jenis: mapJenisApiToUi(vd.jenis),
-              // string supaya input bisa kosong & tak jadi "02"
-              panjang: String(vd.panjang ?? ""),
-              lebar: String(vd.lebar ?? ""),
-              tinggi: String(vd.tinggi ?? ""),
-              jumlah: String(vd.jumlah ?? ""),
-              volume: Number(vd.volume ?? 0),
-            }))
-          : [];
+    const sections: Section[] = (detailEstimation.items || []).map(
+      (sec: any) => {
+        const items: ItemRow[] = (sec.details || []).map((d: any) => {
+          // map volumeDetails API -> UI
+          const vds: VolumeDetailRow[] = d.volumeDetails
+            ? d.volumeDetails.map((vd: any) => ({
+                id: vd.id || uid(),
+                uraian: vd.nama || "",
+                jenis: mapJenisApiToUi(vd.jenis),
+                // string supaya input bisa kosong & tak jadi "02"
+                panjang: String(vd.panjang ?? ""),
+                lebar: String(vd.lebar ?? ""),
+                tinggi: String(vd.tinggi ?? ""),
+                jumlah: String(vd.jumlah ?? ""),
+                volume: Number(vd.volume ?? 0),
+              }))
+            : [];
 
-        const volumeNumber = Number(d.volume ?? 0);
-        const hargaSatuan = Number(d.hargaSatuan ?? 0);
+          const volumeNumber = Number(d.volume ?? 0);
+          const hargaSatuan = Number(d.hargaSatuan ?? d.harga ?? 0);
+          return {
+            id: d.id,
+            kode: d.kode || "",
+            deskripsi: d.deskripsi || "",
+            volume: volumeNumber,
+            volumeDetails: vds,
+            satuan: d.satuan || "",
+            hargaSatuan,
+            hargaTotal: Number(d.hargaTotal ?? volumeNumber * hargaSatuan),
+            isEditing: false,
+          };
+        });
+
         return {
-          id: d.id,
-          kode: d.kode || "",
-          deskripsi: d.deskripsi || "",
-          volume: volumeNumber,
-          volumeDetails: vds,
-          satuan: d.satuan || "",
-          hargaSatuan,
-          hargaTotal: Number(d.hargaTotal ?? volumeNumber * hargaSatuan),
-          isEditing: false,
+          id: sec.id,
+          title: sec.title,
+          items,
         };
-      });
-
-      return {
-        id: sec.id,
-        title: sec.title,
-        items,
-      };
-    });
+      }
+    );
 
     setSeedSections(sections);
   }, [detailEstimation]);
@@ -1247,7 +1298,7 @@ const UpdateEstimation: React.FC = () => {
         </p>
       </div>
 
-      <div className="join join-vertical w/full gap-4">
+      <div className="join join-vertical w-full gap-4">
         {/* Step 1 */}
         <div className="collapse collapse-arrow join-item rounded-xl border border-gray-200 bg-white">
           <input

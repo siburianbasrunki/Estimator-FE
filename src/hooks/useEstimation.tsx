@@ -10,8 +10,7 @@ export const useEstimations = (
 ) => {
   return useQuery({
     queryKey: ["estimations", { page, limit, search }],
-    queryFn: () =>
-      EstimationService.getEstimations(page, limit, search),
+    queryFn: () => EstimationService.getEstimations(page, limit, search),
   });
 };
 
@@ -65,10 +64,10 @@ export const useDeleteEstimation = () => {
     mutationFn: (id: string) => EstimationService.deleteEstimation(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["estimations"] });
-      toast("Estimation deleted successfully");
+      toast.success("Estimation deleted successfully");
     },
     onError: (error: Error) => {
-      toast(error.message);
+      toast.error(error.message);
     },
   });
 };
