@@ -37,7 +37,7 @@ import ImageProyek from "../../assets/images/image 1.png";
 import { UnitList } from "../../stores/units";
 
 import VolModal from "./VolumeModal";
-import type { VolumeDetailRow } from "./VolumeModal";
+import type { VolumeDetailRow, ExtraCol } from "./VolumeModal";
 
 import { useEstimation, useUpdateEstimation } from "../../hooks/useEstimation";
 import { useGetCategoryJob, useGetItemJob } from "../../hooks/useHsp";
@@ -63,7 +63,7 @@ const mapJenisApiToUi = (v?: string): "penjumlahan" | "pengurangan" =>
 // Normalisasi input angka uang (biar gak jadi 03 / gak auto 0 saat kosong)
 const sanitizeMoneyInput = (v: string) => {
   const cleaned = v.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-  return cleaned.replace(/^0+(?=\d)/, ""); // hapus leading zero kecuali "0.xxx"
+  return cleaned.replace(/^0+(?=\d)/, "");
 };
 const toNumber = (v?: string) => {
   if (v == null || v.trim() === "") return 0;
@@ -429,7 +429,7 @@ function SortableItemRow({
         )}
       </td>
 
-      {/* Harga Satuan (string saat edit) */}
+      {/* Harga Satuan */}
       <td className="px-4 py-3 text-sm text-gray-800">
         {item.isEditing ? (
           <input
@@ -440,7 +440,7 @@ function SortableItemRow({
             onChange={(e) =>
               onUpdateField(item.id, "hargaSatuanInput", e.target.value)
             }
-            onBlur={() => onEditToggle(item.id, false)} // finalize parse
+            onBlur={() => onEditToggle(item.id, false)}
             onKeyDown={(e) => {
               if (e.key === "Enter" || e.key === "Escape")
                 onEditToggle(item.id, false);
@@ -843,6 +843,11 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           tinggi: d.tinggi,
           jumlah: d.jumlah,
           volume: Number(d.volume), // sudah dihitung di modal
+          // >>> KIRIM EXTRAS KE API
+          extras: (d.extras || []).map((ex: ExtraCol) => ({
+            name: ex.name,
+            value: ex.value,
+          })),
         })),
       })),
     }));
@@ -1197,24 +1202,30 @@ const UpdateEstimation: React.FC = () => {
     }));
     setCustomFields(cf);
 
-    // sections + items
+    // sections + items (+ VOLUME EXTRAS!!)
     const sections: Section[] = (detailEstimation.items || []).map(
       (sec: any) => {
         const items: ItemRow[] = (sec.details || []).map((d: any) => {
-          // map volumeDetails API -> UI
-          const vds: VolumeDetailRow[] = d.volumeDetails
-            ? d.volumeDetails.map((vd: any) => ({
-                id: vd.id || uid(),
-                uraian: vd.nama || "",
-                jenis: mapJenisApiToUi(vd.jenis),
-                // string supaya input bisa kosong & tak jadi "02"
-                panjang: String(vd.panjang ?? ""),
-                lebar: String(vd.lebar ?? ""),
-                tinggi: String(vd.tinggi ?? ""),
-                jumlah: String(vd.jumlah ?? ""),
-                volume: Number(vd.volume ?? 0),
-              }))
-            : [];
+          const vds: VolumeDetailRow[] = (d.volumeDetails || []).map(
+            (vd: any) => ({
+              id: vd.id || uid(),
+              uraian: vd.nama || "",
+              jenis: mapJenisApiToUi(vd.jenis),
+              panjang: Number(vd.panjang ?? 0),
+              lebar: Number(vd.lebar ?? 0),
+              tinggi: Number(vd.tinggi ?? 0),
+              jumlah: Number(vd.jumlah ?? 0),
+              volume: Number(vd.volume ?? 0),
+              // >>> baca extras dari API agar tampil & bisa di-rename lagi
+              extras: Array.isArray(vd.extras)
+                ? vd.extras.map((ex: any) => ({
+                    id: ex.id || ex.name || uid(),
+                    name: ex.name,
+                    value: Number(ex.value ?? 0),
+                  }))
+                : [],
+            })
+          );
 
           const volumeNumber = Number(d.volume ?? 0);
           const hargaSatuan = Number(d.hargaSatuan ?? d.harga ?? 0);

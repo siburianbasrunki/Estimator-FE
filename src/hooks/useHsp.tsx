@@ -147,3 +147,100 @@ export const useDeleteAhspComponent = () => {
     onError: (e: any) => toast.error(e?.message || "Gagal menghapus komponen"),
   });
 };
+
+export const useCreateCategory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => HspService.createCategory(name),
+    onSuccess: () => {
+      toast.success("Kategori dibuat");
+      qc.invalidateQueries({ queryKey: ["categoryJob"] });
+      qc.invalidateQueries({ queryKey: ["hsp"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Gagal membuat kategori"),
+  });
+};
+
+export const useUpdateCategory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: string; name: string }) =>
+      HspService.updateCategory(id, name),
+    onSuccess: () => {
+      toast.success("Kategori diperbarui");
+      qc.invalidateQueries({ queryKey: ["categoryJob"] });
+      qc.invalidateQueries({ queryKey: ["hsp"] });
+    },
+    onError: (e: any) =>
+      toast.error(e?.message || "Gagal memperbarui kategori"),
+  });
+};
+
+export const useDeleteCategory = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => HspService.deleteCategory(id),
+    onSuccess: () => {
+      toast.success("Kategori dihapus");
+      qc.invalidateQueries({ queryKey: ["categoryJob"] });
+      qc.invalidateQueries({ queryKey: ["hsp"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Gagal menghapus kategori"),
+  });
+};
+
+// Item CRUD hooks
+export const useCreateHspItem = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: {
+      hspCategoryId: string;
+      kode: string;
+      deskripsi: string;
+      satuan?: string;
+    }) => HspService.createHspItem(payload),
+    onSuccess: () => {
+      toast.success("Item dibuat");
+      qc.invalidateQueries({ queryKey: ["hsp"] });
+      qc.invalidateQueries({ queryKey: ["itemJob"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Gagal membuat item"),
+  });
+};
+
+export const useUpdateHspItem = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      kode,
+      payload,
+    }: {
+      kode: string;
+      payload: {
+        hspCategoryId?: string;
+        kode?: string;
+        deskripsi?: string;
+        satuan?: string;
+      };
+    }) => HspService.updateHspItemByKode(kode, payload),
+    onSuccess: () => {
+      toast.success("Item diperbarui");
+      qc.invalidateQueries({ queryKey: ["hsp"] });
+      qc.invalidateQueries({ queryKey: ["itemJob"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Gagal memperbarui item"),
+  });
+};
+
+export const useDeleteHspItem = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (kode: string) => HspService.deleteHspItemByKode(kode),
+    onSuccess: () => {
+      toast.success("Item dihapus");
+      qc.invalidateQueries({ queryKey: ["hsp"] });
+      qc.invalidateQueries({ queryKey: ["itemJob"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Gagal menghapus item"),
+  });
+};

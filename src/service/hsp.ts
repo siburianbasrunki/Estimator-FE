@@ -292,6 +292,140 @@ const HspService = {
     if (!res.ok) throw new Error(json?.error || `Failed (HTTP ${res.status})`);
     return json.data;
   },
+  async createCategory(name: string) {
+    const { hsp } = getEndpoints();
+    const res = await fetch(`${hsp}/categories`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ name }),
+    });
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json?.error || `Create failed (HTTP ${res.status})`);
+    return json.data as { id: string; name: string };
+  },
+
+  async updateCategory(id: string, name: string) {
+    const { hsp } = getEndpoints();
+    const res = await fetch(`${hsp}/categories/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ name }),
+    });
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json?.error || `Update failed (HTTP ${res.status})`);
+    return json.data as { id: string; name: string };
+  },
+
+  async deleteCategory(id: string) {
+    const { hsp } = getEndpoints();
+    const res = await fetch(`${hsp}/categories/${id}`, {
+      method: "DELETE",
+      headers: authHeader(),
+    });
+    if (!res.ok) {
+      let msg = "";
+      try {
+        msg = (await res.json())?.error;
+      } catch {}
+      throw new Error(msg || `Delete failed (HTTP ${res.status})`);
+    }
+  },
+  async createHspItem(payload: {
+    hspCategoryId: string;
+    kode: string;
+    deskripsi: string;
+    satuan?: string;
+  }) {
+    const { hsp } = getEndpoints();
+    const res = await fetch(`${hsp}/items`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify(payload),
+    });
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json?.error || `Create failed (HTTP ${res.status})`);
+    return json.data;
+  },
+
+  async updateHspItem(
+    id: string,
+    payload: {
+      hspCategoryId?: string;
+      kode?: string;
+      deskripsi?: string;
+      satuan?: string;
+    }
+  ) {
+    const { hsp } = getEndpoints();
+    const res = await fetch(`${hsp}/items/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify(payload), // harga tidak dikirim dari UI
+    });
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json?.error || `Update failed (HTTP ${res.status})`);
+    return json.data;
+  },
+
+  async deleteHspItem(id: string) {
+    const { hsp } = getEndpoints();
+    const res = await fetch(`${hsp}/items/${id}`, {
+      method: "DELETE",
+      headers: authHeader(),
+    });
+    if (!res.ok) {
+      let msg = "";
+      try {
+        msg = (await res.json())?.error;
+      } catch {}
+      throw new Error(msg || `Delete failed (HTTP ${res.status})`);
+    }
+  },
+  async updateHspItemByKode(
+    kode: string,
+    payload: {
+      hspCategoryId?: string;
+      kode?: string;
+      deskripsi?: string;
+      satuan?: string;
+    }
+  ) {
+    const { hsp } = getEndpoints();
+    const res = await fetch(
+      `${hsp}/items/by-kode/${encodeURIComponent(kode)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload),
+      }
+    );
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json?.error || `Update failed (HTTP ${res.status})`);
+    return json.data;
+  },
+
+  async deleteHspItemByKode(kode: string) {
+    const { hsp } = getEndpoints();
+    const res = await fetch(
+      `${hsp}/items/by-kode/${encodeURIComponent(kode)}`,
+      {
+        method: "DELETE",
+        headers: authHeader(),
+      }
+    );
+    if (!res.ok) {
+      let msg = "";
+      try {
+        msg = (await res.json())?.error;
+      } catch {}
+      throw new Error(msg || `Delete failed (HTTP ${res.status})`);
+    }
+  },
 };
 
 export default HspService;

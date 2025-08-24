@@ -7,5 +7,7 @@ export function getEndpoints() {
     estimation: `${BASE_URL}/estimation`,
     hsp: `${BASE_URL}/hsp`,
     importHsp: `${BASE_URL}/hsp/import`,
+    dasboard: `${BASE_URL}/dashboard`,
+    users: `${BASE_URL}/users`,
   };
 }

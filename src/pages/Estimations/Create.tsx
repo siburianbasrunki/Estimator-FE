@@ -1,3 +1,4 @@
+// pages/creates.tsx
 import { useMemo, useState } from "react";
 import Input from "../../components/input";
 import ImageProyek from "../../assets/images/image 1.png";
@@ -13,6 +14,8 @@ import Button from "../../components/Button";
 import { UnitList } from "../../stores/units";
 import { useCreateEstimation } from "../../hooks/useEstimation";
 import { useGetCategoryJob, useGetItemJob } from "../../hooks/useHsp";
+import type { Option } from "../../components/SearchableSelect";
+import SearchableSelect from "../../components/SearchableSelect";
 
 // dnd-kit
 import {
@@ -47,6 +50,19 @@ const uid = () =>
 const formatIDR = (n: number = 0) =>
   `Rp ${Math.max(0, Number(n || 0)).toLocaleString("id-ID")}`;
 
+// Hapus semua yang bukan digit/koma/titik, normalize koma->titik
+const sanitizeMoneyInput = (v: string) => {
+  const cleaned = v.replace(/[^\d.,]/g, "").replace(/,/g, ".");
+  // Hapus leading zero kecuali pola "0.xxx"
+  return cleaned.replace(/^0+(?=\d)/, "");
+};
+
+const toNumber = (v?: string) => {
+  if (v == null || v.trim() === "") return 0;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : 0;
+};
+
 /* ------------------------------ Types ------------------------------ */
 interface CustomField {
   id: string;
@@ -68,7 +84,8 @@ type ItemRow = {
   volume: number; // auto from modal
   volumeDetails?: VolumeDetailRow[]; // stores detail rows
   satuan: string;
-  hargaSatuan: number;
+  hargaSatuan: number; // nilai final untuk hitung & tampil non-edit
+  hargaSatuanInput?: string; // nilai string saat editing (boleh kosong)
   hargaTotal: number;
   isEditing?: boolean;
 };
@@ -76,6 +93,7 @@ type Section = {
   id: string;
   title: string;
   items: ItemRow[];
+  isEditingTitle?: boolean; // edit judul kategori
 };
 
 /* --------------------------- Step 1: Profile --------------------------- */
@@ -196,7 +214,7 @@ const CreateStepOne = ({
             {!!customFields.length && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {customFields.map((field) => (
-                  <div key={field.id} className="flex items-start gap-2">
+                  <div key={field.id} className="flex items-end gap-2">
                     <div className="flex-1">
                       <Input
                         label={field.label}
@@ -250,7 +268,6 @@ const CreateStepOne = ({
               </button>
             </div>
           </div>
-
           <div className="pt-2">
             <button onClick={onSave} className="btn btn-success text-white">
               Lanjut ke Estimation Items
@@ -309,6 +326,7 @@ function DroppableRow({
   );
 }
 
+/** ITEM ROW — pakai id dnd "item-<id>" */
 function SortableItemRow({
   idxInSection,
   item,
@@ -333,12 +351,21 @@ function SortableItemRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id });
+  } = useSortable({ id: `item-${item.id}` });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  const unitOptions: Option[] = useMemo(
+    () =>
+      (UnitList ?? []).map((u: { label: string; value: string }) => ({
+        label: u.label ?? u.value,
+        value: u.value,
+      })),
+    []
+  );
 
   return (
     <tr
@@ -378,23 +405,20 @@ function SortableItemRow({
         </div>
       </td>
 
-      {/* Satuan */}
-      <td className="px-4 py-3 text-sm text-gray-800">
+      {/* Satuan (Searchable) */}
+      <td className="px-4 py-3 text-sm text-gray-800 w-36">
         {item.isEditing ? (
-          <select
-            className="select select-bordered select-sm w-28 text-black bg-white border-black"
+          <SearchableSelect
+            options={unitOptions}
             value={item.satuan ?? ""}
-            onChange={(e) => onUpdateField(item.id, "satuan", e.target.value)}
-          >
-            <option value="">Pilih Satuan</option>
-            {UnitList.map((u) => (
-              <option key={u.value} value={u.value}>
-                {u.value}
-              </option>
-            ))}
-          </select>
+            onChange={(v) => onUpdateField(item.id, "satuan", v ?? "")}
+            placeholder="Pilih Satuan"
+            size="sm"
+          />
         ) : (
-          UnitList.find((u) => u.value === item.satuan)?.label || item.satuan
+          UnitList.find((u) => u.value === item.satuan)?.label ||
+          item.satuan ||
+          "-"
         )}
       </td>
 
@@ -402,13 +426,19 @@ function SortableItemRow({
       <td className="px-4 py-3 text-sm text-gray-800">
         {item.isEditing ? (
           <input
-            type="number"
-            min={0}
+            type="text"
+            inputMode="decimal"
             className="input input-bordered input-sm w-36 text-black bg-white border-black"
-            value={item.hargaSatuan ?? 0}
+            value={item.hargaSatuanInput ?? ""}
             onChange={(e) =>
-              onUpdateField(item.id, "hargaSatuan", Number(e.target.value))
+              onUpdateField(item.id, "hargaSatuanInput", e.target.value)
             }
+            onBlur={() => onEditToggle(item.id, false)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape")
+                onEditToggle(item.id, false);
+            }}
+            placeholder="0"
           />
         ) : (
           formatIDR(item.hargaSatuan)
@@ -477,6 +507,157 @@ function SortableItemRow({
   );
 }
 
+/** SECTION HEADER — draggable & editable */
+function SortableSectionHeader({
+  section,
+  index,
+  isLoadingItems,
+  PekerjaanOptions,
+  DropdownPekerjaan,
+  addItemToSection,
+  deleteSection,
+  onToggleEditTitle,
+  onChangeTitle,
+}: {
+  section: Section;
+  index: number;
+  isLoadingItems: boolean;
+  PekerjaanOptions: Option[];
+  DropdownPekerjaan: {
+    kode: string;
+    label: string;
+    value: string;
+    detail: {
+      deskripsi: string;
+      satuan: string;
+      harga: number;
+      categoryId?: string;
+      categoryName?: string;
+    };
+  }[];
+  addItemToSection: (sectionId: string, source?: any) => void;
+  deleteSection: (sectionId: string) => void;
+  onToggleEditTitle: (id: string, editing: boolean) => void;
+  onChangeTitle: (id: string, title: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `sec-${section.id}` });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`bg-blue-50/70 ${isDragging ? "opacity-80" : ""}`}
+    >
+      <td className="px-4 py-3 text-sm font-semibold text-blue-700">
+        <button
+          className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2"
+          title="Drag kategori"
+          aria-label="Drag kategori"
+          {...attributes}
+          {...listeners}
+        >
+          ≡
+        </button>
+        {String.fromCharCode(65 + index)}
+      </td>
+
+      {/* Judul kategori (editable) */}
+      <td className="px-4 py-3 text-sm font-bold text-blue-800">
+        {section.isEditingTitle ? (
+          <input
+            autoFocus
+            className="input input-bordered input-sm w-full text-black bg-white border-black"
+            value={section.title}
+            onChange={(e) => onChangeTitle(section.id, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") {
+                onToggleEditTitle(section.id, false);
+              }
+            }}
+            onBlur={() => onToggleEditTitle(section.id, false)}
+            placeholder="Judul kategori"
+          />
+        ) : (
+          <span>{section.title}</span>
+        )}
+      </td>
+
+      <td colSpan={4}></td>
+
+      {/* Aksi header kategori */}
+      <td>
+        <div className="flex flex-wrap gap-2 items-center">
+          {/* Tambah dari HSP */}
+          <div className="w-72">
+            <SearchableSelect
+              options={PekerjaanOptions}
+              value={""}
+              onChange={(v) => {
+                if (!v) return;
+                const sel = DropdownPekerjaan.find((it) => it.value === v);
+                if (sel) addItemToSection(section.id, sel);
+              }}
+              placeholder={isLoadingItems ? "Memuat..." : "Tambah dari HSP"}
+              loading={isLoadingItems}
+              size="sm"
+              clearable={false}
+            />
+          </div>
+
+          {/* Tambah manual */}
+          <button
+            onClick={() => addItemToSection(section.id)}
+            className="btn btn-solid btn-sm"
+            title="Tambah Manual"
+          >
+            <BiPlus className="mr-1" /> Manual
+          </button>
+
+          {/* Edit / Simpan judul kategori */}
+          {!section.isEditingTitle ? (
+            <button
+              onClick={() => onToggleEditTitle(section.id, true)}
+              className="btn btn-ghost btn-xs text-blue-600"
+              title="Edit judul kategori"
+            >
+              <BiEdit className="text-lg" />
+            </button>
+          ) : (
+            <button
+              onClick={() => onToggleEditTitle(section.id, false)}
+              className="btn btn-ghost btn-xs text-green-600"
+              title="Simpan judul"
+            >
+              <BiSave className="text-lg" />
+            </button>
+          )}
+
+          {/* Hapus kategori */}
+          <button
+            onClick={() => deleteSection(section.id)}
+            className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
+            title="Hapus Kategori"
+          >
+            <BiTrash className="text-lg" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 /* --------------------------- Step 2: Items Table --------------------------- */
 type CreateStepTwoProps = {
   projectProfile: ProjectProfile;
@@ -504,7 +685,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   const { data: categories, isLoading: isLoadingCategories } =
     useGetCategoryJob();
 
-  const DropdownTitleOptions = useMemo(
+  const CategoryOptions: Option[] = useMemo(
     () =>
       (categories ?? []).map((c: { name: string }) => ({
         label: c.name,
@@ -552,13 +733,21 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     [itemJob]
   );
 
+  const PekerjaanOptions: Option[] = useMemo(
+    () => DropdownPekerjaan.map((p) => ({ label: p.label, value: p.value })),
+    [DropdownPekerjaan]
+  );
+
   /* ----------------------------- Add / Remove ----------------------------- */
   const addSection = () => {
     const title = isManualSection
       ? manualSectionTitle.trim()
       : selectedSectionFromList;
     if (!title) return;
-    setSections((prev) => [...prev, { id: uid(), title, items: [] }]);
+    setSections((prev) => [
+      ...prev,
+      { id: uid(), title, items: [], isEditingTitle: false },
+    ]);
     setIsAddingSection(false);
     setIsManualSection(false);
     setSelectedSectionFromList("");
@@ -576,10 +765,14 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           id: uid(),
           kode: source?.value || "",
           deskripsi: source?.detail.deskripsi || "",
-          volume: 0, // start from 0 (computed by modal)
+          volume: 0,
           volumeDetails: [],
           satuan: source?.detail.satuan || "",
           hargaSatuan: source?.detail.harga ?? 0,
+          hargaSatuanInput:
+            source?.detail.harga && source.detail.harga > 0
+              ? String(source.detail.harga)
+              : "",
           hargaTotal: 0,
           isEditing: true,
         };
@@ -598,20 +791,27 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) =>
-          i.id === id
-            ? {
-                ...i,
-                isEditing: editing,
-                hargaSatuan:
-                  Number.isFinite(i.hargaSatuan) && i.hargaSatuan >= 0
-                    ? i.hargaSatuan
-                    : 0,
-                hargaTotal:
-                  (Number(i.volume) || 0) * (Number(i.hargaSatuan) || 0),
-              }
-            : i
-        ),
+        items: s.items.map((i) => {
+          if (i.id !== id) return i;
+
+          if (editing) {
+            const hsInput =
+              i.hargaSatuan > 0
+                ? String(i.hargaSatuan)
+                : i.hargaSatuanInput ?? "";
+            return { ...i, isEditing: true, hargaSatuanInput: hsInput };
+          } else {
+            const hs = toNumber(i.hargaSatuanInput);
+            const hargaTotal = (Number(i.volume) || 0) * hs;
+            return {
+              ...i,
+              isEditing: false,
+              hargaSatuan: hs,
+              hargaSatuanInput: undefined,
+              hargaTotal,
+            };
+          }
+        }),
       }))
     );
   };
@@ -622,20 +822,29 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         ...s,
         items: s.items.map((i) => {
           if (i.id !== id) return i;
-          const next = { ...i, [field]: value };
-          const vol = Number(next.volume || 0);
+
+          if (field === "hargaSatuanInput") {
+            const input = sanitizeMoneyInput(String(value));
+            const hs = toNumber(input);
+            const next = { ...i, hargaSatuanInput: input };
+            next.hargaTotal = (Number(next.volume) || 0) * hs;
+            return next;
+          }
+
+          const next: ItemRow = { ...i, [field]: value } as ItemRow;
           const hs =
-            field === "hargaSatuan"
-              ? Number(value)
+            typeof next.hargaSatuanInput === "string"
+              ? toNumber(next.hargaSatuanInput)
               : Number(next.hargaSatuan || 0);
-          next.hargaTotal = vol * (Number.isFinite(hs) && hs >= 0 ? hs : 0);
+          const vol = Number(next.volume || 0);
+          next.hargaTotal = vol * hs;
           return next;
         }),
       }))
     );
   };
 
-  /* -------------------------- Copy item (NEW) -------------------------- */
+  /* -------------------------- Copy item -------------------------- */
   const copyItem = (itemId: string) => {
     setSections((prev) =>
       prev.map((s) => {
@@ -645,19 +854,20 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         const clone: ItemRow = {
           ...src,
           id: uid(),
-          isEditing: true, // buka langsung agar mudah ubah
+          isEditing: true,
+          hargaSatuanInput: src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
           volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
           hargaTotal:
             (Number(src.volume) || 0) * (Number(src.hargaSatuan) || 0),
-        };
+        } as ItemRow;
         const items = [...s.items];
-        items.splice(idx + 1, 0, clone); // sisipkan tepat setelah sumber
+        items.splice(idx + 1, 0, clone);
         return { ...s, items };
       })
     );
   };
 
-  /* --------------------- Volume Modal: open/save handlers --------------------- */
+  /* --------------------- Volume Modal handlers --------------------- */
   const openVolumeModal = (item: ItemRow) => {
     setVolTargetItemId(item.id);
     setVolTargetItemLabel(item.deskripsi || item.kode);
@@ -676,7 +886,11 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         items: s.items.map((i) => {
           if (i.id !== itemId) return i;
           const volume = Number(totalVol || 0);
-          const hargaTotal = volume * (Number(i.hargaSatuan) || 0);
+          const hs =
+            typeof i.hargaSatuanInput === "string"
+              ? toNumber(i.hargaSatuanInput)
+              : Number(i.hargaSatuan || 0);
+          const hargaTotal = volume * hs;
           return { ...i, volume, volumeDetails: rows, hargaTotal };
         }),
       }))
@@ -684,7 +898,13 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   };
 
   /* --------------------------- Drag & Drop Logic -------------------------- */
-  const findSectionIdByItemId = (itemId: string) => {
+  const isSectionId = (dndId: string) => dndId.startsWith("sec-");
+  const isItemId = (dndId: string) => dndId.startsWith("item-");
+  const rawSectionId = (dndId: string) => dndId.replace(/^sec-/, "");
+  const rawItemId = (dndId: string) => dndId.replace(/^item-/, "");
+
+  const findSectionIdByItemId = (itemDndId: string) => {
+    const itemId = rawItemId(itemDndId);
     for (const s of sections)
       if (s.items.some((i) => i.id === itemId)) return s.id;
     return null;
@@ -693,18 +913,35 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over) return;
+
     const activeId = String(active.id);
     const overId = String(over.id);
     if (activeId === overId) return;
 
-    const fromSectionId = findSectionIdByItemId(activeId);
-    if (!fromSectionId) return;
+    // Reorder KATEGORI
+    if (isSectionId(activeId) && isSectionId(overId)) {
+      const fromId = rawSectionId(activeId);
+      const toId = rawSectionId(overId);
+      setSections((prev) => {
+        const next = [...prev];
+        const fromIdx = next.findIndex((s) => s.id === fromId);
+        const toIdx = next.findIndex((s) => s.id === toId);
+        if (fromIdx < 0 || toIdx < 0) return prev;
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+        return next;
+      });
+      return;
+    }
 
-    const isOverItem = sections.some((s) =>
-      s.items.some((i) => i.id === overId)
-    );
+    // Drag ITEM
+    if (!isItemId(activeId)) return;
+    const isOverItem = isItemId(overId);
     const isOverSectionTop = overId.startsWith("section-");
     const isOverSectionBottom = overId.startsWith("dropzone-");
+
+    const fromSectionId = findSectionIdByItemId(activeId);
+    if (!fromSectionId) return;
 
     const toSectionId = isOverItem
       ? findSectionIdByItemId(overId)!
@@ -716,16 +953,19 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
 
     if (!toSectionId) return;
 
+    const activeItemId = rawItemId(activeId);
+    const overItemId = isOverItem ? rawItemId(overId) : null;
+
     setSections((prev) => {
       const next = prev.map((s) => ({ ...s, items: [...s.items] }));
       const from = next.find((s) => s.id === fromSectionId)!;
       const to = next.find((s) => s.id === toSectionId)!;
 
-      const fromIdx = from.items.findIndex((i) => i.id === activeId);
+      const fromIdx = from.items.findIndex((i) => i.id === activeItemId);
       const [moved] = from.items.splice(fromIdx, 1);
 
-      if (isOverItem) {
-        const overIdx = to.items.findIndex((i) => i.id === overId);
+      if (isOverItem && overItemId) {
+        const overIdx = to.items.findIndex((i) => i.id === overItemId);
         to.items.splice(overIdx, 0, moved);
       } else if (isOverSectionTop) {
         to.items.unshift(moved);
@@ -766,6 +1006,11 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           tinggi: d.tinggi,
           jumlah: d.jumlah,
           volume: Number(d.volume.toFixed(2)),
+          // >>> SIMPAN kolom tambahan
+          extras:
+            d.extras && d.extras.length
+              ? d.extras.map((x) => ({ name: x.name, value: x.value }))
+              : [],
         })),
       })),
     }));
@@ -781,6 +1026,20 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     onSave(dataToSave);
   };
 
+  const toggleEditSectionTitle = (sectionId: string, editing: boolean) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId ? { ...s, isEditingTitle: editing } : s
+      )
+    );
+  };
+
+  const changeSectionTitle = (sectionId: string, title: string) => {
+    setSections((prev) =>
+      prev.map((s) => (s.id === sectionId ? { ...s, title } : s))
+    );
+  };
+
   /* --------------------------------- Render -------------------------------- */
   return (
     <div className="bg-white rounded-xl shadow p-4 sm:p-6">
@@ -790,8 +1049,8 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           {projectProfile.projectName || "Nama Proyek"}
         </h2>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="badge  ">{projectProfile.owner || "Owner: "}</span>
-          <span className="badge ">PPN {ppnPct || 0}%</span>
+          <span className="badge">{projectProfile.owner || "Owner: "}</span>
+          <span className="badge">PPN {ppnPct || 0}%</span>
         </div>
       </div>
 
@@ -807,21 +1066,15 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                 onChange={(e) => setManualSectionTitle(e.target.value)}
               />
             ) : (
-              <select
-                className="select select-bordered w-full text-black bg-white border-black"
+              <SearchableSelect
+                options={CategoryOptions}
                 value={selectedSectionFromList}
-                onChange={(e) => setSelectedSectionFromList(e.target.value)}
-                disabled={isLoadingCategories}
-              >
-                <option value="">
-                  {isLoadingCategories ? "Memuat..." : "Pilih Kategori"}
-                </option>
-                {DropdownTitleOptions.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                onChange={(v) => setSelectedSectionFromList(v || "")}
+                placeholder={
+                  isLoadingCategories ? "Memuat..." : "Pilih Kategori"
+                }
+                loading={isLoadingCategories}
+              />
             )}
             <div className="flex flex-wrap gap-2">
               <button
@@ -920,67 +1173,23 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                 {sections.map((section, sIdx) => (
                   <SortableContext
                     key={section.id}
-                    items={section.items.map((i) => i.id)}
+                    items={section.items.map((i) => `item-${i.id}`)}
                     strategy={rectSortingStrategy}
                   >
                     {/* Header Kategori */}
-                    <tr className="bg-blue-50/70">
-                      <td className="px-4 py-3 text-sm font-semibold text-blue-700">
-                        {String.fromCharCode(65 + sIdx)}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-bold text-blue-800">
-                        {section.title}
-                      </td>
-                      <td colSpan={4}></td>
-                      <td className="">
-                        <div className="flex gap-2 items-center ">
-                          {/* Add dari HSP */}
-                          <select
-                            className="select select-bordered select-sm w-60 text-black bg-white border-black"
-                            defaultValue=""
-                            disabled={isLoadingItems}
-                            onChange={(e) => {
-                              const sel = DropdownPekerjaan.find(
-                                (it) => it.value === e.target.value
-                              );
-                              if (sel) {
-                                addItemToSection(section.id, sel);
-                                e.currentTarget.value = "";
-                              }
-                            }}
-                          >
-                            <option value="">
-                              {isLoadingItems ? "Memuat..." : "Tambah dari HSP"}
-                            </option>
-                            {DropdownPekerjaan.map((it) => (
-                              <option key={it.value} value={it.value}>
-                                {it.label}
-                              </option>
-                            ))}
-                          </select>
+                    <SortableSectionHeader
+                      section={section}
+                      index={sIdx}
+                      isLoadingItems={isLoadingItems}
+                      PekerjaanOptions={PekerjaanOptions}
+                      DropdownPekerjaan={DropdownPekerjaan}
+                      addItemToSection={addItemToSection}
+                      deleteSection={deleteSection}
+                      onToggleEditTitle={toggleEditSectionTitle}
+                      onChangeTitle={changeSectionTitle}
+                    />
 
-                          {/* Tambah manual */}
-                          <button
-                            onClick={() => addItemToSection(section.id)}
-                            className="btn btn-solid btn-sm"
-                            title="Tambah Manual"
-                          >
-                            <BiPlus className="mr-1" /> Manual
-                          </button>
-
-                          {/* Hapus kategori */}
-                          <button
-                            onClick={() => deleteSection(section.id)}
-                            className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
-                            title="Hapus Kategori"
-                          >
-                            <BiTrash className="text-lg" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-
-                    {/* DROPPABLE: header (drop ke atas) */}
+                    {/* DROPPABLE: header (drop ke atas list) */}
                     <DroppableRow
                       droppableId={`section-${section.id}`}
                       colSpan={7}
@@ -1126,7 +1335,7 @@ const CreateEstimation = () => {
   };
   const navigate = useNavigate();
   return (
-    <div className="mx-auto  p-3 sm:p-4">
+    <div className="mx-auto p-3 sm:p-4">
       <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
 
       <div className="mb-5">

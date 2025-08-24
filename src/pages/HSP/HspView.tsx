@@ -1,6 +1,20 @@
 import { useMemo, useRef, useState } from "react";
-import { BiChevronLeft, BiChevronRight, BiUpload } from "react-icons/bi";
-import { useGetAllHsp, useImportHsp } from "../../hooks/useHsp";
+import {
+  BiChevronLeft,
+  BiChevronRight,
+  BiEdit,
+  BiPlus,
+  BiTrash,
+  BiUpload,
+} from "react-icons/bi";
+import {
+  useCreateHspItem,
+  useDeleteHspItem,
+  useGetAllHsp,
+  useGetCategoryJob,
+  useImportHsp,
+  useUpdateHspItem,
+} from "../../hooks/useHsp";
 import toast from "react-hot-toast";
 import { IoDocument } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +46,19 @@ export const HspView = () => {
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
+  const { data: categories } = useGetCategoryJob();
+  const createItem = useCreateHspItem();
+  const updateItem = useUpdateHspItem();
+  const deleteItem = useDeleteHspItem();
+  const [openCreate, setOpenCreate] = useState(false);
+  const [openEdit, setOpenEdit] = useState<null | {
+    kode: string;
+    hspCategoryId: string;
+    deskripsi: string;
+    satuan: string;
+  }>(null);
+  const [openDelete, setOpenDelete] = useState<null | { kode: string }>(null);
+
   const { mutate: importHsp, isPending } = useImportHsp();
   const {
     data: allHsp,
@@ -128,6 +155,13 @@ export const HspView = () => {
           </div>
 
           <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
+            <button
+              onClick={() => setOpenCreate(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-500 hover:bg-green-600 focus:outline-none"
+            >
+              <BiPlus className="w-5 h-5" />
+              Tambah Item
+            </button>
             <input
               type="file"
               accept=".xlsx,.csv"
@@ -228,10 +262,30 @@ export const HspView = () => {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                             Rp {Number(item.harga || 0).toLocaleString("id-ID")}
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex gap-3 justify-end">
                             <IoDocument
                               className="w-5 h-5 text-blue-600 cursor-pointer"
                               onClick={() => navigate(`/hsp/ahsp/${item.kode}`)}
+                              title="Lihat AHSP"
+                            />
+                            <BiEdit
+                              className="w-5 h-5 text-amber-600 cursor-pointer"
+                              title="Edit item"
+                              onClick={() =>
+                                setOpenEdit({
+                                  kode: item.kode,
+                                  hspCategoryId:
+                                    categories?.find((c) => c.name === kategori)
+                                      ?.id ?? "",
+                                  deskripsi: item.deskripsi,
+                                  satuan: item.satuan,
+                                })
+                              }
+                            />
+                            <BiTrash
+                              className="w-5 h-5 text-red-600 cursor-pointer"
+                              title="Hapus item"
+                              onClick={() => setOpenDelete({ kode: item.kode })}
                             />
                           </td>
                         </tr>
@@ -263,6 +317,237 @@ export const HspView = () => {
           </>
         )}
       </div>
+      {openCreate && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
+          <div className="bg-white rounded-lg shadow w-full max-w-lg">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold">Tambah HSP Item</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Kategori
+                </label>
+                <select
+                  className="select select-bordered w-full text-black bg-white border-black"
+                  defaultValue=""
+                  id="create-cat"
+                >
+                  <option value="" disabled>
+                    Pilih kategori
+                  </option>
+                  {(categories ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Kode</label>
+                <input
+                  id="create-kode"
+                  className="input input-bordered w-full text-black bg-white border-black"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Deskripsi
+                </label>
+                <input
+                  id="create-desc"
+                  className="input input-bordered w-full text-black bg-white border-black"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Satuan</label>
+                <input
+                  id="create-satuan"
+                  className="input input-bordered w-full text-black bg-white border-black"
+                />
+              </div>
+              
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setOpenCreate(false)}
+              >
+                Batal
+              </button>
+              <button
+                className="btn btn-primary text-white"
+                onClick={() => {
+                  const hspCategoryId =
+                    (document.getElementById("create-cat") as HTMLSelectElement)
+                      ?.value || "";
+                  const kode = (
+                    document.getElementById("create-kode") as HTMLInputElement
+                  )?.value.trim();
+                  const deskripsi = (
+                    document.getElementById("create-desc") as HTMLInputElement
+                  )?.value.trim();
+                  const satuan = (
+                    document.getElementById("create-satuan") as HTMLInputElement
+                  )?.value.trim();
+                  if (!hspCategoryId || !kode || !deskripsi) {
+                    toast.error("Kategori, Kode, dan Deskripsi wajib diisi");
+                    return;
+                  }
+                  createItem.mutate(
+                    { hspCategoryId, kode, deskripsi, satuan },
+                    {
+                      onSuccess: () => {
+                        setOpenCreate(false);
+                        refetch();
+                      },
+                    }
+                  );
+                }}
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {openEdit && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
+          <div className="bg-white rounded-lg shadow w-full max-w-lg">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold">Edit HSP Item</h3>
+            </div>
+            <div className="p-4 space-y-3">
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Kategori
+                </label>
+                <select
+                  id="edit-cat"
+                  defaultValue={openEdit.hspCategoryId}
+                  className="select select-bordered w-full text-black bg-white border-black"
+                >
+                  {(categories ?? []).map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Kode</label>
+                <input
+                  id="edit-kode"
+                  defaultValue={openEdit.kode}
+                  className="input input-bordered w-full text-black bg-white border-black"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Deskripsi
+                </label>
+                <input
+                  id="edit-desc"
+                  defaultValue={openEdit.deskripsi}
+                  className="input input-bordered w-full text-black bg-white border-black"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Satuan</label>
+                <input
+                  id="edit-satuan"
+                  defaultValue={openEdit.satuan}
+                  className="input input-bordered w-full text-black bg-white border-black"
+                />
+              </div>
+              <p className="text-xs text-gray-500">
+                Harga tidak dapat diubah di sini. Sistem mempertahankan harga
+                yang ada.
+              </p>
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setOpenEdit(null)}
+              >
+                Batal
+              </button>
+              <button
+                className="btn btn-primary text-white"
+                onClick={() => {
+                  const hspCategoryId =
+                    (document.getElementById("edit-cat") as HTMLSelectElement)
+                      ?.value || "";
+                  const kode = (
+                    document.getElementById("edit-kode") as HTMLInputElement
+                  )?.value.trim();
+                  const deskripsi = (
+                    document.getElementById("edit-desc") as HTMLInputElement
+                  )?.value.trim();
+                  const satuan = (
+                    document.getElementById("edit-satuan") as HTMLInputElement
+                  )?.value.trim();
+                  if (!hspCategoryId || !kode || !deskripsi) {
+                    toast.error("Kategori, Kode, dan Deskripsi wajib diisi");
+                    return;
+                  }
+                  updateItem.mutate(
+                    {
+                      kode: openEdit.kode,
+                      payload: { hspCategoryId, kode, deskripsi, satuan },
+                    },
+                    {
+                      onSuccess: () => {
+                        setOpenEdit(null);
+                        refetch();
+                      },
+                    }
+                  );
+                }}
+              >
+                Simpan
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {openDelete && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
+          <div className="bg-white rounded-lg shadow w-full max-w-md">
+            <div className="p-4 border-b">
+              <h3 className="text-lg font-semibold">Hapus Item</h3>
+            </div>
+            <div className="p-4">
+              <p className="text-sm">
+                Yakin menghapus item{" "}
+                <span className="font-semibold">{openDelete.kode}</span>?
+              </p>
+              
+            </div>
+            <div className="p-4 border-t flex justify-end gap-2">
+              <button
+                className="btn btn-ghost"
+                onClick={() => setOpenDelete(null)}
+              >
+                Batal
+              </button>
+              <button
+                className="btn btn-error text-white"
+                onClick={() => {
+                  deleteItem.mutate(openDelete.kode, {
+                    onSuccess: () => {
+                      setOpenDelete(null);
+                      refetch();
+                    },
+                  });
+                }}
+              >
+                Hapus
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

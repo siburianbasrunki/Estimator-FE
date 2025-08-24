@@ -193,15 +193,13 @@ export const DetailEstimation: React.FC = () => {
             </div>
           </div>
           <div className="flex gap-2 justify-end">
-            {/* <button
+            <button
               type="button"
-              className={`btn btn-warning ${downloadingPdf ? "loading" : ""}`}
-              onClick={handleExportPdf}
-              disabled={downloadingPdf}
-              aria-busy={downloadingPdf}
+              className="btn bg-blue-400 hover:bg-blue-500 "
+              onClick={() => navigate(`/estimation/update/${id}`)}
             >
-              {downloadingPdf ? "Mempersiapkan PDF..." : "Export PDF"}
-            </button> */}
+              Update Estimation
+            </button>
 
             <button
               type="button"
@@ -261,8 +259,9 @@ export const DetailEstimation: React.FC = () => {
                     <table className="table">
                       <thead className=" text-black">
                         <tr>
-                          <th>Kode</th>
+                          <th>No</th>
                           <th>Deskripsi</th>
+                          <th>Kode</th>
                           <th className="text-right">Volume</th>
                           <th>Satuan</th>
                           <th className="text-right">Harga Satuan</th>
@@ -277,10 +276,11 @@ export const DetailEstimation: React.FC = () => {
                               : d.hargaSatuan * d.volume;
                           return (
                             <tr key={d.id}>
-                              <td className="font-medium">{d.kode}</td>
+                              <td>{section.details.indexOf(d) + 1}</td>
                               <td className="whitespace-pre-wrap">
                                 {d.deskripsi}
                               </td>
+                              <td className="font-medium">{d.kode}</td>
                               <td className="text-right">{d.volume}</td>
                               <td>{d.satuan}</td>
                               <td className="text-right">
