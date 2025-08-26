@@ -129,13 +129,37 @@ const EstimationService = {
     await triggerBrowserDownload(res, fallback);
   },
 
-  async downloadExcel(id: string, projectName?: string): Promise<void> {
+  async downloadExcel(
+    id: string,
+    projectName?: string,
+    logoFile?: File | null
+  ): Promise<void> {
     const { estimation } = getEndpoints();
-    const res = await fetch(`${estimation}/${id}/download/excel`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
+
+    let res: Response;
+
+    if (logoFile) {
+      const fd = new FormData();
+      fd.append("logo", logoFile);
+
+      res = await fetch(`${estimation}/${id}/download/excel`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          // NOTE: jangan set Content-Type manual untuk FormData
+        } as any,
+        body: fd,
+      });
+    } else {
+      // tetap dukung tanpa logo via POST tanpa body
+      res = await fetch(`${estimation}/${id}/download/excel`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+    }
+
     if (!res.ok) {
       let msg = `HTTP error! status: ${res.status}`;
       try {

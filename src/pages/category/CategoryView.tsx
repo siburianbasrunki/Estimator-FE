@@ -7,6 +7,7 @@ import {
 } from "../../hooks/useHsp";
 import { BiEdit, BiPlus, BiTrash } from "react-icons/bi";
 import toast from "react-hot-toast";
+import Skeleton from "../../components/Skeleton";
 
 export const CategoryView = () => {
   const { data: categories, isLoading: isLoadingCategories } =
@@ -24,43 +25,86 @@ export const CategoryView = () => {
   }>(null);
   const [search, setSearch] = useState("");
 
+  const ToolbarSkeleton = () => (
+    <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+      <div className="w-full md:w-auto flex items-center justify-between gap-4">
+        <Skeleton.Line width="w-72" height="h-10" className="rounded-md" />
+        <Skeleton.Line width="w-40" height="h-10" className="rounded-md" />
+      </div>
+    </div>
+  );
+
+  const TableBodySkeleton = () => (
+    <tbody className="bg-white divide-y divide-gray-200">
+      {Array.from({ length: 6 }).map((_, i) => (
+        <tr key={i}>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <Skeleton.Line width="w-8" height="h-4" />
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <Skeleton.Line width="w-64" height="h-4" />
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            <Skeleton.Line width="w-16" height="h-4" />
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap text-right">
+            <div className="flex gap-3 justify-end">
+              <Skeleton.Circle width="w-5" height="h-5" />
+              <Skeleton.Circle width="w-5" height="h-5" />
+            </div>
+          </td>
+        </tr>
+      ))}
+    </tbody>
+  );
+
+  const filtered =
+    (categories ?? []).filter((c) =>
+      c.name?.toLowerCase().includes(search.toLowerCase())
+    ) ?? [];
+
   return (
     <div>
       <h1 className="mb-6 text-2xl font-bold text-gray-800">Category Jobs</h1>
       <div className="bg-white rounded-lg shadow overflow-hidden">
-        <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-          <div className="w-full md:w-auto flex items-center justify-between gap-4">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg
-                  className="h-5 w-5 text-gray-400"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                    clipRule="evenodd"
-                  />
-                </svg>
+        {/* Toolbar */}
+        {isLoadingCategories ? (
+          <ToolbarSkeleton />
+        ) : (
+          <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+            <div className="w-full md:w-auto flex items-center justify-between gap-4">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg
+                    className="h-5 w-5 text-gray-400"
+                    fill="currentColor"
+                    viewBox="0 0 20 20"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="Search..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                />
               </div>
-              <input
-                type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Search..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
+              <button
+                onClick={() => setOpenCreate(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
+              >
+                <BiPlus className="w-5 h-5" />
+                Tambah Kategori
+              </button>
             </div>
-            <button
-              onClick={() => setOpenCreate(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
-            >
-              <BiPlus className="w-5 h-5" />
-              Tambah Kategori
-            </button>
           </div>
-        </div>
+        )}
 
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
@@ -77,58 +121,68 @@ export const CategoryView = () => {
               <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider"></th>
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {categories?.map((category, index) => {
-              return (
-                <tr key={index}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {index + 1}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {isLoadingCategories ? "Loading..." : category.name ?? "-"}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {isLoadingCategories
-                      ? "Loading..."
-                      : category?._count?.items ?? 0}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
-                    <div className="flex gap-3 justify-end">
-                      <BiEdit
-                        className="w-5 h-5 text-amber-600 cursor-pointer"
-                        title="Edit"
-                        onClick={() =>
-                          setOpenEdit({ id: category.id, name: category.name })
-                        }
-                      />
-                      <BiTrash
-                        className="w-5 h-5 text-red-600 cursor-pointer"
-                        title="Delete"
-                        onClick={() =>
-                          setOpenDelete({
-                            id: category.id,
-                            name: category.name,
-                          })
-                        }
-                      />
-                    </div>
+
+          {/* Loading Skeleton Rows */}
+          {isLoadingCategories ? (
+            <TableBodySkeleton />
+          ) : (
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filtered.map((category, index) => {
+                return (
+                  <tr key={category.id}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {index + 1}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {category.name ?? "-"}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {category?._count?.items ?? 0}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
+                      <div className="flex gap-3 justify-end">
+                        <BiEdit
+                          className="w-5 h-5 text-amber-600 cursor-pointer"
+                          title="Edit"
+                          onClick={() =>
+                            setOpenEdit({
+                              id: category.id,
+                              name: category.name,
+                            })
+                          }
+                        />
+                        <BiTrash
+                          className="w-5 h-5 text-red-600 cursor-pointer"
+                          title="Delete"
+                          onClick={() =>
+                            setOpenDelete({
+                              id: category.id,
+                              name: category.name,
+                            })
+                          }
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {/* Empty state */}
+              {!isLoadingCategories && filtered.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-6 py-6 text-center text-gray-500 text-sm"
+                  >
+                    No categories found
                   </td>
                 </tr>
-              );
-            })}
-            {categories?.length === 0 && (
-              <tr>
-                <td
-                  colSpan={3}
-                  className="px-6 py-4 text-center text-gray-500 text-sm"
-                >
-                  No categories found
-                </td>
-              </tr>
-            )}
-          </tbody>
+              )}
+            </tbody>
+          )}
         </table>
       </div>
+
       {openCreate && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
           <div className="bg-white rounded-lg shadow w-full max-w-md">
@@ -174,6 +228,7 @@ export const CategoryView = () => {
           </div>
         </div>
       )}
+
       {openEdit && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
           <div className="bg-white rounded-lg shadow w-full max-w-md">
@@ -219,6 +274,7 @@ export const CategoryView = () => {
           </div>
         </div>
       )}
+
       {openDelete && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
           <div className="bg-white rounded-lg shadow w-full max-w-md">
@@ -230,7 +286,6 @@ export const CategoryView = () => {
                 Yakin menghapus kategori{" "}
                 <span className="font-semibold">{openDelete.name}</span>?
               </p>
-              
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
               <button

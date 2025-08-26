@@ -18,6 +18,7 @@ import {
 import toast from "react-hot-toast";
 import { IoDocument } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
+import Skeleton from "../../components/Skeleton";
 
 type ItemType = {
   kode: string;
@@ -40,6 +41,91 @@ export const flattenToDropdown = (data: HspDataMap) => {
     }))
   );
 };
+
+const ToolbarSkeleton = () => (
+  <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+    <div className="w-full md:w-[380px]">
+      <Skeleton.Line width="w-full" height="h-10" className="rounded-md" />
+    </div>
+    <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
+      <Skeleton.Line width="w-40" height="h-10" className="rounded-md" />
+      <Skeleton.Line width="w-36" height="h-10" className="rounded-md" />
+      <Skeleton.Line width="w-48" height="h-5" />
+    </div>
+  </div>
+);
+
+const TableSkeleton = () => (
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          {["No", "Kode", "Jenis Pekerjaan", "Satuan", "Harga", "Aksi"].map(
+            (_, i) => (
+              <th
+                key={i}
+                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
+              >
+                <Skeleton.Line width="w-20" height="h-4" />
+              </th>
+            )
+          )}
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {/* 2 kategori, masing2 4 baris */}
+        {Array.from({ length: 2 })
+          .map((_, k) => (
+            <tr key={`kat-${k}`} className="bg-white">
+              <td colSpan={6} className="px-6 py-3 bg-gray-100">
+                <Skeleton.Line width="w-64" height="h-5" />
+              </td>
+            </tr>
+          ))
+          .concat(
+            Array.from({ length: 8 }).map((_, r) => (
+              <tr key={`row-${r}`}>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <Skeleton.Line width="w-6" height="h-4" />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <Skeleton.Line width="w-20" height="h-4" />
+                </td>
+                <td className="px-6 py-4">
+                  <Skeleton.Line width="w-80" height="h-4" />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <Skeleton.Line width="w-16" height="h-4" />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <Skeleton.Line width="w-28" height="h-4" />
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="flex justify-end gap-3">
+                    <Skeleton.Circle width="w-5" height="h-5" />
+                    <Skeleton.Circle width="w-5" height="h-5" />
+                    <Skeleton.Circle width="w-5" height="h-5" />
+                  </div>
+                </td>
+              </tr>
+            ))
+          )}
+      </tbody>
+    </table>
+  </div>
+);
+
+const FooterSkeleton = () => (
+  <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+    <Skeleton.Line width="w-48" height="h-4" />
+    <div className="hidden sm:flex sm:items-center sm:justify-between">
+      <div className="inline-flex -space-x-px">
+        <Skeleton.Line width="w-10" height="h-10" className="rounded-l-md" />
+        <Skeleton.Line width="w-10" height="h-10" className="rounded-r-md" />
+      </div>
+    </div>
+  </div>
+);
 
 export const HspView = () => {
   const [search, setSearch] = useState("");
@@ -188,8 +274,14 @@ export const HspView = () => {
         </div>
 
         {isLoadingHsp && (
-          <div className="p-6 text-sm text-gray-600">Memuat data HSP...</div>
+          <>
+            <ToolbarSkeleton />
+            <TableSkeleton />
+            <FooterSkeleton />
+          </>
         )}
+
+        {/* Error */}
         {isErrorHsp && (
           <div className="p-6 text-sm text-red-600">
             Gagal memuat data HSP:{" "}
@@ -197,6 +289,7 @@ export const HspView = () => {
           </div>
         )}
 
+        {/* Content */}
         {!isLoadingHsp && !isErrorHsp && (
           <>
             <div className="overflow-x-auto">
@@ -227,7 +320,7 @@ export const HspView = () => {
                   {Object.entries(filteredData).length === 0 && (
                     <tr>
                       <td
-                        colSpan={5}
+                        colSpan={6}
                         className="px-6 py-6 text-center text-sm text-gray-500"
                       >
                         Tidak ada data yang cocok.
@@ -317,6 +410,8 @@ export const HspView = () => {
           </>
         )}
       </div>
+
+      {/* Create */}
       {openCreate && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
           <div className="bg-white rounded-lg shadow w-full max-w-lg">
@@ -366,7 +461,6 @@ export const HspView = () => {
                   className="input input-bordered w-full text-black bg-white border-black"
                 />
               </div>
-              
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
               <button
@@ -411,6 +505,8 @@ export const HspView = () => {
           </div>
         </div>
       )}
+
+      {/* Edit */}
       {openEdit && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
           <div className="bg-white rounded-lg shadow w-full max-w-lg">
@@ -511,6 +607,8 @@ export const HspView = () => {
           </div>
         </div>
       )}
+
+      {/* Delete */}
       {openDelete && (
         <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
           <div className="bg-white rounded-lg shadow w-full max-w-md">
@@ -522,7 +620,6 @@ export const HspView = () => {
                 Yakin menghapus item{" "}
                 <span className="font-semibold">{openDelete.kode}</span>?
               </p>
-              
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
               <button

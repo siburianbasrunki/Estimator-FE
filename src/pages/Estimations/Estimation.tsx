@@ -1,4 +1,3 @@
-// src/pages/estimation/EstimationView.tsx
 import { BiChevronLeft, BiChevronRight, BiEdit, BiTrash } from "react-icons/bi";
 import { IoDocument } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
@@ -8,6 +7,7 @@ import { formatDateTime } from "../../helper/date";
 import EmptyState from "../../components/EmptyState";
 import { useConfirm } from "../../components/ConfirmDialog";
 import useDebounce from "../../hooks/useDebunce";
+import Skeleton from "../../components/Skeleton";
 
 export const EstimationView = () => {
   const navigate = useNavigate();
@@ -41,7 +41,6 @@ export const EstimationView = () => {
     const start = (page - 1) * limit + 1;
     const end = Math.min(page * limit, total);
     return `Showing ${start}–${end} of ${total} results`;
-    // atau tampilkan array panjang
   }, [estimation?.data?.length, page, limit, total]);
 
   const onDelete = async (id: string, name?: string) => {
@@ -119,9 +118,84 @@ export const EstimationView = () => {
           </div>
         </div>
 
-        {/* Loading */}
+        {/* Loading (skeleton table) */}
         {(isLoading || isFetching) && (
-          <div className="skeleton h-[300px] w-full bg-gray-50"></div>
+          <div className="p-4">
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {[
+                      "Title Project",
+                      "Project Owner",
+                      "Date",
+                      "Dibuat Oleh",
+                      "Status",
+                      "",
+                    ].map((h, i) => (
+                      <th
+                        key={i}
+                        className={`px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider ${
+                          i === 5 ? "text-right" : ""
+                        }`}
+                      >
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {Array.from({ length: 6 }).map((_, idx) => (
+                    <tr key={idx}>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Skeleton.Line width="w-56" height="h-4" />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Skeleton.Line width="w-40" height="h-4" />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Skeleton.Line width="w-32" height="h-4" />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col gap-2">
+                          <Skeleton.Line width="w-32" height="h-4" />
+                          <Skeleton.Line width="w-44" height="h-3" />
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <Skeleton.Line width="w-20" height="h-5" />
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex justify-end gap-3">
+                          <Skeleton.Circle width="w-5" height="h-5" />
+                          <Skeleton.Circle width="w-5" height="h-5" />
+                          <Skeleton.Circle width="w-5" height="h-5" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Footer skeleton */}
+            <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
+              <Skeleton.Line width="w-52" height="h-4" />
+              <div className="flex items-center gap-2">
+                <Skeleton.Line
+                  width="w-8"
+                  height="h-8"
+                  className="rounded-md"
+                />
+                <Skeleton.Line width="w-24" height="h-4" />
+                <Skeleton.Line
+                  width="w-8"
+                  height="h-8"
+                  className="rounded-md"
+                />
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Empty */}
@@ -160,7 +234,7 @@ export const EstimationView = () => {
                   </tr>
                 </thead>
 
-                {estimation?.data.map((item) => (
+                {estimation?.data.map((item: any) => (
                   <tbody
                     key={item.id}
                     className="bg-white divide-y divide-gray-200"
@@ -178,10 +252,10 @@ export const EstimationView = () => {
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col">
                           <p className="font-bold text-gray-700 text-sm">
-                            {item.author.name || "-"}
+                            {item.author?.name || "-"}
                           </p>
                           <p className="text-gray-500 text-sm">
-                            {item.author.email || "-"}
+                            {item.author?.email || "-"}
                           </p>
                         </div>
                       </td>
@@ -253,3 +327,5 @@ export const EstimationView = () => {
     </div>
   );
 };
+
+export default EstimationView;

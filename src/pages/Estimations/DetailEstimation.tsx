@@ -6,7 +6,11 @@ import { formatIDR } from "../../helper/rupiah";
 import EstimationService from "../../service/estimation";
 import toast from "react-hot-toast";
 import { BackButton } from "../../components/BackButton";
+import Skeleton from "../../components/Skeleton";
 
+/* =========================
+   Kartu field kecil reusable
+   ========================= */
 const FieldCard = ({
   label,
   value,
@@ -22,6 +26,167 @@ const FieldCard = ({
   </div>
 );
 
+/* =========================
+   Skeleton untuk halaman detail
+   ========================= */
+const DetailSkeleton: React.FC = () => {
+  return (
+    <div className="max-w mx-auto p-4 space-y-6 text-black">
+      {/* Back button + title area */}
+      <div className="flex items-center gap-3">
+        <Skeleton.Line width="w-24" height="h-9" className="rounded-lg" />
+        <Skeleton.Line width="w-48" height="h-6" />
+      </div>
+
+      {/* Header card */}
+      <div className="card bg-white border border-gray-200 shadow-sm">
+        <div className="card-body gap-4">
+          <div className="flex flex-col md:flex-row md:justify-between gap-3">
+            <div className="space-y-2">
+              <Skeleton.Line width="w-72" height="h-8" />
+              <div className="flex flex-wrap items-center gap-3">
+                <Skeleton.Line width="w-24" height="h-4" />
+                <Skeleton.Line width="w-24" height="h-4" />
+                <Skeleton.Line width="w-16" height="h-4" />
+              </div>
+            </div>
+            <div className="flex flex-col items-start md:items-end gap-2">
+              <Skeleton.Line width="w-40" height="h-4" />
+              <Skeleton.Line width="w-44" height="h-4" />
+              <Skeleton.Line width="w-56" height="h-4" />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <Skeleton.Line width="w-32" height="h-4" />
+          <Skeleton.Line width="w-full" height="h-12" />
+
+          {/* Stats */}
+          <div className="stats stats-vertical sm:stats-horizontal shadow mt-2 bg-white border border-gray-200">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="stat">
+                <Skeleton.Line width="w-24" height="h-4" className="mb-2" />
+                <Skeleton.Line width="w-20" height="h-6" />
+              </div>
+            ))}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-2 justify-end">
+            <Skeleton.Line width="w-40" height="h-10" className="rounded-lg" />
+            <Skeleton.Line width="w-40" height="h-10" className="rounded-lg" />
+          </div>
+        </div>
+      </div>
+
+      {/* Custom fields */}
+      <div className="space-y-2">
+        <Skeleton.Line width="w-48" height="h-5" />
+        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="card bg-white border border-gray-200 shadow-sm"
+            >
+              <div className="card-body p-4">
+                <Skeleton.Line width="w-24" height="h-3" className="mb-2" />
+                <Skeleton.Line width="w-40" height="h-5" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Sections + tables */}
+      <div className="space-y-3">
+        <Skeleton.Line width="w-56" height="h-5" />
+        {Array.from({ length: 2 }).map((_, box) => (
+          <div
+            key={box}
+            className="card bg-white border border-gray-200 shadow-sm overflow-hidden"
+          >
+            <div className="collapse collapse-arrow">
+              <input type="checkbox" defaultChecked />
+              <div className="collapse-title flex justify-between items-center bg-gray-200">
+                <Skeleton.Line width="w-64" height="h-5" />
+                <Skeleton.Line
+                  width="w-24"
+                  height="h-6"
+                  className="rounded-full"
+                />
+              </div>
+              <div className="collapse-content">
+                <div className="overflow-x-auto">
+                  <table className="table">
+                    <thead className="text-black">
+                      <tr>
+                        {[
+                          "No",
+                          "Deskripsi",
+                          "Kode",
+                          "Volume",
+                          "Satuan",
+                          "Harga Satuan",
+                          "Harga Total",
+                        ].map(( i) => (
+                          <th key={i}>
+                            <Skeleton.Line width="w-20" height="h-4" />
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Array.from({ length: 4 }).map((__, r) => (
+                        <tr key={r}>
+                          <td>
+                            <Skeleton.Line width="w-6" height="h-4" />
+                          </td>
+                          <td>
+                            <Skeleton.Line width="w-64" height="h-4" />
+                          </td>
+                          <td>
+                            <Skeleton.Line width="w-20" height="h-4" />
+                          </td>
+                          <td className="text-right">
+                            <Skeleton.Line width="w-12" height="h-4" />
+                          </td>
+                          <td>
+                            <Skeleton.Line width="w-16" height="h-4" />
+                          </td>
+                          <td className="text-right">
+                            <Skeleton.Line width="w-24" height="h-4" />
+                          </td>
+                          <td className="text-right">
+                            <Skeleton.Line width="w-24" height="h-4" />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td colSpan={4}></td>
+                        <td className="text-right">
+                          <Skeleton.Line width="w-20" height="h-4" />
+                        </td>
+                        <td className="text-right" colSpan={2}>
+                          <Skeleton.Line width="w-28" height="h-5" />
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+/* =========================
+   Halaman utama
+   ========================= */
 export const DetailEstimation: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams();
@@ -31,8 +196,57 @@ export const DetailEstimation: React.FC = () => {
     isError,
     error,
   } = useEstimation(id || "");
-  // const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [downloadingExcel, setDownloadingExcel] = useState(false);
+  const [showLogoModal, setShowLogoModal] = useState(false);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoError, setLogoError] = useState<string | null>(null);
+
+  const onPickLogo: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+    setLogoError(null);
+    const f = e.target.files?.[0] || null;
+    if (!f) {
+      setLogoFile(null);
+      setLogoPreview(null);
+      return;
+    }
+    if (!/^image\/(png|jpe?g)$/i.test(f.type)) {
+      setLogoError("Format harus PNG atau JPG.");
+      setLogoFile(null);
+      setLogoPreview(null);
+      return;
+    }
+    if (f.size > 2 * 1024 * 1024) {
+      setLogoError("Ukuran maksimal 2 MB.");
+      setLogoFile(null);
+      setLogoPreview(null);
+      return;
+    }
+    setLogoFile(f);
+    setLogoPreview(URL.createObjectURL(f));
+  };
+
+  const doExport = async (withLogo: boolean) => {
+    if (!id || !estimation) return;
+    try {
+      setDownloadingExcel(true);
+      await EstimationService.downloadExcel(
+        id,
+        estimation.projectName,
+        withLogo ? logoFile : null
+      );
+      toast.success("Export Excel berhasil");
+    } catch (e: any) {
+      toast.error(e?.message || "Gagal export Excel");
+    } finally {
+      setDownloadingExcel(false);
+      setShowLogoModal(false);
+    }
+  };
+
+  const handleExportExcel = () => {
+    setShowLogoModal(true);
+  };
 
   const { subtotal, ppnAmount, grandTotal, itemCount } = useMemo(() => {
     const items = estimation?.items ?? [];
@@ -60,39 +274,10 @@ export const DetailEstimation: React.FC = () => {
       itemCount: count,
     };
   }, [estimation]);
-  // const handleExportPdf = async () => {
-  //   if (!id || !estimation) return;
-  //   try {
-  //     setDownloadingPdf(true);
-  //     await EstimationService.downloadPdf(id, estimation.projectName);
-  //     toast.success("Export PDF berhasil");
-  //   } catch (e: any) {
-  //     toast.error(e?.message || "Gagal export PDF");
-  //   } finally {
-  //     setDownloadingPdf(false);
-  //   }
-  // };
 
-  const handleExportExcel = async () => {
-    if (!id || !estimation) return;
-    try {
-      setDownloadingExcel(true);
-      await EstimationService.downloadExcel(id, estimation.projectName);
-      toast.success("Export Excel berhasil");
-    } catch (e: any) {
-      toast.error(e?.message || "Gagal export Excel");
-    } finally {
-      setDownloadingExcel(false);
-    }
-  };
+  /* -------- Loading with full skeleton -------- */
   if (isLoading) {
-    return (
-      <div className="max-w mx-auto p-4 space-y-4">
-        <div className="skeleton h-24 w-full" />
-        <div className="skeleton h-40 w-full" />
-        <div className="skeleton h-40 w-full" />
-      </div>
-    );
+    return <DetailSkeleton />;
   }
 
   if (isError) {
@@ -124,6 +309,7 @@ export const DetailEstimation: React.FC = () => {
   return (
     <div className="max-w mx-auto p-4 space-y-6 text-black">
       <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
+
       {/* Header */}
       <div className="card bg-white border border-gray-200 shadow-sm">
         <div className="card-body gap-4">
@@ -269,14 +455,14 @@ export const DetailEstimation: React.FC = () => {
                         </tr>
                       </thead>
                       <tbody>
-                        {section.details.map((d) => {
+                        {section.details.map((d, idx) => {
                           const total =
                             typeof d.hargaTotal === "number"
                               ? d.hargaTotal
                               : d.hargaSatuan * d.volume;
                           return (
                             <tr key={d.id}>
-                              <td>{section.details.indexOf(d) + 1}</td>
+                              <td>{idx + 1}</td>
                               <td className="whitespace-pre-wrap">
                                 {d.deskripsi}
                               </td>
@@ -297,7 +483,10 @@ export const DetailEstimation: React.FC = () => {
                           <td className="text-right text-black font-semibold">
                             Subtotal
                           </td>
-                          <td className="text-right font-bold text-black">
+                          <td
+                            className="text-right font-bold text-black"
+                            colSpan={2}
+                          >
                             {formatIDR(sectionSubtotal)}
                           </td>
                         </tr>
@@ -310,6 +499,74 @@ export const DetailEstimation: React.FC = () => {
           );
         })}
       </div>
+
+      {showLogoModal && (
+        <div className="modal modal-open">
+          <div className="modal-box bg-white text-black">
+            <h3 className="font-bold text-lg mb-2">Tambah Logo ke Excel?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              (Opsional) Unggah logo perusahaan Anda (PNG/JPG, maks 2MB). Logo
+              akan dipasang sebagai kop header di sheet RAB dan Ringkasan
+              Estimasi.
+            </p>
+
+            <input
+              type="file"
+              accept="image/png,image/jpeg"
+              onChange={onPickLogo}
+              className="file-input file-input-bordered w-full mb-3 text-white"
+            />
+
+            {logoError && (
+              <div className="alert alert-warning mb-3">
+                <span>{logoError}</span>
+              </div>
+            )}
+
+            {logoPreview && (
+              <div className="border border-gray-200 rounded p-2 mb-3 w-fit">
+                <div className="text-xs text-gray-500 mb-1">Pratinjau:</div>
+                <img
+                  src={logoPreview}
+                  alt="Preview Logo"
+                  className="max-h-24 object-contain"
+                />
+              </div>
+            )}
+
+            <div className="modal-action flex justify-start">
+              <button
+                className="btn btn-soft"
+                onClick={() => setShowLogoModal(false)}
+                disabled={downloadingExcel}
+              >
+                Batal
+              </button>
+
+              <button
+                className="btn btn-dash"
+                onClick={() => doExport(false)}
+                disabled={downloadingExcel}
+              >
+                {downloadingExcel ? "Mengunduh..." : "Lanjut tanpa logo"}
+              </button>
+
+              <button
+                className="btn btn-success"
+                onClick={() => doExport(true)}
+                disabled={!logoFile || downloadingExcel}
+                title={!logoFile ? "Pilih logo dulu (opsional)" : ""}
+              >
+                {downloadingExcel ? "Mengunduh..." : "Export dengan logo"}
+              </button>
+            </div>
+          </div>
+          <div
+            className="modal-backdrop"
+            onClick={() => setShowLogoModal(false)}
+          />
+        </div>
+      )}
     </div>
   );
 };

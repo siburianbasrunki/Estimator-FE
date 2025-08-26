@@ -21,6 +21,7 @@ import { useConfirm } from "../../components/ConfirmDialog";
 import { BiChevronRight } from "react-icons/bi";
 import { useNavigate } from "react-router-dom";
 import { BackButton } from "../../components/BackButton";
+import Skeleton from "../../components/Skeleton";
 
 export const AhspView: React.FC = () => {
   const navigate = useNavigate();
@@ -230,10 +231,120 @@ export const AhspView: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="max-w mx-auto p-4 space-y-4">
-        <div className="skeleton h-24 w-full" />
-        <div className="skeleton h-40 w-full" />
-        <div className="skeleton h-40 w-full" />
+      <div className="max-w mx-auto p-4 space-y-6 text-black">
+        {/* Back + title */}
+        <div className="flex items-center gap-3">
+          <Skeleton.Line width="w-24" height="h-9" className="rounded-lg" />
+          <Skeleton.Line width="w-72" height="h-7" />
+        </div>
+
+        {/* header info */}
+        <div className="flex items-center gap-2">
+          <Skeleton.Line width="w-20" height="h-7" />
+          <BiChevronRight className="text-gray-300 h-6 w-6" />
+          <Skeleton.Line width="w-80" height="h-6" />
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="rounded-xl border bg-white p-4 shadow-sm">
+              <Skeleton.Line width="w-24" height="h-4" className="mb-2" />
+              <Skeleton.Line width="w-40" height="h-6" />
+              <Skeleton.Line width="w-28" height="h-3" className="mt-1" />
+            </div>
+          ))}
+        </div>
+
+        {Array.from({ length: 2 }).map((_, box) => (
+          <div
+            key={box}
+            className="rounded-xl border bg-white p-4 shadow-sm space-y-3"
+          >
+            <div className="flex justify-between items-center">
+              <Skeleton.Line width="w-48" height="h-5" />
+              <Skeleton.Line width="w-24" height="h-8" className="rounded-md" />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="table">
+                <thead>
+                  <tr>
+                    {[
+                      "Kode",
+                      "Deskripsi",
+                      "Koefisien",
+                      "Satuan",
+                      "Harga",
+                      "Subtotal",
+                      "Aksi",
+                    ].map((_, i) => (
+                      <th key={i}>
+                        <Skeleton.Line width="w-20" height="h-4" />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {Array.from({ length: 4 }).map((__, r) => (
+                    <tr key={r}>
+                      <td>
+                        <Skeleton.Line width="w-16" height="h-4" />
+                      </td>
+                      <td>
+                        <Skeleton.Line width="w-64" height="h-4" />
+                      </td>
+                      <td>
+                        <Skeleton.Line width="w-16" height="h-4" />
+                      </td>
+                      <td>
+                        <Skeleton.Line width="w-14" height="h-4" />
+                      </td>
+                      <td>
+                        <Skeleton.Line width="w-24" height="h-4" />
+                      </td>
+                      <td>
+                        <Skeleton.Line width="w-24" height="h-4" />
+                      </td>
+                      <td>
+                        <div className="flex justify-end gap-2">
+                          <Skeleton.Circle width="w-6" height="h-6" />
+                          <Skeleton.Circle width="w-6" height="h-6" />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={5}></td>
+                    <td>
+                      <Skeleton.Line width="w-28" height="h-5" />
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        ))}
+
+        {/* bottom summary & actions */}
+        <div className="rounded-xl border bg-white p-4 shadow-sm space-y-3">
+          <div className="grid gap-4 md:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="rounded-lg bg-gray-50 p-3">
+                <Skeleton.Line width="w-44" height="h-4" className="mb-2" />
+                <Skeleton.Line width="w-40" height="h-6" />
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <Skeleton.Line width="w-56" height="h-10" className="rounded-md" />
+            <Skeleton.Line width="w-56" height="h-10" className="rounded-md" />
+            <div className="ml-auto">
+              <Skeleton.Line width="w-56" height="h-4" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
