@@ -6,7 +6,7 @@ interface SidebarProps {
   setSidebarOpen: (arg: boolean) => void;
 }
 
-import Logo from "../assets/icon/NewLogo.png";
+import Logo from "../assets/icon/Icon.png";
 import { FaUserTie, FaSitemap, FaPeopleCarryBox } from "react-icons/fa6";
 import { MdOutlinePriceChange, MdOutlineSubtitles } from "react-icons/md";
 import { PiProjectorScreenChartDuotone } from "react-icons/pi";
@@ -18,7 +18,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: FiHome, show: true },
     {
-      name: "All Estimation",
+      name: "Rancangan Biaya",
       href: "/estimation",
       icon: PiProjectorScreenChartDuotone,
       show: true,
@@ -30,30 +30,30 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       show: true,
     },
     {
-      name: "Category Job",
+      name: "Kategori Pekerjaan",
       href: "/category-job",
       icon: MdOutlineSubtitles,
       show: true,
     },
     {
-      name: "Item Job",
+      name: "Item Pekerjaan",
       href: "/item-job",
       icon: FaSitemap,
       show: true,
     },
     {
-      name: "Upah",
+      name: "Upah Kerja",
       href: "/master/upah",
       icon: FaPeopleCarryBox,
     },
     {
-      name: "Bahan",
+      name: "Bahan Material",
       href: "/master/bahan",
       icon: GiStakeHammer,
       show: true,
     },
     {
-      name: "User",
+      name: "Manajemen User",
       href: "/users",
       icon: FaUserTie,
       show: isAdmin,
@@ -75,7 +75,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         } md:translate-x-0`}
       >
         <div className="flex items-center flex-row justify-center h-16 px-4 bg-white">
-          <img src={Logo} alt="Logo" className="w-50 h-50 mr-2 mt-1" />
+          <img src={Logo} alt="Logo" className="w-60 h-45 mr-2 mt-1" />
         </div>
         <nav className="px-4 py-6">
           <ul className="space-y-2">

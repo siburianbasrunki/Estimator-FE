@@ -109,7 +109,7 @@ export const UserView = () => {
 
             <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
               <button
-                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none"
+                className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-400 hover:bg-green-500 focus:outline-none"
                 onClick={() => {
                   setSelected(null);
                   setFormMode("create");
@@ -174,7 +174,7 @@ export const UserView = () => {
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
                         <div className="flex justify-end gap-2">
                           <BiEdit
-                            className="text-blue-600 w-6 h-6 cursor-pointer transition hover:text-blue-800"
+                            className="text-green-600 w-5 h-5 cursor-pointer transition hover:text-green-800"
                             onClick={() => {
                               setSelected(u);
                               setFormMode("edit");
@@ -182,7 +182,7 @@ export const UserView = () => {
                             }}
                           />
                           <BiTrash
-                            className="text-red-600 w-6 h-6 cursor-pointer transition hover:text-red-800"
+                            className="text-red-600 w-5 h-5 cursor-pointer transition hover:text-red-800"
                             onClick={() => {
                               setSelected(u);
                               setOpenDelete(true);

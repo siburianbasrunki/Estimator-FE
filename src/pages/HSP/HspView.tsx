@@ -1,12 +1,5 @@
-import { useMemo, useRef, useState } from "react";
-import {
-  BiChevronLeft,
-  BiChevronRight,
-  BiEdit,
-  BiPlus,
-  BiTrash,
-  BiUpload,
-} from "react-icons/bi";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { BiEdit, BiPlus, BiTrash, BiUpload } from "react-icons/bi";
 import {
   useCreateHspItem,
   useDeleteHspItem,
@@ -29,113 +22,17 @@ type ItemType = {
 
 type HspDataMap = Record<string, ItemType[]>;
 
-export const flattenToDropdown = (data: HspDataMap) => {
-  return Object.values(data).flatMap((category) =>
-    category.map((item) => ({
-      kode: item.kode,
-      label: `${item.deskripsi} - Rp${item.harga.toLocaleString("id-ID")}/${
-        item.satuan
-      }`,
-      value: item.kode,
-      detail: item,
-    }))
-  );
-};
-
-const ToolbarSkeleton = () => (
-  <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-    <div className="w-full md:w-[380px]">
-      <Skeleton.Line width="w-full" height="h-10" className="rounded-md" />
-    </div>
-    <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
-      <Skeleton.Line width="w-40" height="h-10" className="rounded-md" />
-      <Skeleton.Line width="w-36" height="h-10" className="rounded-md" />
-      <Skeleton.Line width="w-48" height="h-5" />
-    </div>
-  </div>
-);
-
-const TableSkeleton = () => (
-  <div className="overflow-x-auto">
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50">
-        <tr>
-          {["No", "Kode", "Jenis Pekerjaan", "Satuan", "Harga", "Aksi"].map(
-            (_, i) => (
-              <th
-                key={i}
-                className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
-              >
-                <Skeleton.Line width="w-20" height="h-4" />
-              </th>
-            )
-          )}
-        </tr>
-      </thead>
-      <tbody className="bg-white divide-y divide-gray-200">
-        {/* 2 kategori, masing2 4 baris */}
-        {Array.from({ length: 2 })
-          .map((_, k) => (
-            <tr key={`kat-${k}`} className="bg-white">
-              <td colSpan={6} className="px-6 py-3 bg-gray-100">
-                <Skeleton.Line width="w-64" height="h-5" />
-              </td>
-            </tr>
-          ))
-          .concat(
-            Array.from({ length: 8 }).map((_, r) => (
-              <tr key={`row-${r}`}>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Skeleton.Line width="w-6" height="h-4" />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Skeleton.Line width="w-20" height="h-4" />
-                </td>
-                <td className="px-6 py-4">
-                  <Skeleton.Line width="w-80" height="h-4" />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Skeleton.Line width="w-16" height="h-4" />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <Skeleton.Line width="w-28" height="h-4" />
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="flex justify-end gap-3">
-                    <Skeleton.Circle width="w-5" height="h-5" />
-                    <Skeleton.Circle width="w-5" height="h-5" />
-                    <Skeleton.Circle width="w-5" height="h-5" />
-                  </div>
-                </td>
-              </tr>
-            ))
-          )}
-      </tbody>
-    </table>
-  </div>
-);
-
-const FooterSkeleton = () => (
-  <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-    <Skeleton.Line width="w-48" height="h-4" />
-    <div className="hidden sm:flex sm:items-center sm:justify-between">
-      <div className="inline-flex -space-x-px">
-        <Skeleton.Line width="w-10" height="h-10" className="rounded-l-md" />
-        <Skeleton.Line width="w-10" height="h-10" className="rounded-r-md" />
-      </div>
-    </div>
-  </div>
-);
-
 export const HspView = () => {
   const [search, setSearch] = useState("");
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
+
   const { data: categories } = useGetCategoryJob();
   const createItem = useCreateHspItem();
   const updateItem = useUpdateHspItem();
   const deleteItem = useDeleteHspItem();
+
   const [openCreate, setOpenCreate] = useState(false);
   const [openEdit, setOpenEdit] = useState<null | {
     kode: string;
@@ -154,15 +51,17 @@ export const HspView = () => {
     refetch,
   } = useGetAllHsp();
 
+  // Normalisasi data ke HspDataMap
   const hspData: HspDataMap = useMemo(() => {
     const raw = allHsp as unknown as
       | { data?: HspDataMap }
       | HspDataMap
       | undefined;
     if (!raw) return {};
-    return (raw.data ?? raw) as HspDataMap;
+    return (raw as any).data ?? (raw as HspDataMap);
   }, [allHsp]);
 
+  // Filter pencarian
   const filteredData: HspDataMap = useMemo(() => {
     if (!hspData || Object.keys(hspData).length === 0) return {};
     if (!search.trim()) return hspData;
@@ -182,6 +81,68 @@ export const HspView = () => {
     }, {} as HspDataMap);
   }, [hspData, search]);
 
+  // ===== Pagination =====
+  const [page, setPage] = useState(1);
+  const [pageSize] = useState(10); // fixed 10/halaman (bisa kamu ubah kalau perlu)
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, Object.keys(filteredData).length]);
+
+  const totalItems = useMemo(() => {
+    return Object.values(filteredData || {}).reduce(
+      (acc, items) => acc + items.length,
+      0
+    );
+  }, [filteredData]);
+
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const startIdx = (page - 1) * pageSize; // inklusif
+  const endIdx = Math.min(totalItems, startIdx + pageSize); // eksklusif
+
+  type Row =
+    | { type: "header"; kategori: string }
+    | { type: "item"; kategori: string; item: ItemType; globalIndex: number };
+
+  const pageRows: Row[] = useMemo(() => {
+    const rows: Row[] = [];
+    let seen = 0;
+
+    for (const [kategori, items] of Object.entries(filteredData || {})) {
+      const catStart = seen;
+      const catEnd = seen + items.length;
+
+      const overlapStart = Math.max(startIdx, catStart);
+      const overlapEnd = Math.min(endIdx, catEnd);
+
+      if (overlapEnd > overlapStart) {
+        rows.push({ type: "header", kategori });
+        const fromIndex = overlapStart - catStart;
+        const count = overlapEnd - overlapStart;
+        const slice = items.slice(fromIndex, fromIndex + count);
+
+        slice.forEach((item, i) => {
+          rows.push({
+            type: "item",
+            kategori,
+            item,
+            globalIndex: overlapStart + i,
+          });
+        });
+      }
+
+      seen = catEnd;
+    }
+
+    return rows;
+  }, [filteredData, startIdx, endIdx]);
+
+  const goToPage = (p: number) => {
+    if (p < 1 || p > totalPages) return;
+    setPage(p);
+  };
+
+  // ===== Import file =====
   const onClickImport = () => fileInputRef.current?.click();
 
   const onFileChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
@@ -198,8 +159,6 @@ export const HspView = () => {
     importHsp(file, {
       onSuccess: (res) => {
         if (res.status === "success") {
-          const errors = res.summary?.errors || [];
-          if (errors.length) console.warn("Import warnings:", errors);
           toast.success("Import sukses. Data akan dimuat ulang.");
           refetch();
         }
@@ -208,46 +167,31 @@ export const HspView = () => {
   };
 
   return (
-    <div>
-      <h1 className="mb-6 text-2xl font-bold text-gray-800">
-        HSP (Harga Satuan Pekerjaan)
-      </h1>
+    <div className="text-black">
+      <h1 className="mb-6 text-2xl font-bold">HSP (Harga Satuan Pekerjaan)</h1>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
+        {/* Toolbar */}
         <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
           <div className="w-full md:w-auto">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg
-                  className="h-5 w-5 text-gray-400"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                >
-                  <path
-                    fillRule="evenodd"
-                    d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
-                    clipRule="evenodd"
-                  />
-                </svg>
-              </div>
-              <input
-                type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Cari kategori / kode / deskripsi / satuan..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
+            <input
+              type="text"
+              className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Cari kategori / kode / deskripsi / satuan..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
           </div>
 
           <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => setOpenCreate(true)}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-500 hover:bg-green-600 focus:outline-none"
+              className="px-4 py-2 rounded-md text-sm text-white bg-green-400 hover:bg-green-500"
             >
-              <BiPlus className="w-5 h-5" />
+              <BiPlus className="inline-block mr-1" />
               Tambah Item
             </button>
+
             <input
               type="file"
               accept=".xlsx,.csv"
@@ -258,32 +202,115 @@ export const HspView = () => {
             <button
               onClick={onClickImport}
               disabled={isPending}
-              className={`inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white ${
+              className={`px-4 py-2 rounded-md text-sm text-white ${
                 isPending ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700"
-              } focus:outline-none`}
+              }`}
             >
-              <BiUpload className="w-5 h-5" />
+              <BiUpload className="inline-block mr-1" />
               {isPending ? "Importing..." : "Import"}
             </button>
+
             {selectedFileName && (
-              <div className="text-xs text-gray-600 self-center">
+              <div className="text-xs self-center">
                 File: <span className="font-medium">{selectedFileName}</span>
               </div>
             )}
           </div>
         </div>
 
+        {/* Loading skeleton */}
         {isLoadingHsp && (
           <>
-            <ToolbarSkeleton />
-            <TableSkeleton />
-            <FooterSkeleton />
+            <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
+              <div className="w-full md:w-[380px]">
+                <Skeleton.Line
+                  width="w-full"
+                  height="h-10"
+                  className="rounded-md"
+                />
+              </div>
+              <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
+                <Skeleton.Line
+                  width="w-40"
+                  height="h-10"
+                  className="rounded-md"
+                />
+                <Skeleton.Line
+                  width="w-36"
+                  height="h-10"
+                  className="rounded-md"
+                />
+                <Skeleton.Line width="w-48" height="h-5" />
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    {[
+                      "No",
+                      "Kode",
+                      "Jenis Pekerjaan",
+                      "Satuan",
+                      "Harga",
+                      "Aksi",
+                    ].map((_, i) => (
+                      <th
+                        key={i}
+                        className="px-6 py-3 text-left text-xs font-medium uppercase"
+                      >
+                        <Skeleton.Line width="w-20" height="h-4" />
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {Array.from({ length: 2 })
+                    .map((_, k) => (
+                      <tr key={`kat-${k}`} className="bg-white">
+                        <td colSpan={6} className="px-6 py-3 bg-gray-100">
+                          <Skeleton.Line width="w-64" height="h-5" />
+                        </td>
+                      </tr>
+                    ))
+                    .concat(
+                      Array.from({ length: 8 }).map((_, r) => (
+                        <tr key={`row-${r}`}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Skeleton.Line width="w-6" height="h-4" />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Skeleton.Line width="w-20" height="h-4" />
+                          </td>
+                          <td className="px-6 py-4">
+                            <Skeleton.Line width="w-80" height="h-4" />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Skeleton.Line width="w-16" height="h-4" />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Skeleton.Line width="w-28" height="h-4" />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex justify-end gap-3">
+                              <Skeleton.Circle width="w-5" height="h-5" />
+                              <Skeleton.Circle width="w-5" height="h-5" />
+                              <Skeleton.Circle width="w-5" height="h-5" />
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-4 py-3 bg-white border-t border-gray-200" />
           </>
         )}
 
         {/* Error */}
         {isErrorHsp && (
-          <div className="p-6 text-sm text-red-600">
+          <div className="p-6 text-sm">
             Gagal memuat data HSP:{" "}
             {(hspError as Error)?.message || "unknown error"}
           </div>
@@ -296,125 +323,165 @@ export const HspView = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       No
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       Kode
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       Jenis Pekerjaan
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       Satuan
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       Harga
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       Aksi
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {Object.entries(filteredData).length === 0 && (
+                  {totalItems === 0 && (
                     <tr>
-                      <td
-                        colSpan={6}
-                        className="px-6 py-6 text-center text-sm text-gray-500"
-                      >
-                        Tidak ada data yang cocok.
+                      <td colSpan={6} className="px-6 py-6 text-center text-sm">
+                        Tidak ada data
                       </td>
                     </tr>
                   )}
 
-                  {Object.entries(filteredData).map(([kategori, items]) => {
-                    return [
-                      <tr key={`${kategori}-header`} className="bg-gray-100">
-                        <td
-                          colSpan={6}
-                          className="px-6 py-3 font-bold text-gray-700"
-                        >
-                          {kategori}
+                  {pageRows.map((row) =>
+                    row.type === "header" ? (
+                      <tr key={`head-${row.kategori}`} className="bg-gray-100">
+                        <td colSpan={6} className="px-6 py-3 font-bold">
+                          {row.kategori}
                         </td>
-                      </tr>,
-                      ...items.map((item, index) => (
-                        <tr key={`${kategori}-${item.kode}`}>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                            {index + 1}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                            {item.kode}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">
-                            {item.deskripsi}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            {item.satuan}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                            Rp {Number(item.harga || 0).toLocaleString("id-ID")}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium flex gap-3 justify-end">
-                            <IoDocument
-                              className="w-5 h-5 text-blue-600 cursor-pointer"
-                              onClick={() => navigate(`/hsp/ahsp/${item.kode}`)}
-                              title="Lihat AHSP"
-                            />
-                            <BiEdit
-                              className="w-5 h-5 text-amber-600 cursor-pointer"
-                              title="Edit item"
-                              onClick={() =>
-                                setOpenEdit({
-                                  kode: item.kode,
-                                  hspCategoryId:
-                                    categories?.find((c) => c.name === kategori)
-                                      ?.id ?? "",
-                                  deskripsi: item.deskripsi,
-                                  satuan: item.satuan,
-                                })
-                              }
-                            />
-                            <BiTrash
-                              className="w-5 h-5 text-red-600 cursor-pointer"
-                              title="Hapus item"
-                              onClick={() => setOpenDelete({ kode: item.kode })}
-                            />
-                          </td>
-                        </tr>
-                      )),
-                    ];
-                  })}
+                      </tr>
+                    ) : (
+                      <tr key={`${row.kategori}-${row.item.kode}`}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {row.globalIndex + 1}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          {row.item.kode}
+                        </td>
+                        <td className="px-6 py-4 text-sm">
+                          {row.item.deskripsi}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {row.item.satuan}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          Rp{" "}
+                          {Number(row.item.harga || 0).toLocaleString("id-ID")}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                          <IoDocument
+                            className="w-5 h-5 inline-block mr-2 cursor-pointer text-blue-600"
+                            title="Lihat AHSP"
+                            onClick={() =>
+                              navigate(`/hsp/ahsp/${row.item.kode}`)
+                            }
+                          />
+                          <BiEdit
+                            className="w-5 h-5 inline-block mr-2 cursor-pointer text-green-600"
+                            title="Edit item"
+                            onClick={() =>
+                              setOpenEdit({
+                                kode: row.item.kode,
+                                hspCategoryId:
+                                  categories?.find(
+                                    (c) => c.name === row.kategori
+                                  )?.id ?? "",
+                                deskripsi: row.item.deskripsi,
+                                satuan: row.item.satuan,
+                              })
+                            }
+                          />
+                          <BiTrash
+                            className="w-5 h-5 inline-block cursor-pointer text-red-600"
+                            title="Hapus item"
+                            onClick={() =>
+                              setOpenDelete({ kode: row.item.kode })
+                            }
+                          />
+                        </td>
+                      </tr>
+                    )
+                  )}
                 </tbody>
               </table>
             </div>
 
-            <div className="bg-gray-50 px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
-              <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-                <p className="text-sm text-gray-700">
-                  Total kategori:{" "}
-                  <span className="font-medium">
-                    {Object.keys(hspData || {}).length}
-                  </span>
-                </p>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
-                  <span className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-400">
-                    <BiChevronLeft className="w-5 h-5" />
-                  </span>
-                  <span className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-400">
-                    <BiChevronRight className="w-5 h-5" />
-                  </span>
-                </nav>
+            {/* Pagination controls (style yang kamu minta) */}
+            <div className="px-4 py-3 bg-white border-t border-gray-200 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="text-sm">
+                Page {page} of {totalPages}
+              </div>
+              <div className="inline-flex rounded-md shadow-sm" role="group">
+                <button
+                  type="button"
+                  onClick={() => goToPage(page - 1)}
+                  disabled={page <= 1}
+                  className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-l-md disabled:opacity-50 cursor-pointer"
+                >
+                  Prev
+                </button>
+                {Array.from({ length: totalPages })
+                  .map((_, i) => i + 1)
+                  .filter(
+                    (p) =>
+                      Math.abs(p - page) <= 2 || p === 1 || p === totalPages
+                  )
+                  .reduce<number[]>((arr, p) => {
+                    if (arr.length === 0) return [p];
+                    const prev = arr[arr.length - 1];
+                    if (p - prev > 1) arr.push(-1);
+                    arr.push(p);
+                    return arr;
+                  }, [])
+                  .map((p, i) =>
+                    p === -1 ? (
+                      <span
+                        key={`gap-${i}`}
+                        className="px-3 py-2 text-sm border-t border-b border-gray-300 select-none"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        onClick={() => goToPage(p)}
+                        className={`px-3 py-2 text-sm font-medium border-t border-b border-gray-300 cursor-pointer hover:bg-gray-100 ${
+                          p === totalPages
+                            ? "border-r rounded-r-md"
+                            : "border-r"
+                        } ${p === page ? "bg-gray-100" : ""}`}
+                      >
+                        {p}
+                      </button>
+                    )
+                  )}
+                <button
+                  type="button"
+                  onClick={() => goToPage(page + 1)}
+                  disabled={page >= totalPages}
+                  className="px-3 py-2 text-sm font-medium border border-gray-300 rounded-r-md disabled:opacity-50"
+                >
+                  Next
+                </button>
               </div>
             </div>
           </>
         )}
       </div>
 
-      {/* Create */}
+      {/* ===== Create Modal ===== */}
       {openCreate && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
-          <div className="bg-white rounded-lg shadow w-full max-w-lg">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow w-full max-w-lg text-black">
             <div className="p-4 border-b">
               <h3 className="text-lg font-semibold">Tambah HSP Item</h3>
             </div>
@@ -484,10 +551,12 @@ export const HspView = () => {
                   const satuan = (
                     document.getElementById("create-satuan") as HTMLInputElement
                   )?.value.trim();
+
                   if (!hspCategoryId || !kode || !deskripsi) {
                     toast.error("Kategori, Kode, dan Deskripsi wajib diisi");
                     return;
                   }
+
                   createItem.mutate(
                     { hspCategoryId, kode, deskripsi, satuan },
                     {
@@ -506,10 +575,10 @@ export const HspView = () => {
         </div>
       )}
 
-      {/* Edit */}
+      {/* ===== Edit Modal ===== */}
       {openEdit && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
-          <div className="bg-white rounded-lg shadow w-full max-w-lg">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow w-full max-w-lg text-black">
             <div className="p-4 border-b">
               <h3 className="text-lg font-semibold">Edit HSP Item</h3>
             </div>
@@ -556,7 +625,7 @@ export const HspView = () => {
                   className="input input-bordered w-full text-black bg-white border-black"
                 />
               </div>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs">
                 Harga tidak dapat diubah di sini. Sistem mempertahankan harga
                 yang ada.
               </p>
@@ -583,10 +652,12 @@ export const HspView = () => {
                   const satuan = (
                     document.getElementById("edit-satuan") as HTMLInputElement
                   )?.value.trim();
+
                   if (!hspCategoryId || !kode || !deskripsi) {
                     toast.error("Kategori, Kode, dan Deskripsi wajib diisi");
                     return;
                   }
+
                   updateItem.mutate(
                     {
                       kode: openEdit.kode,
@@ -608,10 +679,10 @@ export const HspView = () => {
         </div>
       )}
 
-      {/* Delete */}
+      {/* ===== Delete Modal ===== */}
       {openDelete && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4 text-black">
-          <div className="bg-white rounded-lg shadow w-full max-w-md">
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow w-full max-w-md text-black">
             <div className="p-4 border-b">
               <h3 className="text-lg font-semibold">Hapus Item</h3>
             </div>

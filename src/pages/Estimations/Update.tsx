@@ -368,7 +368,7 @@ function SortableItemRow({
   const unitOptions: Option[] = useMemo(
     () =>
       (UnitList ?? []).map((u: { label: string; value: string }) => ({
-        label: u.label ?? u.value,
+        label: u.value,
         value: u.value,
       })),
     []
@@ -423,9 +423,7 @@ function SortableItemRow({
             size="sm"
           />
         ) : (
-          UnitList.find((u) => u.value === item.satuan)?.label ||
-          item.satuan ||
-          "-"
+          item.satuan || "-"
         )}
       </td>
 
@@ -541,8 +539,12 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     VolumeDetailRow[] | undefined
   >(undefined);
 
-  /* Data dropdown kategori & item HSP */
-  const { data: itemJob, isLoading: isLoadingItems } = useGetItemJob();
+  const { data: itemJobResp, isLoading: isLoadingItems } = useGetItemJob({
+    q: undefined,
+    skip: 0,
+    take: 100,
+  });
+  const itemJobList = itemJobResp?.data ?? [];
   const { data: categories, isLoading: isLoadingCategories } =
     useGetCategoryJob();
 
@@ -570,41 +572,29 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
 
   const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
     () =>
-      (itemJob ?? []).map(
-        (it: {
-          kode: string;
-          deskripsi: string;
-          satuan: string;
-          harga: number;
-          hspCategoryId?: string;
-          category?: { name?: string };
-        }) => ({
-          kode: it.kode,
-          label: `${it.deskripsi} - ${formatIDR(it.harga)}/${it.satuan}`,
-          value: it.kode,
-          detail: {
-            deskripsi: it.deskripsi,
-            satuan: it.satuan,
-            harga: it.harga ?? 0,
-            categoryId: it.hspCategoryId,
-            categoryName: it.category?.name,
-          },
-        })
-      ),
-    [itemJob]
+      itemJobList.map((it) => ({
+        kode: it.kode,
+        label: `${it.deskripsi} - ${formatIDR(it.harga)}/${it.satuan}`,
+        value: it.kode,
+        detail: {
+          deskripsi: it.deskripsi,
+          satuan: it.satuan,
+          harga: it.harga ?? 0,
+          categoryId: it.hspCategoryId,
+          categoryName: it.category?.name,
+        },
+      })),
+    [itemJobList]
   );
-
   const PekerjaanOptions: Option[] = useMemo(
     () => DropdownPekerjaan.map((p) => ({ label: p.label, value: p.value })),
     [DropdownPekerjaan]
   );
 
-  /* seed data dari server */
   useEffect(() => {
     setSections(initialSections || []);
   }, [initialSections]);
 
-  /* ----------------------------- Add / Remove ----------------------------- */
   const addSection = () => {
     const title = isManualSection
       ? manualSectionTitle.trim()

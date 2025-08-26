@@ -65,7 +65,9 @@ export const EstimationView = () => {
 
   return (
     <div>
-      <h1 className="mb-6 text-2xl font-bold text-gray-800">All Estimation</h1>
+      <h1 className="mb-6 text-2xl font-bold text-gray-800">
+        Semua Rancangan Biaya
+      </h1>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Toolbar */}
@@ -90,7 +92,7 @@ export const EstimationView = () => {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="Search by title or owner..."
+                placeholder="cari berdasarkan nama judul..."
               />
             </div>
           </div>
@@ -113,7 +115,7 @@ export const EstimationView = () => {
               onClick={() => navigate("/estimation/create")}
               className="btn btn-success text-white"
             >
-              Create
+              + Tambah
             </button>
           </div>
         </div>
@@ -126,9 +128,9 @@ export const EstimationView = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     {[
-                      "Title Project",
-                      "Project Owner",
-                      "Date",
+                      "Judul Project",
+                      "Penanggung Jawab",
+                      "Dibuat Pada",
                       "Dibuat Oleh",
                       "Status",
                       "",
@@ -271,19 +273,19 @@ export const EstimationView = () => {
                             title="Detail"
                             onClick={() => navigate(`/estimation/${item.id}`)}
                           />
+                          <BiEdit
+                            className="text-green-600 h-5 w-5 cursor-pointer"
+                            title="Edit"
+                            onClick={() =>
+                              navigate(`/estimation/update/${item.id}`)
+                            }
+                          />
                           <BiTrash
                             className={`h-5 w-5 cursor-pointer ${
                               isPending ? "text-red-300" : "text-red-600"
                             }`}
                             title="Delete"
                             onClick={() => onDelete(item.id, item.projectName)}
-                          />
-                          <BiEdit
-                            className="text-blue-600 h-5 w-5 cursor-pointer"
-                            title="Edit"
-                            onClick={() =>
-                              navigate(`/estimation/update/${item.id}`)
-                            }
                           />
                         </div>
                       </td>

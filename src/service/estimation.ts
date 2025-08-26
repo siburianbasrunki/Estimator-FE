@@ -109,13 +109,33 @@ const EstimationService = {
     return json.data;
   },
 
-  async downloadPdf(id: string, projectName?: string): Promise<void> {
+  async downloadPdf(
+    id: string,
+    projectName?: string,
+    logoFile?: File | null
+  ): Promise<void> {
     const { estimation } = getEndpoints();
-    const res = await fetch(`${estimation}/${id}/download/pdf`, {
-      headers: {
-        Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-    });
+
+    let res: Response;
+    if (logoFile) {
+      const fd = new FormData();
+      fd.append("logo", logoFile);
+      res = await fetch(`${estimation}/${id}/download/pdf`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        } as any,
+        body: fd,
+      });
+    } else {
+      res = await fetch(`${estimation}/${id}/download/pdf`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      });
+    }
+
     if (!res.ok) {
       let msg = `HTTP error! status: ${res.status}`;
       try {
@@ -124,11 +144,11 @@ const EstimationService = {
       } catch {}
       throw new Error(msg);
     }
+
     const safe = sanitizeFileName(projectName || "estimation");
-    const fallback = `${safe}_estimation.pdf`;
+    const fallback = `RAB_${safe}.pdf`;
     await triggerBrowserDownload(res, fallback);
   },
-
   async downloadExcel(
     id: string,
     projectName?: string,

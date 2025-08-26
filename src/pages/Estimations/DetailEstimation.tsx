@@ -1,3 +1,4 @@
+// src/pages/estimation/DetailEstimation.tsx
 import React, { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useEstimation } from "../../hooks/useEstimation";
@@ -128,7 +129,7 @@ const DetailSkeleton: React.FC = () => {
                           "Satuan",
                           "Harga Satuan",
                           "Harga Total",
-                        ].map(( i) => (
+                        ].map((i) => (
                           <th key={i}>
                             <Skeleton.Line width="w-20" height="h-4" />
                           </th>
@@ -197,7 +198,12 @@ export const DetailEstimation: React.FC = () => {
     error,
   } = useEstimation(id || "");
   const [downloadingExcel, setDownloadingExcel] = useState(false);
-  const [showLogoModal, setShowLogoModal] = useState(false);
+  const [downloadingPdf, setDownloadingPdf] = useState(false);
+
+  // Modal & file logo (dipakai untuk keduanya: Excel & PDF)
+  const [showLogoModal, setShowLogoModal] = useState<false | "excel" | "pdf">(
+    false
+  );
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -226,27 +232,40 @@ export const DetailEstimation: React.FC = () => {
     setLogoPreview(URL.createObjectURL(f));
   };
 
-  const doExport = async (withLogo: boolean) => {
+  const doExport = async (kind: "excel" | "pdf", withLogo: boolean) => {
     if (!id || !estimation) return;
     try {
-      setDownloadingExcel(true);
-      await EstimationService.downloadExcel(
-        id,
-        estimation.projectName,
-        withLogo ? logoFile : null
-      );
-      toast.success("Export Excel berhasil");
+      if (kind === "excel") {
+        setDownloadingExcel(true);
+        await EstimationService.downloadExcel(
+          id,
+          estimation.projectName,
+          withLogo ? logoFile : null
+        );
+        toast.success("Export Excel berhasil");
+      } else {
+        setDownloadingPdf(true);
+        await EstimationService.downloadPdf(
+          id,
+          estimation.projectName,
+          withLogo ? logoFile : null
+        );
+        toast.success("Export PDF berhasil");
+      }
     } catch (e: any) {
-      toast.error(e?.message || "Gagal export Excel");
+      toast.error(e?.message || `Gagal export ${kind.toUpperCase()}`);
     } finally {
       setDownloadingExcel(false);
+      setDownloadingPdf(false);
       setShowLogoModal(false);
+      setLogoFile(null);
+      setLogoPreview(null);
+      setLogoError(null);
     }
   };
 
-  const handleExportExcel = () => {
-    setShowLogoModal(true);
-  };
+  const handleExportExcel = () => setShowLogoModal("excel");
+  const handleExportPdf = () => setShowLogoModal("pdf");
 
   const { subtotal, ppnAmount, grandTotal, itemCount } = useMemo(() => {
     const items = estimation?.items ?? [];
@@ -391,10 +410,21 @@ export const DetailEstimation: React.FC = () => {
               type="button"
               className={`btn btn-success ${downloadingExcel ? "loading" : ""}`}
               onClick={handleExportExcel}
-              disabled={downloadingExcel}
+              disabled={downloadingExcel || downloadingPdf}
               aria-busy={downloadingExcel}
             >
               {downloadingExcel ? "Mempersiapkan Excel..." : "Export Excel"}
+            </button>
+
+            <button
+              type="button"
+              className={`btn btn-outline ${downloadingPdf ? "loading" : ""}`}
+              onClick={handleExportPdf}
+              disabled={downloadingExcel || downloadingPdf}
+              aria-busy={downloadingPdf}
+              title="Export PDF dengan kop (logo) seperti Excel"
+            >
+              {downloadingPdf ? "Mempersiapkan PDF..." : "Export PDF"}
             </button>
           </div>
         </div>
@@ -500,14 +530,19 @@ export const DetailEstimation: React.FC = () => {
         })}
       </div>
 
+      {/* Modal Export (Excel/PDF) */}
       {showLogoModal && (
         <div className="modal modal-open">
           <div className="modal-box bg-white text-black">
-            <h3 className="font-bold text-lg mb-2">Tambah Logo ke Excel?</h3>
+            <h3 className="font-bold text-lg mb-2">
+              {showLogoModal === "excel"
+                ? "Tambah Logo ke Excel?"
+                : "Tambah Logo ke PDF?"}
+            </h3>
             <p className="text-sm text-gray-600 mb-4">
               (Opsional) Unggah logo perusahaan Anda (PNG/JPG, maks 2MB). Logo
-              akan dipasang sebagai kop header di sheet RAB dan Ringkasan
-              Estimasi.
+              akan dipasang sebagai kop header pada dokumen{" "}
+              {showLogoModal.toUpperCase()}.
             </p>
 
             <input
@@ -534,30 +569,42 @@ export const DetailEstimation: React.FC = () => {
               </div>
             )}
 
-            <div className="modal-action flex justify-start">
+            <div className="modal-action flex flex-wrap gap-2 justify-start">
               <button
                 className="btn btn-soft"
                 onClick={() => setShowLogoModal(false)}
-                disabled={downloadingExcel}
+                disabled={downloadingExcel || downloadingPdf}
               >
                 Batal
               </button>
 
               <button
                 className="btn btn-dash"
-                onClick={() => doExport(false)}
-                disabled={downloadingExcel}
+                onClick={() => doExport(showLogoModal, false)}
+                disabled={downloadingExcel || downloadingPdf}
               >
-                {downloadingExcel ? "Mengunduh..." : "Lanjut tanpa logo"}
+                {showLogoModal === "excel"
+                  ? downloadingExcel
+                    ? "Mengunduh..."
+                    : "Lanjut tanpa logo"
+                  : downloadingPdf
+                  ? "Mengunduh..."
+                  : "Lanjut tanpa logo"}
               </button>
 
               <button
                 className="btn btn-success"
-                onClick={() => doExport(true)}
-                disabled={!logoFile || downloadingExcel}
+                onClick={() => doExport(showLogoModal, true)}
+                disabled={!logoFile || downloadingExcel || downloadingPdf}
                 title={!logoFile ? "Pilih logo dulu (opsional)" : ""}
               >
-                {downloadingExcel ? "Mengunduh..." : "Export dengan logo"}
+                {showLogoModal === "excel"
+                  ? downloadingExcel
+                    ? "Mengunduh..."
+                    : "Export dengan logo"
+                  : downloadingPdf
+                  ? "Mengunduh..."
+                  : "Export dengan logo"}
               </button>
             </div>
           </div>

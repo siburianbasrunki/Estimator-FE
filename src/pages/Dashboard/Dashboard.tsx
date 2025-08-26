@@ -43,12 +43,12 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-2">
         <StatsCard
-          title="Welcome👋,"
+          title="Selamat Datang👋,"
           fontSizeTitle="font-[900] text-2xl"
           value={profile?.name || ""}
         />
         <StatsCard
-          title="your estimation"
+          title="rancangan estimasi anda"
           fontSizeTitle="font-[900] text-lg"
           value={estimation?.pagination?.total || 0}
           icon={<TbReportAnalytics className="w-6 h-6 text-green-500" />}
@@ -58,7 +58,7 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 gap-6 ">
         <div className="p-4 bg-white rounded-lg shadow">
           <h2 className="mb-4 text-lg font-semibold text-black">
-            Total budget for all estimates per month
+            Total Estimasi per Bulan
           </h2>
           <LineChart
             data={monthly?.series ?? []}
@@ -70,7 +70,7 @@ const Dashboard = () => {
 
       <div className="mt-4">
         <h2 className="mb-4 text-lg font-semibold text-black">
-          Recent Estimation
+          Estimasi Terbaru
         </h2>
         <RecentEstimation />
       </div>

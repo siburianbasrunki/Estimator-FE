@@ -3,7 +3,7 @@ import toast from "react-hot-toast";
 import type { ImportHspSummary } from "../service/hsp";
 import HspService from "../service/hsp";
 import { useParams } from "react-router-dom";
-import type { AhspDetailModel } from "../model/hsp";
+import type { AhspDetailModel, ItemJobListResponse } from "../model/hsp";
 
 export const useImportHsp = () => {
   return useMutation<ImportHspSummary, Error, File>({
@@ -34,10 +34,17 @@ export const useGetAllHsp = () => {
   });
 };
 
-export const useGetItemJob = () => {
-  return useQuery({
-    queryKey: ["itemJob"],
-    queryFn: () => HspService.getItemJob(),
+export const useGetItemJob = (params: {
+  q?: string;
+  skip: number;
+  take: number;
+  orderBy?: "kode" | "harga";
+  orderDir?: "asc" | "desc";
+}) => {
+  return useQuery<ItemJobListResponse>({
+    queryKey: ["itemJob", params],
+    queryFn: () => HspService.getItemJob(params),
+    
   });
 };
 

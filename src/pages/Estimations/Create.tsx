@@ -361,7 +361,7 @@ function SortableItemRow({
   const unitOptions: Option[] = useMemo(
     () =>
       (UnitList ?? []).map((u: { label: string; value: string }) => ({
-        label: u.label ?? u.value,
+        label: u.value,
         value: u.value,
       })),
     []
@@ -562,7 +562,7 @@ function SortableSectionHeader({
     >
       <td className="px-4 py-3 text-sm font-semibold text-blue-700">
         <button
-          className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2"
+          className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
           title="Drag kategori"
           aria-label="Drag kategori"
           {...attributes}
@@ -681,7 +681,12 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     VolumeDetailRow[] | undefined
   >(undefined);
 
-  const { data: itemJob, isLoading: isLoadingItems } = useGetItemJob();
+  const { data: itemJobResp, isLoading: isLoadingItems } = useGetItemJob({
+    q: undefined,
+    skip: 0,
+    take: 100,
+  });
+  const itemJobList = itemJobResp?.data ?? [];
   const { data: categories, isLoading: isLoadingCategories } =
     useGetCategoryJob();
 
@@ -709,28 +714,19 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
 
   const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
     () =>
-      (itemJob ?? []).map(
-        (it: {
-          kode: string;
-          deskripsi: string;
-          satuan: string;
-          harga: number;
-          hspCategoryId?: string;
-          category?: { name?: string };
-        }) => ({
-          kode: it.kode,
-          label: `${it.deskripsi} - ${formatIDR(it.harga)}/${it.satuan}`,
-          value: it.kode,
-          detail: {
-            deskripsi: it.deskripsi,
-            satuan: it.satuan,
-            harga: it.harga ?? 0,
-            categoryId: it.hspCategoryId,
-            categoryName: it.category?.name,
-          },
-        })
-      ),
-    [itemJob]
+      itemJobList.map((it) => ({
+        kode: it.kode,
+        label: `${it.deskripsi} - ${formatIDR(it.harga)}/${it.satuan}`,
+        value: it.kode,
+        detail: {
+          deskripsi: it.deskripsi,
+          satuan: it.satuan,
+          harga: it.harga ?? 0,
+          categoryId: it.hspCategoryId,
+          categoryName: it.category?.name,
+        },
+      })),
+    [itemJobList]
   );
 
   const PekerjaanOptions: Option[] = useMemo(
@@ -1119,7 +1115,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
 
       {/* TABLE + DnD */}
       <div className="collapse bg-transparent shadow-none">
-        <div className="overflow-x-auto rounded-lg border border-gray-200">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 h-[500px]">
           <DndContext
             sensors={useSensors(
               useSensor(PointerSensor, {

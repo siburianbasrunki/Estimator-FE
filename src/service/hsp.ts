@@ -2,8 +2,8 @@ import { getEndpoints } from "../config/config";
 import type {
   CategoryItemModel,
   HspAllModel,
-  ItemJobModel,
   AhspDetailModel,
+  ItemJobListResponse,
 } from "../model/hsp";
 import type {
   MasterCreatePayload,
@@ -61,18 +61,33 @@ const HspService = {
     return json.data as HspAllModel;
   },
 
-  async getItemJob(): Promise<ItemJobModel[]> {
+  async getItemJob(params?: {
+    q?: string;
+    skip?: number;
+    take?: number;
+    orderBy?: "kode" | "harga";
+    orderDir?: "asc" | "desc";
+    categoryId?: string;
+    kode?: string; // exact
+  }): Promise<ItemJobListResponse> {
     const { hsp } = getEndpoints();
-    const res = await fetch(`${hsp}/items`, {
-      headers: authHeader(),
-    });
-    const json = await res.json();
-    if (!res.ok) {
-      throw new Error(json?.error || `Fetch failed (HTTP ${res.status})`);
-    }
-    return json.data as ItemJobModel[];
-  },
+    const u = new URL(`${hsp}/items`);
+    if (params?.q) u.searchParams.set("q", params.q);
+    if (typeof params?.skip === "number")
+      u.searchParams.set("skip", String(params.skip));
+    if (typeof params?.take === "number")
+      u.searchParams.set("take", String(params.take));
+    if (params?.orderBy) u.searchParams.set("orderBy", params.orderBy);
+    if (params?.orderDir) u.searchParams.set("orderDir", params.orderDir);
+    if (params?.categoryId) u.searchParams.set("categoryId", params.categoryId);
+    if (params?.kode) u.searchParams.set("kode", params.kode);
 
+    const res = await fetch(u.toString(), { headers: authHeader() });
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json?.error || `Fetch failed (HTTP ${res.status})`);
+    return json as ItemJobListResponse;
+  },
   async getCategoryJob(): Promise<CategoryItemModel[]> {
     const { hsp } = getEndpoints();
     const res = await fetch(`${hsp}/categories`, {

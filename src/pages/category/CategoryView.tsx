@@ -97,7 +97,7 @@ export const CategoryView = () => {
               </div>
               <button
                 onClick={() => setOpenCreate(true)}
-                className="inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700"
+                className="inline-flex items-center gap-2 px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-400 hover:bg-green-500"
               >
                 <BiPlus className="w-5 h-5" />
                 Tambah Kategori
@@ -142,7 +142,7 @@ export const CategoryView = () => {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-900">
                       <div className="flex gap-3 justify-end">
                         <BiEdit
-                          className="w-5 h-5 text-amber-600 cursor-pointer"
+                          className="w-5 h-5 text-green-600 cursor-pointer"
                           title="Edit"
                           onClick={() =>
                             setOpenEdit({

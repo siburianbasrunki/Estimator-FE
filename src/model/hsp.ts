@@ -38,11 +38,18 @@ export interface ItemJobModel {
     id: string;
     name: string;
   };
-  pagination: {
-    skip: number;
-    take: number;
-    total: number;
-  };
+}
+
+export interface Pagination {
+  skip: number;
+  take: number;
+  total: number;
+}
+
+export interface ItemJobListResponse {
+  status: "success";
+  data: ItemJobModel[];
+  pagination: Pagination;
 }
 
 export interface CategoryItemModel {

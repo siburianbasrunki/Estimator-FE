@@ -122,7 +122,7 @@ export const MasterView: React.FC<Props> = ({ type }) => {
         </div>
         <button
           onClick={() => setOpenCreate(true)}
-          className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700"
+          className="rounded-lg bg-green-400 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
         >
           + Tambah
         </button>
@@ -295,7 +295,7 @@ export const MasterView: React.FC<Props> = ({ type }) => {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex gap-3 justify-end">
                       <BiEdit
-                        className="w-5 h-5 text-amber-600 cursor-pointer"
+                        className="w-5 h-5 text-green-600 cursor-pointer"
                         title="Edit"
                         onClick={() => setEditing(it)}
                       />
