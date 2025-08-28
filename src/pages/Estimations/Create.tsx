@@ -40,6 +40,7 @@ import type { VolumeDetailRow } from "./VolumeModal";
 import VolModal from "./VolumeModal";
 import { BackButton } from "../../components/BackButton";
 import { useNavigate } from "react-router-dom";
+import { useNotify } from "../../components/Notify/notify";
 
 /* ------------------------------ Helpers ------------------------------ */
 const uid = () =>
@@ -1303,7 +1304,7 @@ const CreateEstimation = () => {
   });
   const [customFields, setCustomFields] = useState<CustomField[]>([]);
   const createMutation = useCreateEstimation();
-
+  const notify = useNotify();
   const toggleAccordion = (step: string) =>
     setActiveAccordion((prev) => (prev === step ? "" : step));
 
@@ -1326,6 +1327,7 @@ const CreateEstimation = () => {
         setFormData({ projectName: "", owner: "", ppn: "11", notes: "" });
         setCustomFields([]);
         setActiveAccordion("step1");
+        notify("Berhasil menyimpan data", 'success');
       },
     });
   };

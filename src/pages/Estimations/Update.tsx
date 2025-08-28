@@ -47,6 +47,7 @@ import { BackButton } from "../../components/BackButton";
 import SearchableSelect, {
   type Option,
 } from "../../components/SearchableSelect";
+import { useNotify } from "../../components/Notify/notify";
 
 /* ------------------------------ Helpers ------------------------------ */
 const uid = () =>
@@ -1155,7 +1156,7 @@ const UpdateEstimation: React.FC = () => {
     isError,
   } = useEstimation(id || "");
   const updateMutation = useUpdateEstimation();
-
+  const notify = useNotify();
   // Step accordion
   const [activeAccordion, setActiveAccordion] = useState<string>("step1");
   const toggleAccordion = (step: string) =>
@@ -1259,7 +1260,13 @@ const UpdateEstimation: React.FC = () => {
 
   const handleSaveData = (data: any) => {
     if (!id) return;
-    updateMutation.mutate({ id, data });
+
+    try {
+      updateMutation.mutate({ id, data });
+      notify("Berhasil memperbarui estimasi", "success");
+    } catch (error) {
+      notify("Gagal memperbarui estimasi", "error");
+    }
   };
 
   if (!id) {

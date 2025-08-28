@@ -8,11 +8,11 @@ import {
   useImportHsp,
   useUpdateHspItem,
 } from "../../hooks/useHsp";
-import toast from "react-hot-toast";
 import { IoDocument } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
 import Skeleton from "../../components/Skeleton";
 import EmptyState from "../../components/EmptyState";
+import { useNotify } from "../../components/Notify/notify";
 
 type ItemType = {
   kode: string;
@@ -28,7 +28,7 @@ export const HspView = () => {
   const [selectedFileName, setSelectedFileName] = useState<string>("");
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const navigate = useNavigate();
-
+  const notify = useNotify();
   const { data: categories } = useGetCategoryJob();
   const createItem = useCreateHspItem();
   const updateItem = useUpdateHspItem();
@@ -153,14 +153,14 @@ export const HspView = () => {
 
     const ext = file.name.toLowerCase().split(".").pop();
     if (!["xlsx", "csv"].includes(ext || "")) {
-      toast.error("File harus .xlsx atau .csv");
+      notify("File harus .xlsx atau .csv", 'info');
       return;
     }
 
     importHsp(file, {
       onSuccess: (res) => {
         if (res.status === "success") {
-          toast.success("Import sukses. Data akan dimuat ulang.");
+          notify("Import sukses. Data akan dimuat ulang.", 'success');
           refetch();
         }
       },
@@ -187,7 +187,7 @@ export const HspView = () => {
           <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
             <button
               onClick={() => setOpenCreate(true)}
-              className="px-4 py-2 rounded-md text-sm text-white bg-green-400 hover:bg-green-500"
+              className="px-4 py-2 rounded-md text-sm text-white bg-green-400 hover:bg-green-500 cursor-pointer"
             >
               <BiPlus className="inline-block mr-1" />
               Tambah Item
@@ -204,7 +204,9 @@ export const HspView = () => {
               onClick={onClickImport}
               disabled={isPending}
               className={`px-4 py-2 rounded-md text-sm text-white ${
-                isPending ? "bg-blue-400" : "bg-blue-600 hover:bg-blue-700"
+                isPending
+                  ? "bg-blue-400"
+                  : "bg-blue-600 hover:bg-blue-700 cursor-pointer"
               }`}
             >
               <BiUpload className="inline-block mr-1" />
@@ -559,7 +561,7 @@ export const HspView = () => {
                   )?.value.trim();
 
                   if (!hspCategoryId || !kode || !deskripsi) {
-                    toast.error("Kategori, Kode, dan Deskripsi wajib diisi");
+                    notify("Kategori, Kode, dan Deskripsi wajib diisi", 'info');
                     return;
                   }
 
@@ -660,7 +662,7 @@ export const HspView = () => {
                   )?.value.trim();
 
                   if (!hspCategoryId || !kode || !deskripsi) {
-                    toast.error("Kategori, Kode, dan Deskripsi wajib diisi");
+                    notify("Kategori, Kode, dan Deskripsi wajib diisi" , 'info');
                     return;
                   }
 

@@ -5,9 +5,9 @@ import { useEstimation } from "../../hooks/useEstimation";
 import { formatDateTimeID } from "../../helper/date";
 import { formatIDR } from "../../helper/rupiah";
 import EstimationService from "../../service/estimation";
-import toast from "react-hot-toast";
 import { BackButton } from "../../components/BackButton";
 import Skeleton from "../../components/Skeleton";
+import { useNotify } from "../../components/Notify/notify";
 
 /* =========================
    Kartu field kecil reusable
@@ -199,7 +199,7 @@ export const DetailEstimation: React.FC = () => {
   } = useEstimation(id || "");
   const [downloadingExcel, setDownloadingExcel] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
-
+  const notify = useNotify();
   // Modal & file logo (dipakai untuk keduanya: Excel & PDF)
   const [showLogoModal, setShowLogoModal] = useState<false | "excel" | "pdf">(
     false
@@ -242,7 +242,7 @@ export const DetailEstimation: React.FC = () => {
           estimation.projectName,
           withLogo ? logoFile : null
         );
-        toast.success("Export Excel berhasil");
+        notify("Export Excel berhasil", "success");
       } else {
         setDownloadingPdf(true);
         await EstimationService.downloadPdf(
@@ -250,10 +250,10 @@ export const DetailEstimation: React.FC = () => {
           estimation.projectName,
           withLogo ? logoFile : null
         );
-        toast.success("Export PDF berhasil");
+        notify("Export PDF berhasil", "success");
       }
     } catch (e: any) {
-      toast.error(e?.message || `Gagal export ${kind.toUpperCase()}`);
+      notify(e?.message || `Gagal export ${kind.toUpperCase()}`, "error");
     } finally {
       setDownloadingExcel(false);
       setDownloadingPdf(false);
@@ -326,7 +326,7 @@ export const DetailEstimation: React.FC = () => {
   }
 
   return (
-    <div className="max-w mx-auto p-4 space-y-6 text-black">
+    <div className="max-w mx-auto space-y-6 text-black">
       <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
 
       {/* Header */}
