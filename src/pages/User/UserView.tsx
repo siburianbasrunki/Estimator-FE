@@ -10,6 +10,7 @@ import UserModal from "./UserModal";
 import DeleteConfirm from "./Confirm";
 import Skeleton from "../../components/Skeleton";
 import { BiEdit, BiTrash } from "react-icons/bi";
+import EmptyState from "../../components/EmptyState";
 
 export const UserView = () => {
   const [search, setSearch] = useState("");
@@ -198,7 +199,10 @@ export const UserView = () => {
                       colSpan={5}
                       className="px-6 py-6 text-center text-sm text-gray-500"
                     >
-                      No data found
+                      <EmptyState
+                        title="Belum ada User"
+                        description="Mulai dengan membuat user baru"
+                      />
                     </td>
                   </tr>
                 )}

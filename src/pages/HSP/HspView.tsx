@@ -12,6 +12,7 @@ import toast from "react-hot-toast";
 import { IoDocument } from "react-icons/io5";
 import { useNavigate } from "react-router-dom";
 import Skeleton from "../../components/Skeleton";
+import EmptyState from "../../components/EmptyState";
 
 type ItemType = {
   kode: string;
@@ -347,7 +348,12 @@ export const HspView = () => {
                   {totalItems === 0 && (
                     <tr>
                       <td colSpan={6} className="px-6 py-6 text-center text-sm">
-                        Tidak ada data
+                        <div className="p-4">
+                          <EmptyState
+                            title="Belum ada Harga Satuan Pekerjaan"
+                            description="Mulai dengan membuat HSP baru atau import dari file."
+                          />
+                        </div>
                       </td>
                     </tr>
                   )}

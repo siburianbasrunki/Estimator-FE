@@ -1,6 +1,7 @@
-import {  useState } from "react";
+import { useState } from "react";
 import { useGetItemJob } from "../../hooks/useHsp";
 import Skeleton from "../../components/Skeleton";
+import EmptyState from "../../components/EmptyState";
 
 export const ItemJobsView = () => {
   const [search, setSearch] = useState("");
@@ -180,7 +181,10 @@ export const ItemJobsView = () => {
                     colSpan={6}
                     className="px-6 py-6 text-center text-gray-500 text-sm"
                   >
-                    No items found
+                    <EmptyState
+                      title="Belum ada Item Pekerjaan"
+                      description="Mulai dengan membuat item baru di page hsp"
+                    />
                   </td>
                 </tr>
               )}
@@ -207,7 +211,7 @@ export const ItemJobsView = () => {
               .filter(
                 (p) => Math.abs(p - page) <= 2 || p === 1 || p === totalPages
               )
-              .reduce<number[]>((arr, p, _, ) => {
+              .reduce<number[]>((arr, p, _) => {
                 if (arr.length === 0) return [p];
                 const prev = arr[arr.length - 1];
                 if (p - prev > 1) arr.push(-1);

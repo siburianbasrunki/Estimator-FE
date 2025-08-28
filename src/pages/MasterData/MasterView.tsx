@@ -10,6 +10,7 @@ import { MasterForm } from "./MasterForm";
 import { formatIDR } from "../../helper/rupiah";
 import { BiEdit, BiTrash, BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import Skeleton from "../../components/Skeleton";
+import EmptyState from "../../components/EmptyState";
 
 const LABEL: Record<MasterType, string> = {
   LABOR: "Upah / Tenaga",
@@ -257,7 +258,10 @@ export const MasterView: React.FC<Props> = ({ type }) => {
                     colSpan={type === "LABOR" ? 8 : 6}
                     className="px-6 py-6 text-center text-gray-500 text-sm"
                   >
-                    Tidak ada data
+                    <EmptyState
+                      title="Belum ada data"
+                      description="Mulai dengan membuat data baru"
+                    />
                   </td>
                 </tr>
               )}

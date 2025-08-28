@@ -8,6 +8,7 @@ import {
 import { BiEdit, BiPlus, BiTrash } from "react-icons/bi";
 import toast from "react-hot-toast";
 import Skeleton from "../../components/Skeleton";
+import EmptyState from "../../components/EmptyState";
 
 export const CategoryView = () => {
   const { data: categories, isLoading: isLoadingCategories } =
@@ -174,7 +175,10 @@ export const CategoryView = () => {
                     colSpan={4}
                     className="px-6 py-6 text-center text-gray-500 text-sm"
                   >
-                    No categories found
+                    <EmptyState
+                      title="Belum ada Kategori"
+                      description="Mulai dengan membuat kategori baru"
+                    />
                   </td>
                 </tr>
               )}
