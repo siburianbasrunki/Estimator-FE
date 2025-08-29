@@ -218,13 +218,16 @@ export const EstimationView = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Title Project
+                      No.
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Project Owner
+                      Judul Project
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
+                      Penanggung Jawab
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dibuat Pada
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Dibuat Oleh
@@ -242,6 +245,9 @@ export const EstimationView = () => {
                     className="bg-white divide-y divide-gray-200"
                   >
                     <tr>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {estimation?.data.indexOf(item) + 1 + (page - 1) * limit}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {item.projectName || "-"}
                       </td>

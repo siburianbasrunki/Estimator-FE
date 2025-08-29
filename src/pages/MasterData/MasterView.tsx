@@ -218,6 +218,9 @@ export const MasterView: React.FC<Props> = ({ type }) => {
           <thead className="bg-gray-50">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                No.
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 Kode
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -269,6 +272,9 @@ export const MasterView: React.FC<Props> = ({ type }) => {
               {/* Rows */}
               {list.data?.data?.map((it) => (
                 <tr key={it.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {list.data?.data.indexOf(it) + 1 + (page - 1) * pageSize}
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {it.code}
                   </td>
