@@ -8,6 +8,7 @@ import EstimationService from "../../service/estimation";
 import { BackButton } from "../../components/BackButton";
 import Skeleton from "../../components/Skeleton";
 import { useNotify } from "../../components/Notify/notify";
+import PdfService from "../../service/pdfDownload";
 
 /* =========================
    Kartu field kecil reusable
@@ -201,9 +202,9 @@ export const DetailEstimation: React.FC = () => {
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const notify = useNotify();
   // Modal & file logo (dipakai untuk keduanya: Excel & PDF)
-  const [showLogoModal, setShowLogoModal] = useState<false | "excel" | "pdf">(
-    false
-  );
+  const [showLogoModal, setShowLogoModal] = useState<
+    false | "excel" | "pdf-rab"
+  >(false);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string | null>(null);
   const [logoError, setLogoError] = useState<string | null>(null);
@@ -232,7 +233,7 @@ export const DetailEstimation: React.FC = () => {
     setLogoPreview(URL.createObjectURL(f));
   };
 
-  const doExport = async (kind: "excel" | "pdf", withLogo: boolean) => {
+  const doExport = async (kind: "excel" | "pdf-rab", withLogo: boolean) => {
     if (!id || !estimation) return;
     try {
       if (kind === "excel") {
@@ -245,15 +246,18 @@ export const DetailEstimation: React.FC = () => {
         notify("Export Excel berhasil", "success");
       } else {
         setDownloadingPdf(true);
-        await EstimationService.downloadPdf(
+        await PdfService.downloadPdfRAB(
           id,
           estimation.projectName,
           withLogo ? logoFile : null
         );
-        notify("Export PDF berhasil", "success");
+        notify("Export PDF RAB berhasil", "success");
       }
     } catch (e: any) {
-      notify(e?.message || `Gagal export ${kind.toUpperCase()}`, "error");
+      notify(
+        e?.message || `Gagal export ${kind === "excel" ? "Excel" : "PDF RAB"}`,
+        "error"
+      );
     } finally {
       setDownloadingExcel(false);
       setDownloadingPdf(false);
@@ -265,8 +269,31 @@ export const DetailEstimation: React.FC = () => {
   };
 
   const handleExportExcel = () => setShowLogoModal("excel");
-  const handleExportPdf = () => setShowLogoModal("pdf");
-
+  const handleExportPdfRAB = () => setShowLogoModal("pdf-rab");
+  const handlePdfPick = async (
+    type: "volume" | "jobitem" | "kategori" | "ahsp" | "masteritem"
+  ) => {
+    if (!id || !estimation) return;
+    try {
+      setDownloadingPdf(true);
+      if (type === "volume") {
+        await PdfService.downloadPdfVolume(id, estimation.projectName);
+      } else if (type === "jobitem") {
+        await PdfService.downloadPdfJobItem(id, estimation.projectName);
+      } else if (type === "kategori") {
+        await PdfService.downloadPdfKategori(id, estimation.projectName);
+      } else if (type === "ahsp") {
+        await PdfService.downloadPdfAHSP(id, estimation.projectName);
+      } else if (type === "masteritem") {
+        await PdfService.downloadPdfMasterItem(id, estimation.projectName);
+      }
+      notify("Export PDF berhasil", "success");
+    } catch (e: any) {
+      notify(e?.message || "Gagal export PDF", "error");
+    } finally {
+      setDownloadingPdf(false);
+    }
+  };
   const { subtotal, ppnAmount, grandTotal, itemCount } = useMemo(() => {
     const items = estimation?.items ?? [];
     const sub = items.reduce((sum, it) => {
@@ -294,7 +321,6 @@ export const DetailEstimation: React.FC = () => {
     };
   }, [estimation]);
 
-  /* -------- Loading with full skeleton -------- */
   if (isLoading) {
     return <DetailSkeleton />;
   }
@@ -410,22 +436,82 @@ export const DetailEstimation: React.FC = () => {
               type="button"
               className={`btn btn-success ${downloadingExcel ? "loading" : ""}`}
               onClick={handleExportExcel}
-              disabled={downloadingExcel || downloadingPdf}
+              // disabled={downloadingExcel || downloadingPdf}
               aria-busy={downloadingExcel}
             >
               {downloadingExcel ? "Mempersiapkan Excel..." : "Export Excel"}
             </button>
 
-            <button
-              type="button"
-              className={`btn btn-outline ${downloadingPdf ? "loading" : ""}`}
-              onClick={handleExportPdf}
-              disabled={downloadingExcel || downloadingPdf}
-              aria-busy={downloadingPdf}
-              title="Export PDF dengan kop (logo) seperti Excel"
-            >
-              {downloadingPdf ? "Mempersiapkan PDF..." : "Export PDF"}
-            </button>
+            <div className="dropdown dropdown-end">
+              <label
+                tabIndex={0}
+                className={`btn btn-outline ${downloadingPdf ? "loading" : ""}`}
+                aria-busy={downloadingPdf}
+              >
+                {downloadingPdf ? "Mempersiapkan PDF..." : "Export PDF"}
+                <svg
+                  className="ml-2 h-4 w-4"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                >
+                  <path d="M5.25 7.5l4.5 4.5 4.5-4.5h-9z" />
+                </svg>
+              </label>
+              <ul
+                tabIndex={0}
+                className="dropdown-content menu p-2 shadow bg-white border border-gray-200 rounded-box w-56"
+              >
+                <li>
+                  <button
+                    onClick={handleExportPdfRAB}
+                    // disabled={downloadingPdf}
+                  >
+                    PDF RAB (dengan/ tanpa logo)
+                  </button>
+                </li>
+
+                <li>
+                  <button
+                    onClick={() => handlePdfPick("volume")}
+                    // disabled={downloadingPdf}
+                  >
+                    Volume
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handlePdfPick("jobitem")}
+                    // disabled={downloadingPdf}
+                  >
+                    Job Item Dipakai
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handlePdfPick("kategori")}
+                    // disabled={downloadingPdf}
+                  >
+                    Kategori Dipakai
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handlePdfPick("ahsp")}
+                    // disabled={downloadingPdf}
+                  >
+                    AHSP Dipakai
+                  </button>
+                </li>
+                <li>
+                  <button
+                    onClick={() => handlePdfPick("masteritem")}
+                    // disabled={downloadingPdf}
+                  >
+                    Master Item Dipakai
+                  </button>
+                </li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>
@@ -537,12 +623,10 @@ export const DetailEstimation: React.FC = () => {
             <h3 className="font-bold text-lg mb-2">
               {showLogoModal === "excel"
                 ? "Tambah Logo ke Excel?"
-                : "Tambah Logo ke PDF?"}
+                : "Tambah Logo ke PDF RAB?"}
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              (Opsional) Unggah logo perusahaan Anda (PNG/JPG, maks 2MB). Logo
-              akan dipasang sebagai kop header pada dokumen{" "}
-              {showLogoModal.toUpperCase()}.
+              (Opsional) Unggah logo perusahaan Anda (PNG/JPG, maks 2MB).
             </p>
 
             <input

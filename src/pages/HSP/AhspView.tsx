@@ -524,7 +524,7 @@ export const AhspView: React.FC = () => {
             >
               {recomputeMut.isPending
                 ? "Memproses..."
-                : "Recompute & Sync Harga"}
+                : "Sinkronkan Harga Ke HSP Item"}
             </button>
             <div className="ml-auto text-sm text-gray-500">
               Terakhir diperbarui:{" "}

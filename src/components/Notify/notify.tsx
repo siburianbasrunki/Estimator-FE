@@ -40,7 +40,7 @@ export const NotifyProvider: React.FC<{ children: React.ReactNode }> = ({
               className={[
                 "rounded-lg px-4 py-3 shadow-lg border text-sm",
                 "bg-white/80 backdrop-blur-sm",
-                t.variant === "success" && "border-emerald-200",
+                t.variant === "success" && "border-green-600",
                 t.variant === "error" && "border-red-200",
                 t.variant === "info" && "border-indigo-200",
               ]
@@ -50,7 +50,7 @@ export const NotifyProvider: React.FC<{ children: React.ReactNode }> = ({
               <div
                 className={[
                   "font-medium",
-                  t.variant === "success" && "text-emerald-700",
+                  t.variant === "success" && "text-green-700",
                   t.variant === "error" && "text-red-700",
                   t.variant === "info" && "text-indigo-700",
                 ]

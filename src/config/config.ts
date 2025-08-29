@@ -9,5 +9,6 @@ export function getEndpoints() {
     importHsp: `${BASE_URL}/hsp/import`,
     dasboard: `${BASE_URL}/dashboard`,
     users: `${BASE_URL}/users`,
+    exportPdf: `${BASE_URL}/export-pdf`,
   };
 }
