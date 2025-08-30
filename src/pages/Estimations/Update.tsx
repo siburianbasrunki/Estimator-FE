@@ -61,16 +61,14 @@ const formatIDR = (n: number = 0) =>
 const mapJenisApiToUi = (v?: string): "penjumlahan" | "pengurangan" =>
   v === "SUB" ? "pengurangan" : "penjumlahan";
 
-// Normalisasi input angka uang (biar gak jadi 03 / gak auto 0 saat kosong)
-const sanitizeMoneyInput = (v: string) => {
-  const cleaned = v.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-  return cleaned.replace(/^0+(?=\d)/, "");
-};
-const toNumber = (v?: string) => {
-  if (v == null || v.trim() === "") return 0;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
-};
+// Normalisasi input angka
+const sanitizeMoneyInput = (v: string) =>
+  v
+    .replace(/[^\d.,]/g, "")
+    .replace(/,/g, ".")
+    .replace(/^0+(?=\d)/, "");
+const toNumber = (v?: string) =>
+  v == null || v.trim() === "" ? 0 : Number(v) || 0;
 
 /* ------------------------------ Types ------------------------------ */
 interface CustomFieldUI {
@@ -82,7 +80,7 @@ interface CustomFieldUI {
 interface ProjectProfile {
   projectName: string;
   owner: string;
-  ppn: string; // string untuk binding input
+  ppn: string;
   notes: string;
   customFields: Record<string, string>;
 }
@@ -90,11 +88,11 @@ type ItemRow = {
   id: string;
   kode: string;
   deskripsi: string;
-  volume: number; // auto dari modal
+  volume: number;
   volumeDetails?: VolumeDetailRow[];
   satuan: string;
-  hargaSatuan: number; // nilai final (number)
-  hargaSatuanInput?: string; // nilai saat editing (string)
+  hargaSatuan: number;
+  hargaSatuanInput?: string;
   hargaTotal: number;
   isEditing?: boolean;
 };
@@ -102,6 +100,7 @@ type Section = {
   id: string;
   title: string;
   items: ItemRow[];
+  isEditingTitle?: boolean;
 };
 
 /* -------------------------- Step 1 (Profil) -------------------------- */
@@ -113,12 +112,7 @@ const UpdateStepOne = ({
   setCustomFields,
 }: {
   onSave: () => void;
-  formData: {
-    projectName: string;
-    owner: string;
-    ppn: string;
-    notes: string;
-  };
+  formData: { projectName: string; owner: string; ppn: string; notes: string };
   setFormData: React.Dispatch<
     React.SetStateAction<{
       projectName: string;
@@ -335,6 +329,7 @@ function DroppableRow({
   );
 }
 
+/** ITEM ROW — id dnd "item-<id>" (selaras dengan create) */
 function SortableItemRow({
   idxInSection,
   item,
@@ -359,7 +354,7 @@ function SortableItemRow({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: item.id });
+  } = useSortable({ id: `item-${item.id}` });
 
   const style: React.CSSProperties = {
     transform: CSS.Transform.toString(transform),
@@ -512,6 +507,155 @@ function SortableItemRow({
   );
 }
 
+/** SECTION HEADER — draggable & editable (id dnd: "sec-<id>") */
+function SortableSectionHeader({
+  section,
+  index,
+  isLoadingItems,
+  PekerjaanOptions,
+  DropdownPekerjaan,
+  addItemToSection,
+  deleteSection,
+  onToggleEditTitle,
+  onChangeTitle,
+}: {
+  section: Section;
+  index: number;
+  isLoadingItems: boolean;
+  PekerjaanOptions: Option[];
+  DropdownPekerjaan: {
+    kode: string;
+    label: string;
+    value: string;
+    detail: {
+      deskripsi: string;
+      satuan: string;
+      harga: number;
+      categoryId?: string;
+      categoryName?: string;
+    };
+  }[];
+  addItemToSection: (sectionId: string, source?: any) => void;
+  deleteSection: (sectionId: string) => void;
+  onToggleEditTitle: (id: string, editing: boolean) => void;
+  onChangeTitle: (id: string, title: string) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `sec-${section.id}` });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`bg-blue-50/70 ${isDragging ? "opacity-80" : ""}`}
+    >
+      <td className="px-4 py-3 text-sm font-semibold text-blue-700">
+        <button
+          className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
+          title="Drag kategori"
+          aria-label="Drag kategori"
+          {...attributes}
+          {...listeners}
+        >
+          ≡
+        </button>
+        {String.fromCharCode(65 + index)}
+      </td>
+
+      <td className="px-4 py-3 text-sm font-bold text-blue-800">
+        {section.isEditingTitle ? (
+          <input
+            autoFocus
+            className="input input-bordered input-sm w-full text-black bg-white border-black"
+            value={section.title}
+            onChange={(e) => onChangeTitle(section.id, e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === "Escape") {
+                onToggleEditTitle(section.id, false);
+              }
+            }}
+            onBlur={() => onToggleEditTitle(section.id, false)}
+            placeholder="Judul kategori"
+          />
+        ) : (
+          <span>{section.title}</span>
+        )}
+      </td>
+
+      <td colSpan={4}></td>
+
+      <td className="">
+        <div className="flex gap-2 items-center">
+          {/* Tambah dari HSP (Searchable) */}
+          <div className="w-72">
+            <SearchableSelect
+              options={PekerjaanOptions}
+              value={""}
+              onChange={(v) => {
+                if (!v) return;
+                const sel = DropdownPekerjaan.find((it) => it.value === v);
+                if (sel) addItemToSection(section.id, sel);
+              }}
+              placeholder={isLoadingItems ? "Memuat..." : "Tambah dari HSP"}
+              loading={isLoadingItems}
+              size="sm"
+              clearable={false}
+            />
+          </div>
+
+          {/* Tambah manual */}
+          <button
+            onClick={() => addItemToSection(section.id)}
+            className="btn btn-solid btn-sm"
+            title="Tambah Manual"
+          >
+            <BiPlus className="mr-1" /> Manual
+          </button>
+
+          {/* Edit / Simpan judul kategori */}
+          {!section.isEditingTitle ? (
+            <button
+              onClick={() => onToggleEditTitle(section.id, true)}
+              className="btn btn-ghost btn-xs text-blue-600"
+              title="Edit judul kategori"
+            >
+              <BiEdit className="text-lg" />
+            </button>
+          ) : (
+            <button
+              onClick={() => onToggleEditTitle(section.id, false)}
+              className="btn btn-ghost btn-xs text-green-600"
+              title="Simpan judul"
+            >
+              <BiSave className="text-lg" />
+            </button>
+          )}
+
+          {/* Hapus kategori */}
+          <button
+            onClick={() => deleteSection(section.id)}
+            className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
+            title="Hapus Kategori"
+          >
+            <BiTrash className="text-lg" />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 /* ----------------------- Step 2 (Items + DnD) ----------------------- */
 type UpdateStepTwoProps = {
   projectProfile: ProjectProfile;
@@ -593,15 +737,24 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   );
 
   useEffect(() => {
-    setSections(initialSections || []);
+    setSections(
+      (initialSections || []).map((s) => ({
+        ...s,
+        isEditingTitle: false,
+      }))
+    );
   }, [initialSections]);
 
+  /* ----------------------------- Add / Remove ----------------------------- */
   const addSection = () => {
     const title = isManualSection
       ? manualSectionTitle.trim()
       : selectedSectionFromList;
     if (!title) return;
-    setSections((prev) => [...prev, { id: uid(), title, items: [] }]);
+    setSections((prev) => [
+      ...prev,
+      { id: uid(), title, items: [], isEditingTitle: false },
+    ]);
     setIsAddingSection(false);
     setIsManualSection(false);
     setSelectedSectionFromList("");
@@ -751,31 +904,60 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     );
   };
 
-  /* --------------------------- Drag & Drop -------------------------- */
-  const findSectionIdByItemId = (itemId: string) => {
+  /* --------------------------- Drag & Drop Logic -------------------------- */
+  const isSectionId = (dndId: string) => dndId.startsWith("sec-");
+  const isItemId = (dndId: string) => dndId.startsWith("item-");
+  const rawSectionId = (dndId: string) => dndId.replace(/^sec-/, "");
+  const rawItemId = (dndId: string) => dndId.replace(/^item-/, "");
+
+  const findSectionIdByItemDndId = (itemDndId: string) => {
+    const itemId = rawItemId(itemDndId);
     for (const s of sections)
       if (s.items.some((i) => i.id === itemId)) return s.id;
     return null;
   };
 
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 }, // samakan dengan create
+    })
+  );
+
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
     if (!over) return;
+
     const activeId = String(active.id);
     const overId = String(over.id);
     if (activeId === overId) return;
 
-    const fromSectionId = findSectionIdByItemId(activeId);
-    if (!fromSectionId) return;
+    // Reorder KATEGORI (sec-*)
+    if (isSectionId(activeId) && isSectionId(overId)) {
+      const fromId = rawSectionId(activeId);
+      const toId = rawSectionId(overId);
+      setSections((prev) => {
+        const next = [...prev];
+        const fromIdx = next.findIndex((s) => s.id === fromId);
+        const toIdx = next.findIndex((s) => s.id === toId);
+        if (fromIdx < 0 || toIdx < 0) return prev;
+        const [moved] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, moved);
+        return next;
+      });
+      return;
+    }
 
-    const isOverItem = sections.some((s) =>
-      s.items.some((i) => i.id === overId)
-    );
+    // Drag ITEM (item-*)
+    if (!isItemId(activeId)) return;
+    const isOverItem = isItemId(overId);
     const isOverSectionTop = overId.startsWith("section-");
     const isOverSectionBottom = overId.startsWith("dropzone-");
 
+    const fromSectionId = findSectionIdByItemDndId(activeId);
+    if (!fromSectionId) return;
+
     const toSectionId = isOverItem
-      ? findSectionIdByItemId(overId)!
+      ? findSectionIdByItemDndId(overId)!
       : isOverSectionTop
       ? overId.replace("section-", "")
       : isOverSectionBottom
@@ -784,16 +966,21 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
 
     if (!toSectionId) return;
 
+    const activeItemId = rawItemId(activeId);
+    const overItemId = isOverItem ? rawItemId(overId) : null;
+
     setSections((prev) => {
       const next = prev.map((s) => ({ ...s, items: [...s.items] }));
       const from = next.find((s) => s.id === fromSectionId)!;
       const to = next.find((s) => s.id === toSectionId)!;
 
-      const fromIdx = from.items.findIndex((i) => i.id === activeId);
+      const fromIdx = from.items.findIndex((i) => i.id === activeItemId);
+      if (fromIdx < 0) return prev;
+
       const [moved] = from.items.splice(fromIdx, 1);
 
-      if (isOverItem) {
-        const overIdx = to.items.findIndex((i) => i.id === overId);
+      if (isOverItem && overItemId) {
+        const overIdx = to.items.findIndex((i) => i.id === overItemId);
         to.items.splice(overIdx, 0, moved);
       } else if (isOverSectionTop) {
         to.items.unshift(moved);
@@ -828,13 +1015,12 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         hargaTotal: i.hargaTotal,
         details: (i.volumeDetails || []).map((d) => ({
           nama: d.uraian,
-          jenis: d.jenis, // "penjumlahan" | "pengurangan"
+          jenis: d.jenis,
           panjang: d.panjang,
           lebar: d.lebar,
           tinggi: d.tinggi,
           jumlah: d.jumlah,
-          volume: Number(d.volume), // sudah dihitung di modal
-          // >>> KIRIM EXTRAS KE API
+          volume: Number(d.volume),
           extras: (d.extras || []).map((ex: ExtraCol) => ({
             name: ex.name,
             value: ex.value,
@@ -854,6 +1040,21 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     onSave(dataToSave);
   };
 
+  const toggleEditSectionTitle = (sectionId: string, editing: boolean) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId ? { ...s, isEditingTitle: editing } : s
+      )
+    );
+  };
+
+  const changeSectionTitle = (sectionId: string, title: string) => {
+    setSections((prev) =>
+      prev.map((s) => (s.id === sectionId ? { ...s, title } : s))
+    );
+  };
+
+  /* --------------------------------- Render -------------------------------- */
   return (
     <div className="bg-white rounded-xl shadow p-4 sm:p-6">
       {/* Title Bar */}
@@ -932,169 +1133,129 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         )}
       </div>
 
-      {/* TABLE + DnD */}
-      <div className="overflow-x-auto rounded-lg border border-gray-200">
-        <DndContext
-          sensors={useSensors(
-            useSensor(PointerSensor, { activationConstraint: { distance: 5 } })
-          )}
-          onDragEnd={handleDragEnd}
-          onDragOver={handleDragOver}
-          collisionDetection={closestCorners}
-        >
-          <table className="table min-w-[1100px]">
-            <thead className="bg-gray-50 sticky top-0 z-[1]">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  No
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Uraian Pekerjaan
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Vol (M³)
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Satuan
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Harga Satuan
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Harga Total
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                  Aksi
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="bg-white">
-              {sections.length === 0 && (
+      {/* TABLE + DnD — STRUKTUR DISAMAKAN DENGAN CREATE */}
+      <div className="collapse bg-transparent shadow-none">
+        <div className="overflow-x-auto rounded-lg border border-gray-200 h-[500px]">
+          <DndContext
+            sensors={sensors}
+            onDragEnd={handleDragEnd}
+            onDragOver={handleDragOver}
+            collisionDetection={closestCorners}
+          >
+            <table className="table min-w-[1100px]">
+              <thead className="bg-gray-50 sticky top-0 z-[1]">
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="px-6 py-8 text-center text-sm text-gray-500"
-                  >
-                    Belum ada kategori.
-                  </td>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    No
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Uraian Pekerjaan
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Vol (M³)
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Satuan
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Harga Satuan
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Harga Total
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Aksi
+                  </th>
                 </tr>
-              )}
+              </thead>
 
-              {sections.map((section, sIdx) => (
-                <SortableContext
-                  key={section.id}
-                  items={section.items.map((i) => i.id)}
-                  strategy={rectSortingStrategy}
-                >
-                  {/* Header Kategori */}
-                  <tr className="bg-blue-50/70">
-                    <td className="px-4 py-3 text-sm font-semibold text-blue-700">
-                      {String.fromCharCode(65 + sIdx)}
-                    </td>
-                    <td className="px-4 py-3 text-sm font-bold text-blue-800">
-                      {section.title}
-                    </td>
-                    <td colSpan={4}></td>
-                    <td className="">
-                      <div className="flex gap-2 items-center ">
-                        {/* Tambah dari HSP (Searchable) */}
-                        <div className="w-72">
-                          <SearchableSelect
-                            options={PekerjaanOptions}
-                            value={""}
-                            onChange={(v) => {
-                              if (!v) return;
-                              const sel = DropdownPekerjaan.find(
-                                (it) => it.value === v
-                              );
-                              if (sel) addItemToSection(section.id, sel);
-                            }}
-                            placeholder={
-                              isLoadingItems ? "Memuat..." : "Tambah dari HSP"
-                            }
-                            loading={isLoadingItems}
-                            size="sm"
-                            clearable={false}
-                          />
-                        </div>
-
-                        {/* Tambah manual */}
-                        <button
-                          onClick={() => addItemToSection(section.id)}
-                          className="btn btn-solid btn-sm"
-                          title="Tambah Manual"
-                        >
-                          <BiPlus className="mr-1" /> Manual
-                        </button>
-
-                        {/* Hapus kategori */}
-                        <button
-                          onClick={() => deleteSection(section.id)}
-                          className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
-                          title="Hapus Kategori"
-                        >
-                          <BiTrash className="text-lg" />
-                        </button>
-                      </div>
+              <tbody className="bg-white">
+                {sections.length === 0 && (
+                  <tr>
+                    <td
+                      colSpan={7}
+                      className="px-6 py-8 text-center text-sm text-gray-500"
+                    >
+                      Belum ada kategori.
                     </td>
                   </tr>
+                )}
 
-                  {/* DROPPABLE: header (drop ke atas) */}
-                  <DroppableRow
-                    droppableId={`section-${section.id}`}
-                    colSpan={7}
-                  />
-
-                  {/* Items */}
-                  {section.items.map((item, idxInSection) => (
-                    <SortableItemRow
-                      key={item.id}
-                      idxInSection={idxInSection}
-                      item={item}
-                      onEditToggle={toggleEditItem}
-                      onDelete={deleteItem}
-                      onCopy={copyItem}
-                      onUpdateField={updateItemField}
-                      onOpenVolumeModal={openVolumeModal}
+                {sections.map((section, sIdx) => (
+                  <SortableContext
+                    key={section.id}
+                    items={section.items.map((i) => `item-${i.id}`)}
+                    strategy={rectSortingStrategy}
+                  >
+                    {/* Header Kategori (draggable + editable) */}
+                    <SortableSectionHeader
+                      section={section}
+                      index={sIdx}
+                      isLoadingItems={isLoadingItems}
+                      PekerjaanOptions={PekerjaanOptions}
+                      DropdownPekerjaan={DropdownPekerjaan}
+                      addItemToSection={addItemToSection}
+                      deleteSection={deleteSection}
+                      onToggleEditTitle={toggleEditSectionTitle}
+                      onChangeTitle={changeSectionTitle}
                     />
-                  ))}
 
-                  {/* DROPPABLE: bawah (akhir list) */}
-                  <DroppableRow
-                    droppableId={`dropzone-${section.id}`}
-                    colSpan={7}
-                    showHint={section.items.length === 0}
-                  />
+                    {/* DROPPABLE: header (drop ke atas list) */}
+                    <DroppableRow
+                      droppableId={`section-${section.id}`}
+                      colSpan={7}
+                    />
 
-                  {/* Subtotal per kategori */}
-                  {!!section.items.length && (
-                    <tr className="bg-gray-50">
-                      <td
-                        colSpan={5}
-                        className="px-4 py-3 text-sm text-right text-gray-700"
-                      >
-                        Subtotal {section.title}
-                      </td>
-                      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                        {formatIDR(
-                          section.items.reduce(
-                            (a, b) => a + (b.hargaTotal ?? 0),
-                            0
-                          )
-                        )}
-                      </td>
-                      <td />
-                    </tr>
-                  )}
-                </SortableContext>
-              ))}
-            </tbody>
-          </table>
+                    {/* Items */}
+                    {section.items.map((item, idxInSection) => (
+                      <SortableItemRow
+                        key={item.id}
+                        idxInSection={idxInSection}
+                        item={item}
+                        onEditToggle={toggleEditItem}
+                        onDelete={deleteItem}
+                        onCopy={copyItem}
+                        onUpdateField={updateItemField}
+                        onOpenVolumeModal={openVolumeModal}
+                      />
+                    ))}
 
-          {/* Overlay (optional) */}
-          <DragOverlay dropAnimation={defaultDropAnimation} />
-        </DndContext>
+                    {/* DROPPABLE: bawah (akhir list) */}
+                    <DroppableRow
+                      droppableId={`dropzone-${section.id}`}
+                      colSpan={7}
+                      showHint={section.items.length === 0}
+                    />
+
+                    {/* Subtotal per kategori */}
+                    {!!section.items.length && (
+                      <tr className="bg-gray-50">
+                        <td
+                          colSpan={5}
+                          className="px-4 py-3 text-sm text-right text-gray-700"
+                        >
+                          Subtotal {section.title}
+                        </td>
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">
+                          {formatIDR(
+                            section.items.reduce(
+                              (a, b) => a + (b.hargaTotal ?? 0),
+                              0
+                            )
+                          )}
+                        </td>
+                        <td />
+                      </tr>
+                    )}
+                  </SortableContext>
+                ))}
+              </tbody>
+            </table>
+
+            {/* Overlay (optional) */}
+            <DragOverlay dropAnimation={defaultDropAnimation} />
+          </DndContext>
+        </div>
       </div>
 
       {/* Footer total & actions */}
@@ -1157,6 +1318,7 @@ const UpdateEstimation: React.FC = () => {
   } = useEstimation(id || "");
   const updateMutation = useUpdateEstimation();
   const notify = useNotify();
+
   // Step accordion
   const [activeAccordion, setActiveAccordion] = useState<string>("step1");
   const toggleAccordion = (step: string) =>
@@ -1193,7 +1355,7 @@ const UpdateEstimation: React.FC = () => {
     }));
     setCustomFields(cf);
 
-    // sections + items (+ VOLUME EXTRAS!!)
+    // sections + items (beserta volume extras)
     const sections: Section[] = (detailEstimation.items || []).map(
       (sec: any) => {
         const items: ItemRow[] = (sec.details || []).map((d: any) => {
@@ -1207,7 +1369,6 @@ const UpdateEstimation: React.FC = () => {
               tinggi: Number(vd.tinggi ?? 0),
               jumlah: Number(vd.jumlah ?? 0),
               volume: Number(vd.volume ?? 0),
-              // >>> baca extras dari API agar tampil & bisa di-rename lagi
               extras: Array.isArray(vd.extras)
                 ? vd.extras.map((ex: any) => ({
                     id: ex.id || ex.name || uid(),
@@ -1237,6 +1398,7 @@ const UpdateEstimation: React.FC = () => {
           id: sec.id,
           title: sec.title,
           items,
+          isEditingTitle: false,
         };
       }
     );

@@ -184,7 +184,42 @@ const HspService = {
       throw new Error(json?.error || `Update failed (HTTP ${res.status})`);
     return json.data as MasterItem;
   },
+  async updateMasterByCode(
+    code: string,
+    payload: MasterUpdatePayload
+  ): Promise<MasterItem> {
+    const { hsp } = getEndpoints();
+    const res = await fetch(
+      `${hsp}/master/by-code/${encodeURIComponent(code)}`,
+      {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...authHeader() },
+        body: JSON.stringify(payload),
+      }
+    );
+    const json = await res.json();
+    if (!res.ok)
+      throw new Error(json?.error || `Update failed (HTTP ${res.status})`);
+    return json.data as MasterItem;
+  },
 
+  async deleteMasterByCode(code: string): Promise<void> {
+    const { hsp } = getEndpoints();
+    const res = await fetch(
+      `${hsp}/master/by-code/${encodeURIComponent(code)}`,
+      {
+        method: "DELETE",
+        headers: authHeader(),
+      }
+    );
+    if (!res.ok) {
+      let msg = "";
+      try {
+        msg = (await res.json())?.error;
+      } catch {}
+      throw new Error(msg || `Delete failed (HTTP ${res.status})`);
+    }
+  },
   async deleteMaster(id: string): Promise<void> {
     const { hsp } = getEndpoints();
     const res = await fetch(`${hsp}/master/${id}`, {

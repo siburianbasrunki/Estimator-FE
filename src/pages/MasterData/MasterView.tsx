@@ -2,9 +2,9 @@ import React from "react";
 import type { MasterItem, MasterType } from "../../model/master";
 import {
   useCreateMaster,
-  useDeleteMaster,
+  useDeleteMasterByCode,
   useListMaster,
-  useUpdateMaster,
+  useUpdateMasterByCode,
 } from "../../hooks/useMaster";
 import { MasterForm } from "./MasterForm";
 import { formatIDR } from "../../helper/rupiah";
@@ -32,8 +32,8 @@ export const MasterView: React.FC<Props> = ({ type }) => {
 
   const list = useListMaster(type, { q, page, pageSize, orderBy, orderDir });
   const createMut = useCreateMaster(type);
-  const updateMut = useUpdateMaster(type);
-  const deleteMut = useDeleteMaster(type);
+  const updateByCodeMut = useUpdateMasterByCode(type);
+  const deleteByCodeMut = useDeleteMasterByCode(type);
 
   const [openCreate, setOpenCreate] = React.useState(false);
   const [editing, setEditing] = React.useState<MasterItem | null>(null);
@@ -48,21 +48,17 @@ export const MasterView: React.FC<Props> = ({ type }) => {
     await createMut.mutateAsync(payload);
     setOpenCreate(false);
   };
-  const onUpdate = async (payload: any, opts?: { recompute?: boolean }) => {
+  const onUpdate = async (payload: any) => {
     if (!editing) return;
-    await updateMut.mutateAsync({
-      id: editing.id,
-      payload,
-      recompute: !!opts?.recompute,
-    });
+    await updateByCodeMut.mutateAsync({ code: editing.code, payload });
     setEditing(null);
   };
 
-  const onDelete = async (id: string) => {
+  const onDelete = async (code: string) => {
     const ok = confirm("Yakin hapus item ini?");
     if (!ok) return;
     try {
-      await deleteMut.mutateAsync({ id });
+      await deleteByCodeMut.mutateAsync({ code });
     } catch (e: any) {
       alert(e.message || "Gagal menghapus");
     }
@@ -312,7 +308,7 @@ export const MasterView: React.FC<Props> = ({ type }) => {
                       <BiTrash
                         className="w-5 h-5 text-red-600 cursor-pointer"
                         title="Hapus"
-                        onClick={() => onDelete(it.id)}
+                        onClick={() => onDelete(it.code)}
                       />
                     </div>
                   </td>

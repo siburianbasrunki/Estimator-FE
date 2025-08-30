@@ -72,7 +72,34 @@ export const useUpdateMaster = (type: MasterType) => {
     onError: (e) => toast.error(e.message || "Gagal memperbarui data"),
   });
 };
+export const useUpdateMasterByCode = (type: MasterType) => {
+  const qc = useQueryClient();
+  return useMutation<
+    MasterItem,
+    Error,
+    { code: string; payload: MasterUpdatePayload }
+  >({
+    mutationFn: ({ code, payload }) =>
+      HspService.updateMasterByCode(code, payload),
+    onSuccess: () => {
+      toast.success("Data berhasil diperbarui");
+      qc.invalidateQueries({ queryKey: ["master", type] });
+    },
+    onError: (e) => toast.error(e.message || "Gagal memperbarui data"),
+  });
+};
 
+export const useDeleteMasterByCode = (type: MasterType) => {
+  const qc = useQueryClient();
+  return useMutation<void, Error, { code: string }>({
+    mutationFn: ({ code }) => HspService.deleteMasterByCode(code),
+    onSuccess: () => {
+      toast.success("Data berhasil dihapus");
+      qc.invalidateQueries({ queryKey: ["master", type] });
+    },
+    onError: (e) => toast.error(e.message || "Gagal menghapus data"),
+  });
+};
 export const useDeleteMaster = (type: MasterType) => {
   const qc = useQueryClient();
   return useMutation<void, Error, { id: string }>({
