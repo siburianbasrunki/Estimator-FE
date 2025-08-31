@@ -70,6 +70,13 @@ const sanitizeMoneyInput = (v: string) =>
 const toNumber = (v?: string) =>
   v == null || v.trim() === "" ? 0 : Number(v) || 0;
 
+/** NEW: volume efektif mengikuti mode - MANUAL > DETAIL */
+type VolumeSource = "MANUAL" | "DETAIL";
+const getEffectiveVolume = (i: ItemRow) =>
+  (i.volumeSource === "MANUAL"
+    ? Math.max(0, toNumber(i.manualVolumeInput || "0"))
+    : Math.max(0, Number(i.volume || 0))) || 0;
+
 /* ------------------------------ Types ------------------------------ */
 interface CustomFieldUI {
   id: string;
@@ -88,8 +95,15 @@ type ItemRow = {
   id: string;
   kode: string;
   deskripsi: string;
+
+  // DETAIL (hasil modal)
   volume: number;
   volumeDetails?: VolumeDetailRow[];
+
+  // NEW: mode volume
+  volumeSource?: VolumeSource; // "MANUAL" | "DETAIL"
+  manualVolumeInput?: string; // input string manual
+
   satuan: string;
   hargaSatuan: number;
   hargaSatuanInput?: string;
@@ -329,7 +343,7 @@ function DroppableRow({
   );
 }
 
-/** ITEM ROW — id dnd "item-<id>" (selaras dengan create) */
+/** ITEM ROW — id dnd "item-<id>" (dengan mode volume: MANUAL/DETAIL) */
 function SortableItemRow({
   idxInSection,
   item,
@@ -370,6 +384,11 @@ function SortableItemRow({
     []
   );
 
+  const volInputDisplay =
+    item.volumeSource === "MANUAL"
+      ? item.manualVolumeInput ?? ""
+      : String(Number(item.volume || 0));
+
   return (
     <tr
       ref={setNodeRef}
@@ -394,10 +413,22 @@ function SortableItemRow({
         )}
       </td>
 
-      {/* Volume */}
+      {/* Volume: input manual + tombol Detail (modal) */}
       <td className="px-4 py-3 text-sm text-gray-800">
         <div className="flex items-center gap-2">
-          <span className="font-medium">{(item.volume ?? 0).toFixed(2)}</span>
+          <input
+            type="number"
+            min={0}
+            step="any"
+            className="input input-bordered input-sm w-28 text-right text-black bg-white border-black"
+            value={volInputDisplay}
+            onChange={(e) => {
+              // switch ke MANUAL & update nilai
+              onUpdateField(item.id, "volumeSource", "MANUAL");
+              onUpdateField(item.id, "manualVolumeInput", e.target.value);
+            }}
+            placeholder="0.00"
+          />
           <button
             className="btn btn-ghost btn-xs text-blue-600 bg-white"
             title="Detail Volume"
@@ -743,6 +774,12 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
       (initialSections || []).map((s) => ({
         ...s,
         isEditingTitle: false,
+        items: (s.items || []).map((d) => ({
+          ...d,
+          // default: pakai DETAIL; manual kosong
+          volumeSource: "DETAIL",
+          manualVolumeInput: "",
+        })),
       }))
     );
   }, [initialSections]);
@@ -776,6 +813,8 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           deskripsi: source?.detail.deskripsi || "",
           volume: 0,
           volumeDetails: [],
+          volumeSource: "DETAIL",
+          manualVolumeInput: "",
           satuan: source?.detail.satuan || "",
           hargaSatuan: source?.detail.harga ?? 0,
           hargaSatuanInput:
@@ -811,13 +850,13 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
             return { ...i, isEditing: true, hargaSatuanInput: hsInput };
           } else {
             const hs = toNumber(i.hargaSatuanInput);
-            const hargaTotal = (Number(i.volume) || 0) * hs;
+            const volEff = getEffectiveVolume(i);
             return {
               ...i,
               isEditing: false,
               hargaSatuan: hs,
               hargaSatuanInput: undefined,
-              hargaTotal,
+              hargaTotal: volEff * hs,
             };
           }
         }),
@@ -832,21 +871,24 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         items: s.items.map((i) => {
           if (i.id !== id) return i;
 
+          // khusus input harga satuan (string sanitasi)
           if (field === "hargaSatuanInput") {
             const input = sanitizeMoneyInput(String(value));
             const hs = toNumber(input);
-            const next = { ...i, hargaSatuanInput: input };
-            next.hargaTotal = (Number(next.volume) || 0) * hs;
+            const next = { ...i, hargaSatuanInput: input } as ItemRow;
+            next.hargaTotal = getEffectiveVolume(next) * hs;
             return next;
           }
 
+          // field lain (termasuk volumeSource & manualVolumeInput & volume & volumeDetails)
           const next: ItemRow = { ...i, [field]: value } as ItemRow;
+
           const hs =
             typeof next.hargaSatuanInput === "string"
               ? toNumber(next.hargaSatuanInput)
               : Number(next.hargaSatuan || 0);
-          const vol = Number(next.volume || 0);
-          next.hargaTotal = vol * hs;
+
+          next.hargaTotal = getEffectiveVolume(next) * hs;
           return next;
         }),
       }))
@@ -866,9 +908,10 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           isEditing: true,
           hargaSatuanInput: src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
           volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
-          hargaTotal:
-            (Number(src.volume) || 0) * (Number(src.hargaSatuan) || 0),
-        };
+          volumeSource: src.volumeSource ?? "DETAIL",
+          manualVolumeInput: src.manualVolumeInput ?? "",
+          hargaTotal: getEffectiveVolume(src) * (Number(src.hargaSatuan) || 0),
+        } as ItemRow;
         const items = [...s.items];
         items.splice(idx + 1, 0, clone);
         return { ...s, items };
@@ -894,13 +937,22 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         ...s,
         items: s.items.map((i) => {
           if (i.id !== itemId) return i;
+
           const volume = Number(totalVol || 0);
+          const next: ItemRow = {
+            ...i,
+            volume,
+            volumeDetails: rows,
+            volumeSource: "DETAIL", // hasil modal -> DETAIL
+          };
+
           const hs =
-            typeof i.hargaSatuanInput === "string"
-              ? toNumber(i.hargaSatuanInput)
-              : Number(i.hargaSatuan || 0);
-          const hargaTotal = volume * hs;
-          return { ...i, volume, volumeDetails: rows, hargaTotal };
+            typeof next.hargaSatuanInput === "string"
+              ? toNumber(next.hargaSatuanInput)
+              : Number(next.hargaSatuan || 0);
+
+          next.hargaTotal = getEffectiveVolume(next) * hs;
+          return next;
         }),
       }))
     );
@@ -1008,27 +1060,33 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   const handleSaveAllData = () => {
     const estimationItem = sections.map((s) => ({
       title: s.title,
-      item: s.items.map((i) => ({
-        kode: i.kode,
-        nama: i.deskripsi,
-        satuan: i.satuan,
-        harga: i.hargaSatuan,
-        volume: i.volume,
-        hargaTotal: i.hargaTotal,
-        details: (i.volumeDetails || []).map((d) => ({
-          nama: d.uraian,
-          jenis: d.jenis,
-          panjang: d.panjang,
-          lebar: d.lebar,
-          tinggi: d.tinggi,
-          jumlah: d.jumlah,
-          volume: Number(d.volume),
-          extras: (d.extras || []).map((ex: ExtraCol) => ({
-            name: ex.name,
-            value: ex.value,
-          })),
-        })),
-      })),
+      item: s.items.map((i) => {
+        const effectiveVol = getEffectiveVolume(i);
+        const isManual = i.volumeSource === "MANUAL";
+        return {
+          kode: i.kode,
+          nama: i.deskripsi,
+          satuan: i.satuan,
+          harga: i.hargaSatuan,
+          volume: effectiveVol,
+          hargaTotal: effectiveVol * Number(i.hargaSatuan || 0),
+          details: isManual
+            ? []
+            : (i.volumeDetails || []).map((d) => ({
+                nama: d.uraian,
+                jenis: d.jenis,
+                panjang: d.panjang,
+                lebar: d.lebar,
+                tinggi: d.tinggi,
+                jumlah: d.jumlah,
+                volume: Number(Number(d.volume).toFixed(2)),
+                extras: (d.extras || []).map((ex: ExtraCol) => ({
+                  name: ex.name,
+                  value: ex.value,
+                })),
+              })),
+        };
+      }),
     }));
 
     const dataToSave = {
@@ -1389,6 +1447,8 @@ const UpdateEstimation: React.FC = () => {
             deskripsi: d.deskripsi || "",
             volume: volumeNumber,
             volumeDetails: vds,
+            volumeSource: "DETAIL", // default: DETAIL saat seed
+            manualVolumeInput: "",
             satuan: d.satuan || "",
             hargaSatuan,
             hargaTotal: Number(d.hargaTotal ?? volumeNumber * hargaSatuan),

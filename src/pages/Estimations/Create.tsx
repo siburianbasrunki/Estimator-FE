@@ -54,7 +54,6 @@ const formatIDR = (n: number = 0) =>
 // Hapus semua yang bukan digit/koma/titik, normalize koma->titik
 const sanitizeMoneyInput = (v: string) => {
   const cleaned = v.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-  // Hapus leading zero kecuali pola "0.xxx"
   return cleaned.replace(/^0+(?=\d)/, "");
 };
 
@@ -78,12 +77,21 @@ interface ProjectProfile {
   notes: string;
   customFields: Record<string, string>;
 }
+type VolumeSource = "MANUAL" | "DETAIL";
+
 type ItemRow = {
   id: string;
   kode: string;
   deskripsi: string;
-  volume: number; // auto from modal
-  volumeDetails?: VolumeDetailRow[]; // stores detail rows
+
+  // AUTO hasil dari modal
+  volume: number;
+  volumeDetails?: VolumeDetailRow[];
+
+  // NEW: input manual tanpa toggle
+  volumeSource?: VolumeSource; // "MANUAL" | "DETAIL"
+  manualVolumeInput?: string; // string input untuk angka manual
+
   satuan: string;
   hargaSatuan: number; // nilai final untuk hitung & tampil non-edit
   hargaSatuanInput?: string; // nilai string saat editing (boleh kosong)
@@ -327,6 +335,12 @@ function DroppableRow({
   );
 }
 
+/** Effective Volume (tanpa toggle): MANUAL > DETAIL */
+const getEffectiveVolume = (i: ItemRow) =>
+  (i.volumeSource === "MANUAL"
+    ? Math.max(0, toNumber(i.manualVolumeInput || "0"))
+    : Math.max(0, Number(i.volume || 0))) || 0;
+
 /** ITEM ROW — pakai id dnd "item-<id>" */
 function SortableItemRow({
   idxInSection,
@@ -368,6 +382,11 @@ function SortableItemRow({
     []
   );
 
+  const volInputDisplay =
+    item.volumeSource === "MANUAL"
+      ? item.manualVolumeInput ?? ""
+      : String(Number(item.volume || 0));
+
   return (
     <tr
       ref={setNodeRef}
@@ -392,10 +411,22 @@ function SortableItemRow({
         )}
       </td>
 
-      {/* Volume (read-only + tombol detail) */}
+      {/* Volume: input langsung + tombol Detail */}
       <td className="px-4 py-3 text-sm text-gray-800">
         <div className="flex items-center gap-2">
-          <span className="font-medium">{(item.volume ?? 0).toFixed(2)}</span>
+          <input
+            type="number"
+            min={0}
+            step="any"
+            className="input input-bordered input-sm w-28 text-right text-black bg-white border-black"
+            value={volInputDisplay}
+            onChange={(e) => {
+              // Switch ke MANUAL & update nilai
+              onUpdateField(item.id, "volumeSource", "MANUAL");
+              onUpdateField(item.id, "manualVolumeInput", e.target.value);
+            }}
+            placeholder="0.00"
+          />
           <button
             className="btn btn-ghost btn-xs text-blue-600 bg-white"
             title="Detail Volume"
@@ -404,6 +435,11 @@ function SortableItemRow({
             <BiCalculator className="mr-1" /> Detail
           </button>
         </div>
+        {/* <div className="text-[11px] text-gray-500 mt-1">
+          {item.volumeSource === "MANUAL"
+            ? "Mode: manual"
+            : "Mode: dari detail"}
+        </div> */}
       </td>
 
       {/* Satuan (Searchable) */}
@@ -564,15 +600,15 @@ function SortableSectionHeader({
       <td className="px-4 py-3 text-sm font-semibold text-blue-700">
         <div className="flex items-end gap-2">
           <button
-          className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
-          title="Drag kategori"
-          aria-label="Drag kategori"
-          {...attributes}
-          {...listeners}
-        >
-          ≡
-        </button>
-        {String.fromCharCode(65 + index)}
+            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
+            title="Drag kategori"
+            aria-label="Drag kategori"
+            {...attributes}
+            {...listeners}
+          >
+            ≡
+          </button>
+          {String.fromCharCode(65 + index)}
         </div>
       </td>
 
@@ -766,6 +802,8 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           deskripsi: source?.detail.deskripsi || "",
           volume: 0,
           volumeDetails: [],
+          volumeSource: "DETAIL", // default: dari modal (0)
+          manualVolumeInput: "", // kosong
           satuan: source?.detail.satuan || "",
           hargaSatuan: source?.detail.harga ?? 0,
           hargaSatuanInput:
@@ -801,13 +839,12 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
             return { ...i, isEditing: true, hargaSatuanInput: hsInput };
           } else {
             const hs = toNumber(i.hargaSatuanInput);
-            const hargaTotal = (Number(i.volume) || 0) * hs;
             return {
               ...i,
               isEditing: false,
               hargaSatuan: hs,
               hargaSatuanInput: undefined,
-              hargaTotal,
+              hargaTotal: getEffectiveVolume(i) * hs,
             };
           }
         }),
@@ -822,21 +859,24 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         items: s.items.map((i) => {
           if (i.id !== id) return i;
 
+          // hargaSatuanInput: sanitize & hitung ulang
           if (field === "hargaSatuanInput") {
             const input = sanitizeMoneyInput(String(value));
             const hs = toNumber(input);
-            const next = { ...i, hargaSatuanInput: input };
-            next.hargaTotal = (Number(next.volume) || 0) * hs;
+            const next = { ...i, hargaSatuanInput: input } as ItemRow;
+            next.hargaTotal = getEffectiveVolume(next) * hs;
             return next;
           }
 
+          // field lain (termasuk volumeSource & manualVolumeInput)
           const next: ItemRow = { ...i, [field]: value } as ItemRow;
+
           const hs =
             typeof next.hargaSatuanInput === "string"
               ? toNumber(next.hargaSatuanInput)
               : Number(next.hargaSatuan || 0);
-          const vol = Number(next.volume || 0);
-          next.hargaTotal = vol * hs;
+
+          next.hargaTotal = getEffectiveVolume(next) * hs;
           return next;
         }),
       }))
@@ -856,8 +896,9 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           isEditing: true,
           hargaSatuanInput: src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
           volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
-          hargaTotal:
-            (Number(src.volume) || 0) * (Number(src.hargaSatuan) || 0),
+          volumeSource: src.volumeSource ?? "DETAIL",
+          manualVolumeInput: src.manualVolumeInput ?? "",
+          hargaTotal: getEffectiveVolume(src) * (Number(src.hargaSatuan) || 0),
         } as ItemRow;
         const items = [...s.items];
         items.splice(idx + 1, 0, clone);
@@ -884,13 +925,22 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         ...s,
         items: s.items.map((i) => {
           if (i.id !== itemId) return i;
+
           const volume = Number(totalVol || 0);
+          const next: ItemRow = {
+            ...i,
+            volume,
+            volumeDetails: rows,
+            volumeSource: "DETAIL", // hasil modal = pakai DETAIL
+          };
+
           const hs =
-            typeof i.hargaSatuanInput === "string"
-              ? toNumber(i.hargaSatuanInput)
-              : Number(i.hargaSatuan || 0);
-          const hargaTotal = volume * hs;
-          return { ...i, volume, volumeDetails: rows, hargaTotal };
+            typeof next.hargaSatuanInput === "string"
+              ? toNumber(next.hargaSatuanInput)
+              : Number(next.hargaSatuan || 0);
+
+          next.hargaTotal = getEffectiveVolume(next) * hs;
+          return next;
         }),
       }))
     );
@@ -990,28 +1040,34 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   const handleSaveAllData = () => {
     const estimationItem = sections.map((s) => ({
       title: s.title,
-      item: s.items.map((i) => ({
-        kode: i.kode,
-        nama: i.deskripsi,
-        satuan: i.satuan,
-        harga: i.hargaSatuan,
-        volume: i.volume,
-        hargaTotal: i.hargaTotal,
-        details: (i.volumeDetails || []).map((d) => ({
-          nama: d.uraian,
-          jenis: d.jenis, // "penjumlahan" | "pengurangan"
-          panjang: d.panjang,
-          lebar: d.lebar,
-          tinggi: d.tinggi,
-          jumlah: d.jumlah,
-          volume: Number(d.volume.toFixed(2)),
-          // >>> SIMPAN kolom tambahan
-          extras:
-            d.extras && d.extras.length
-              ? d.extras.map((x) => ({ name: x.name, value: x.value }))
-              : [],
-        })),
-      })),
+      item: s.items.map((i) => {
+        const isManual = i.volumeSource === "MANUAL";
+        const effectiveVol = getEffectiveVolume(i);
+
+        return {
+          kode: i.kode,
+          nama: i.deskripsi,
+          satuan: i.satuan,
+          harga: i.hargaSatuan,
+          volume: effectiveVol,
+          hargaTotal: effectiveVol * Number(i.hargaSatuan || 0),
+          details: isManual
+            ? []
+            : (i.volumeDetails || []).map((d) => ({
+                nama: d.uraian,
+                jenis: d.jenis, // "penjumlahan" | "pengurangan"
+                panjang: d.panjang,
+                lebar: d.lebar,
+                tinggi: d.tinggi,
+                jumlah: d.jumlah,
+                volume: Number(d.volume.toFixed(2)),
+                extras:
+                  d.extras && d.extras.length
+                    ? d.extras.map((x) => ({ name: x.name, value: x.value }))
+                    : [],
+              })),
+        };
+      }),
     }));
 
     const dataToSave = {
@@ -1139,7 +1195,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                     Uraian Pekerjaan
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Vol 
+                    Vol
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                     Satuan
@@ -1329,7 +1385,7 @@ const CreateEstimation = () => {
         setFormData({ projectName: "", owner: "", ppn: "11", notes: "" });
         setCustomFields([]);
         setActiveAccordion("step1");
-        notify("Berhasil menyimpan data", 'success');
+        notify("Berhasil menyimpan data", "success");
       },
     });
   };

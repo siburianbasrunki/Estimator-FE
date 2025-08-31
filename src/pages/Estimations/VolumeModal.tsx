@@ -286,10 +286,9 @@ export default function VolModal({
 
   if (!open) return null;
 
-  const dynamicColCount = 6 + extraCols.length + 3; // No..Tinggi(6) + extra + (Jumlah,Volume,Aksi)
-
+  const dynamicColCount = 6 + extraCols.length + 3; 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-black/45 p-2 sm:p-4">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/45 p-2 sm:p-4">
       <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
         {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-gray-200 bg-white">
