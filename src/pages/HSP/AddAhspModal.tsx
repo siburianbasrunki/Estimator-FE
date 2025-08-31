@@ -11,7 +11,7 @@ type Props = {
   hspCode: string;
   group: GroupKey;
   onAdded?: () => void;
-  title: string; // kirim dari parent sesuai grup
+  title: string; 
 };
 
 const AddComponentModal: React.FC<Props> = ({
@@ -57,7 +57,7 @@ const AddComponentModal: React.FC<Props> = ({
     await createMut.mutateAsync({
       code: hspCode,
       payload: {
-        group,
+        group, 
         masterItemId: selected.id,
         coefficient: parseNumber(coef || "1"),
         priceOverride:

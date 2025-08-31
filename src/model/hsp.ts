@@ -58,7 +58,7 @@ export interface CategoryItemModel {
   _count: { items: number };
 }
 
-export type GroupKey = "LABOR" | "MATERIAL" | "EQUIPMENT" | "OTHER";
+export type GroupKey = "LABOR" | "MATERIAL" | "EQUIPMENT" ;
 
 export interface MasterItemModel {
   id: string;

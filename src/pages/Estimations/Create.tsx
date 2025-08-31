@@ -562,7 +562,8 @@ function SortableSectionHeader({
       className={`bg-blue-50/70 ${isDragging ? "opacity-80" : ""}`}
     >
       <td className="px-4 py-3 text-sm font-semibold text-blue-700">
-        <button
+        <div className="flex items-end gap-2">
+          <button
           className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
           title="Drag kategori"
           aria-label="Drag kategori"
@@ -572,6 +573,7 @@ function SortableSectionHeader({
           ≡
         </button>
         {String.fromCharCode(65 + index)}
+        </div>
       </td>
 
       {/* Judul kategori (editable) */}
@@ -599,7 +601,7 @@ function SortableSectionHeader({
 
       {/* Aksi header kategori */}
       <td>
-        <div className="flex flex-wrap gap-2 items-center">
+        <div className="flex  gap-2 items-center">
           {/* Tambah dari HSP */}
           <div className="w-72">
             <SearchableSelect
@@ -1137,7 +1139,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                     Uraian Pekerjaan
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Vol (M³)
+                    Vol 
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                     Satuan

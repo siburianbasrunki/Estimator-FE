@@ -561,16 +561,18 @@ function SortableSectionHeader({
       className={`bg-blue-50/70 ${isDragging ? "opacity-80" : ""}`}
     >
       <td className="px-4 py-3 text-sm font-semibold text-blue-700">
-        <button
-          className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
-          title="Drag kategori"
-          aria-label="Drag kategori"
-          {...attributes}
-          {...listeners}
-        >
-          ≡
-        </button>
-        {String.fromCharCode(65 + index)}
+        <div className="flex items-end gap-2">
+          <button
+            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
+            title="Drag kategori"
+            aria-label="Drag kategori"
+            {...attributes}
+            {...listeners}
+          >
+            ≡
+          </button>
+          {String.fromCharCode(65 + index)}
+        </div>
       </td>
 
       <td className="px-4 py-3 text-sm font-bold text-blue-800">
@@ -1152,7 +1154,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                     Uraian Pekerjaan
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Vol (M³)
+                    Vol
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                     Satuan
@@ -1463,9 +1465,6 @@ const UpdateEstimation: React.FC = () => {
 
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Update Estimation</h1>
-        <p className="text-sm text-gray-600">
-          Perbarui profil proyek dan item pekerjaan di bawah ini.
-        </p>
       </div>
 
       <div className="join join-vertical w-full gap-4">

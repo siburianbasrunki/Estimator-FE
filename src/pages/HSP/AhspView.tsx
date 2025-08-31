@@ -43,6 +43,12 @@ export const AhspView: React.FC = () => {
   }>({ open: false, group: null });
   const [firstGroup, setFirstGroup] = useState<GroupKey>("LABOR");
 
+  // === Hapus OTHER: gunakan urutan grup tanpa OTHER ===
+  const ORDER_NO_OTHER = useMemo(
+    () => GROUP_ORDER.filter((g) => g !== ("OTHER" as GroupKey)) as GroupKey[],
+    []
+  );
+
   React.useEffect(() => {
     if (data?.recipe)
       setOverheadEdit(String(data.recipe.overheadPercent ?? 10));
@@ -70,7 +76,8 @@ export const AhspView: React.FC = () => {
       C = 0;
     const nextGroups: any = {};
 
-    for (const g of GROUP_ORDER) {
+    // === Loop hanya LABOR, MATERIAL, EQUIPMENT ===
+    for (const g of ORDER_NO_OTHER) {
       const grp = d.recipe.groups[g];
       const items = grp?.items || [];
       const nextItems = items.map((it: AhspComponentModel) => {
@@ -120,7 +127,7 @@ export const AhspView: React.FC = () => {
         computed: { A, B, C, D, E, F },
       },
     };
-  }, [data, dirty, overheadEdit]);
+  }, [data, dirty, overheadEdit, ORDER_NO_OTHER]);
 
   const onCoefChange = (id: string, v: string) =>
     setDirty((p) => ({ ...p, [id]: { ...(p[id] || {}), coefficient: v } }));
@@ -418,7 +425,7 @@ export const AhspView: React.FC = () => {
 
       {recipe ? (
         <div className="space-y-10">
-          {GROUP_ORDER.map((g) => {
+          {ORDER_NO_OTHER.map((g) => {
             const grp = recipe.groups[g];
             const items = grp?.items || [];
             return (
@@ -452,6 +459,7 @@ export const AhspView: React.FC = () => {
             </div>
             <div className="flex items-center gap-2">
               <label className="text-sm">Grup:</label>
+              {/* === Hanya 3 grup; OTHER dihapus === */}
               <select
                 className="rounded-md border px-3 py-2 text-sm"
                 value={firstGroup}
@@ -460,7 +468,6 @@ export const AhspView: React.FC = () => {
                 <option value="LABOR">A — Tenaga</option>
                 <option value="MATERIAL">B — Bahan</option>
                 <option value="EQUIPMENT">C — Peralatan</option>
-                <option value="OTHER">X — Lain-lain</option>
               </select>
               <button
                 onClick={() => setAddOpen({ open: true, group: firstGroup })}
