@@ -284,8 +284,6 @@ export const DetailEstimation: React.FC = () => {
         await PdfService.downloadPdfKategori(id, estimation.projectName);
       } else if (type === "ahsp") {
         await PdfService.downloadPdfAHSP(id, estimation.projectName);
-      } else if (type === "masteritem") {
-        await PdfService.downloadPdfMasterItem(id, estimation.projectName);
       }
       notify("Export PDF berhasil", "success");
     } catch (e: any) {
@@ -466,7 +464,7 @@ export const DetailEstimation: React.FC = () => {
                     onClick={handleExportPdfRAB}
                     // disabled={downloadingPdf}
                   >
-                    PDF RAB (dengan/ tanpa logo)
+                    RAB (dengan/ tanpa logo)
                   </button>
                 </li>
 
@@ -475,7 +473,7 @@ export const DetailEstimation: React.FC = () => {
                     onClick={() => handlePdfPick("volume")}
                     // disabled={downloadingPdf}
                   >
-                    Volume
+                    Rekapitulasi Volume
                   </button>
                 </li>
                 <li>
@@ -483,7 +481,7 @@ export const DetailEstimation: React.FC = () => {
                     onClick={() => handlePdfPick("jobitem")}
                     // disabled={downloadingPdf}
                   >
-                    Job Item Dipakai
+                    Rekapitulasi Pekerjaan
                   </button>
                 </li>
                 <li>
@@ -491,7 +489,7 @@ export const DetailEstimation: React.FC = () => {
                     onClick={() => handlePdfPick("kategori")}
                     // disabled={downloadingPdf}
                   >
-                    Kategori Dipakai
+                    Rekapitulasi Kategori
                   </button>
                 </li>
                 <li>
@@ -499,15 +497,7 @@ export const DetailEstimation: React.FC = () => {
                     onClick={() => handlePdfPick("ahsp")}
                     // disabled={downloadingPdf}
                   >
-                    AHSP Dipakai
-                  </button>
-                </li>
-                <li>
-                  <button
-                    onClick={() => handlePdfPick("masteritem")}
-                    // disabled={downloadingPdf}
-                  >
-                    Master Item Dipakai
+                    AHSP
                   </button>
                 </li>
               </ul>
