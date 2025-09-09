@@ -1,5 +1,6 @@
 // src/pages/estimation/VolumeModal.tsx
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { BiPlus, BiTrash, BiX } from "react-icons/bi";
 
 export type ExtraCol = {
@@ -286,9 +287,11 @@ export default function VolModal({
 
   if (!open) return null;
 
-  const dynamicColCount = 6 + extraCols.length + 3; 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/45 p-2 sm:p-4">
+  const dynamicColCount = 6 + extraCols.length + 3;
+
+  // ================= PORTAL CONTENT =================
+  const modalNode = (
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/45 p-2 sm:p-4">
       <div className="bg-white w-full max-w-6xl rounded-2xl shadow-2xl border border-gray-200 overflow-hidden">
         {/* Header */}
         <div className="flex items-start justify-between px-5 py-4 border-b border-gray-200 bg-white">
@@ -318,7 +321,7 @@ export default function VolModal({
           <div className="relative overflow-auto border border-gray-200 rounded-xl">
             {/* Sticky total (bottom) */}
             {rows.length > 0 && (
-              <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white to-transparent h-8 z-10"></div>
+              <div className="pointer-events-none absolute bottom-0 left-0 right-0 bg-gradient-to-t from-white to-transparent h-8 z-10" />
             )}
 
             <table className="table min-w-[1100px]">
@@ -574,4 +577,6 @@ export default function VolModal({
       </div>
     </div>
   );
+
+  return createPortal(modalNode, document.body);
 }

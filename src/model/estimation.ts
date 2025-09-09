@@ -10,6 +10,8 @@ export interface Estimation {
   author: Author;
   customFields: CustomField[];
   items: EstimationItem[];
+  imageUrl?: string;
+  imageId?: string;
   pagination: {
     page: number;
     limit: number;

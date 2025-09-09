@@ -2,6 +2,35 @@ import { getEndpoints } from "../config/config";
 import { sanitizeFileName, triggerBrowserDownload } from "../helper/download";
 import type { Estimation, EstimationCreateModel } from "../model/estimation";
 
+function buildEstimationFormData(
+  data: Partial<EstimationCreateModel> & { status?: string },
+  imageFile?: File | null
+) {
+  const fd = new FormData();
+
+  // field primitif
+  if (data.projectName != null)
+    fd.append("projectName", String(data.projectName));
+  if (data.owner != null) fd.append("owner", String(data.owner));
+  if (data.ppn != null) fd.append("ppn", String(data.ppn));
+  if (data.notes != null) fd.append("notes", String(data.notes));
+  if ((data as any).status != null)
+    fd.append("status", String((data as any).status));
+
+  // field kompleks (stringify)
+  if (data.customFields != null) {
+    fd.append("customFields", JSON.stringify(data.customFields));
+  }
+  if (data.estimationItem != null) {
+    fd.append("estimationItem", JSON.stringify(data.estimationItem));
+  }
+
+  // file image (opsional)
+  if (imageFile) {
+    fd.append("image", imageFile);
+  }
+  return fd;
+}
 const EstimationService = {
   async getEstimations(
     page: number = 1,
@@ -37,21 +66,26 @@ const EstimationService = {
     return json.data;
   },
 
-  async createEstimation(
-    estimation: EstimationCreateModel
-  ): Promise<Estimation> {
+  async createEstimation(payload: {
+    data: EstimationCreateModel;
+    imageFile?: File | null;
+  }): Promise<Estimation> {
     const { estimation: estimationUrl } = getEndpoints();
+    const fd = buildEstimationFormData(payload.data, payload.imageFile);
+
     const res = await fetch(`${estimationUrl}`, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify(estimation),
+      } as any,
+      body: fd,
     });
+
     if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || "Failed to create estimation");
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(
+        errorData.error || `Failed to create estimation (${res.status})`
+      );
     }
     const json = await res.json();
     return json.data;
@@ -59,25 +93,31 @@ const EstimationService = {
 
   async updateEstimation(
     id: string,
-    estimation: Partial<EstimationCreateModel> & { status?: string }
+    payload: {
+      data: Partial<EstimationCreateModel> & { status?: string };
+      imageFile?: File | null;
+    }
   ): Promise<Estimation> {
     const { estimation: estimationUrl } = getEndpoints();
+    const fd = buildEstimationFormData(payload.data, payload.imageFile);
+
     const res = await fetch(`${estimationUrl}/${id}`, {
       method: "PUT",
       headers: {
-        "Content-Type": "application/json",
         Authorization: `Bearer ${localStorage.getItem("token")}`,
-      },
-      body: JSON.stringify(estimation),
+      } as any,
+      body: fd,
     });
+
     if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || "Failed to update estimation");
+      const errorData = await res.json().catch(() => ({}));
+      throw new Error(
+        errorData.error || `Failed to update estimation (${res.status})`
+      );
     }
     const json = await res.json();
     return json.data;
   },
-
   async deleteEstimation(id: string): Promise<void> {
     const { estimation: estimationUrl } = getEndpoints();
     const res = await fetch(`${estimationUrl}/${id}`, {

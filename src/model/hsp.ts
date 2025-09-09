@@ -128,6 +128,7 @@ export interface AhspDetailModel {
   category: { id: string; name: string };
   harga: number; // cached price
   recipe: AhspRecipeModel | null;
+  
 }
 
 // src/model/hsp.ts
@@ -146,6 +147,7 @@ export interface AhspComponentModel {
   coefficient: number;
   priceOverride: number | null;
   notes?: string | null;
+  useAdminPrice?: boolean;
   effectiveUnitPrice?: number | null;
   subtotal?: number | null;
 }
@@ -183,5 +185,10 @@ export interface AhspDetailModel {
     groups: Record<GroupKey, AhspGroupModel>;
     notes?: string | null;
     updatedAt: string;
+  };
+   meta?: {
+    effectiveSource: "USER" | "ADMIN"; 
+    hasUserOverride: boolean;          
+    userActive: boolean;               
   };
 }

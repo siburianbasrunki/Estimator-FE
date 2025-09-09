@@ -29,7 +29,17 @@ export type ImportHspSummary = {
 const authHeader = () => ({
   Authorization: `Bearer ${localStorage.getItem("token")}`,
 });
-
+export type AdminAllWithItemsFlat = {
+  categories: Array<{ id: string; name: string }>;
+  items: Array<{
+    kode: string;
+    deskripsi: string;
+    satuan?: string;
+    harga?: number;
+    hspCategoryId?: string;
+    categoryName?: string;
+  }>;
+};
 const HspService = {
   async importHsp(file: File): Promise<ImportHspSummary> {
     const { importHsp } = getEndpoints();
@@ -88,6 +98,91 @@ const HspService = {
       throw new Error(json?.error || `Fetch failed (HTTP ${res.status})`);
     return json as ItemJobListResponse;
   },
+  async getAdminAllWithItemsFlat(params?: {
+    scope?: "ALL" | "ADMIN" | "USER";
+    itemOrderBy?: "kode" | "harga";
+    itemOrderDir?: "asc" | "desc";
+  }): Promise<AdminAllWithItemsFlat> {
+    const { hsp } = getEndpoints();
+    const u = new URL(`${hsp}/admin/all-with-items`);
+    u.searchParams.set("flat", "1");
+    u.searchParams.set("scope", params?.scope ?? "ALL");
+    u.searchParams.set("itemOrderBy", params?.itemOrderBy ?? "kode");
+    u.searchParams.set("itemOrderDir", params?.itemOrderDir ?? "asc");
+
+    const res = await fetch(u.toString(), { headers: authHeader() });
+    const json = await res.json();
+    if (!res.ok) {
+      throw new Error(json?.error || `Fetch failed (HTTP ${res.status})`);
+    }
+
+    const raw = json.data ?? json;
+
+    // 1) Sudah sesuai { categories, items } -> normalisasi kecil & return
+    if (Array.isArray(raw?.categories) && Array.isArray(raw?.items)) {
+      const items = raw.items.map(normalizeItem);
+      const categories = (raw.categories || []).map((c: any) => ({
+        id: c.id ?? c.categoryId ?? `name:${c.name}`,
+        name: c.name,
+      }));
+      return { categories, items };
+    }
+
+    // 2) Sudah flat array -> bentuk categories dari item
+    if (Array.isArray(raw)) {
+      const items = raw.map(normalizeItem);
+      const cats = new Map<string, { id: string; name: string }>();
+      for (const it of items) {
+        const name = it.categoryName ?? "Tanpa Kategori";
+        const id = it.hspCategoryId ?? `name:${name}`;
+        if (!cats.has(name)) cats.set(name, { id, name });
+      }
+      return { categories: Array.from(cats.values()), items };
+    }
+
+    // 3) GROUPED object -> flatten + dedupe by kode (prioritas USER)
+    if (raw && typeof raw === "object") {
+      const categories: Array<{ id: string; name: string }> = [];
+      const byKode = new Map<string, any>();
+
+      for (const [catName, arr] of Object.entries(raw)) {
+        const list = Array.isArray(arr) ? (arr as any[]) : [];
+        const first = list[0];
+        const catId =
+          first?.hspCategoryId ?? first?.categoryId ?? `name:${catName}`;
+        categories.push({ id: catId, name: catName });
+
+        for (const it of list) {
+          const current = byKode.get(it.kode);
+          if (!current) {
+            byKode.set(it.kode, it);
+            continue;
+          }
+          const currIsUser = String(current.scope || "").startsWith("u:");
+          const nextIsUser = String(it.scope || "").startsWith("u:");
+          // kalau next USER dan current GLOBAL -> replace
+          if (!currIsUser && nextIsUser) byKode.set(it.kode, it);
+        }
+      }
+
+      const items = Array.from(byKode.values()).map(normalizeItem);
+      return { categories, items };
+    }
+
+    // fallback
+    return { categories: [], items: [] };
+
+    function normalizeItem(it: any) {
+      return {
+        kode: it.kode,
+        deskripsi: it.deskripsi,
+        satuan: it.satuan ?? "",
+        harga: Number(it.harga ?? 0),
+        hspCategoryId: it.hspCategoryId ?? it.categoryId,
+        categoryName: it.categoryName,
+      };
+    }
+  },
   async getCategoryJob(): Promise<CategoryItemModel[]> {
     const { hsp } = getEndpoints();
     const res = await fetch(`${hsp}/categories`, {
@@ -103,17 +198,41 @@ const HspService = {
   // NOTE: return type diperbaiki ke detail AHSP
   async getAhspJob(code: string): Promise<AhspDetailModel> {
     const { hsp } = getEndpoints();
-    // sesuaikan dengan backend kamu; di sini pakai /ahsp/:code
-    const res = await fetch(`${hsp}/ahsp/${encodeURIComponent(code)}`, {
-      headers: authHeader(),
-    });
+    const url = `${hsp}/ahsp/${encodeURIComponent(code)}`;
+    const res = await fetch(url, { headers: authHeader() });
     const json = await res.json();
-    if (!res.ok) {
+    if (!res.ok)
       throw new Error(json?.error || `Fetch failed (HTTP ${res.status})`);
-    }
     return json.data as AhspDetailModel;
   },
-
+  async setHspOverrideActive(kode: string, active: boolean) {
+    const { hsp } = getEndpoints();
+    const url = `${hsp}/items/by-kode/${encodeURIComponent(
+      kode
+    )}/override/active`;
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ active }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || `Failed (HTTP ${res.status})`);
+    return json.data as { kode: string; active: boolean };
+  },
+  async setMasterOverrideActive(code: string, active: boolean) {
+    const { hsp } = getEndpoints();
+    const url = `${hsp}/master/by-code/${encodeURIComponent(
+      code
+    )}/override/active`;
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...authHeader() },
+      body: JSON.stringify({ active }),
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json?.error || `Failed (HTTP ${res.status})`);
+    return json.data as { code: string; active: boolean };
+  },
   // Master item
   async listMaster(
     type: MasterType,
@@ -262,6 +381,7 @@ const HspService = {
       coefficient?: number;
       priceOverride?: number | null;
       notes?: string;
+      useAdminPrice?: boolean;
     }
   ) {
     const { hsp } = getEndpoints();
@@ -287,6 +407,8 @@ const HspService = {
       coefficient?: number;
       priceOverride?: number | null;
       notes?: string;
+      // NEW
+      useAdminPrice?: boolean;
     }
   ) {
     const { hsp } = getEndpoints();
@@ -302,7 +424,6 @@ const HspService = {
     if (!res.ok) throw new Error(json?.error || `Failed (HTTP ${res.status})`);
     return json.data;
   },
-
   async deleteAhspComponent(componentId: string) {
     const { hsp } = getEndpoints();
     const res = await fetch(`${hsp}/recipe/components/${componentId}`, {

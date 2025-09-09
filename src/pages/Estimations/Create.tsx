@@ -13,7 +13,7 @@ import {
 import Button from "../../components/Button";
 import { UnitList } from "../../stores/units";
 import { useCreateEstimation } from "../../hooks/useEstimation";
-import { useGetCategoryJob, useGetItemJob } from "../../hooks/useHsp";
+import { useGetAdminAllWithItemsFlat } from "../../hooks/useHsp";
 import type { Option } from "../../components/SearchableSelect";
 import SearchableSelect from "../../components/SearchableSelect";
 
@@ -112,6 +112,8 @@ const CreateStepOne = ({
   setFormData,
   customFields,
   setCustomFields,
+  imageFile,
+  setImageFile,
 }: {
   onSave: () => void;
   formData: {
@@ -130,17 +132,23 @@ const CreateStepOne = ({
   >;
   customFields: CustomField[];
   setCustomFields: React.Dispatch<React.SetStateAction<CustomField[]>>;
+  imageFile: File | null;
+  setImageFile: React.Dispatch<React.SetStateAction<File | null>>;
 }) => {
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [newFieldType, setNewFieldType] = useState("text");
-
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
+  const onPickImage = (f?: File | null) => {
+    setImageFile(f ?? null);
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(f ? URL.createObjectURL(f) : null);
+  };
   const handleCustomFieldChange = (id: string, value: string) => {
     setCustomFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, value } : f))
@@ -289,15 +297,33 @@ const CreateStepOne = ({
           <div className="card bg-base-100 border border-gray-200 shadow-sm">
             <figure className="px-4 pt-4">
               <img
-                src={ImageProyek}
+                src={previewUrl || ImageProyek}
                 alt="Preview Proyek"
                 className="rounded-lg border border-gray-200 object-cover"
               />
             </figure>
             <div className="card-body p-4">
-              <button className="btn btn-outline btn-sm">
+              <input
+                id="project-image-input"
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => onPickImage(e.target.files?.[0] || null)}
+              />
+              <label
+                htmlFor="project-image-input"
+                className="btn btn-outline btn-sm cursor-pointer"
+              >
                 <BiEdit className="mr-1" /> Ganti Gambar
-              </button>
+              </label>
+              {!!imageFile && (
+                <button
+                  className="btn btn-ghost btn-xs text-red-600 mt-2"
+                  onClick={() => onPickImage(null)}
+                >
+                  <BiTrash className="mr-1" /> Hapus pilihan
+                </button>
+              )}
               <div className="text-xs text-gray-500">
                 Format disarankan: JPG/PNG, rasio 4:3.
               </div>
@@ -720,14 +746,9 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     VolumeDetailRow[] | undefined
   >(undefined);
 
-  const { data: itemJobResp, isLoading: isLoadingItems } = useGetItemJob({
-    q: undefined,
-    skip: 0,
-    take: 100,
-  });
-  const itemJobList = itemJobResp?.data ?? [];
-  const { data: categories, isLoading: isLoadingCategories } =
-    useGetCategoryJob();
+  const { data: hspAll, isLoading } = useGetAdminAllWithItemsFlat();
+  const itemJobList = hspAll?.items ?? [];
+  const categories = hspAll?.categories ?? [];
 
   const CategoryOptions: Option[] = useMemo(
     () =>
@@ -753,16 +774,18 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
 
   const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
     () =>
-      itemJobList.map((it) => ({
+      (itemJobList ?? []).map((it) => ({
         kode: it.kode,
-        label: `${it.deskripsi} - ${formatIDR(it.harga)}/${it.satuan}`,
+        label: `${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
+          it.satuan ?? "-"
+        }`,
         value: it.kode,
         detail: {
           deskripsi: it.deskripsi,
-          satuan: it.satuan,
+          satuan: it.satuan ?? "",
           harga: it.harga ?? 0,
           categoryId: it.hspCategoryId,
-          categoryName: it.category?.name,
+          categoryName: it.categoryName,
         },
       })),
     [itemJobList]
@@ -1125,10 +1148,8 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                 options={CategoryOptions}
                 value={selectedSectionFromList}
                 onChange={(v) => setSelectedSectionFromList(v || "")}
-                placeholder={
-                  isLoadingCategories ? "Memuat..." : "Pilih Kategori"
-                }
-                loading={isLoadingCategories}
+                placeholder={isLoading ? "Memuat..." : "Pilih Kategori"}
+                loading={isLoading}
               />
             )}
             <div className="flex flex-wrap gap-2">
@@ -1235,7 +1256,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                     <SortableSectionHeader
                       section={section}
                       index={sIdx}
-                      isLoadingItems={isLoadingItems}
+                      isLoadingItems={isLoading}
                       PekerjaanOptions={PekerjaanOptions}
                       DropdownPekerjaan={DropdownPekerjaan}
                       addItemToSection={addItemToSection}
@@ -1354,6 +1375,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
 /* ------------------------------- Root Create ------------------------------- */
 const CreateEstimation = () => {
   const [activeAccordion, setActiveAccordion] = useState<string>("step1");
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [formData, setFormData] = useState({
     projectName: "",
     owner: "",
@@ -1380,14 +1402,18 @@ const CreateEstimation = () => {
   );
 
   const handleSaveData = (data: any) => {
-    createMutation.mutate(data, {
-      onSuccess: () => {
-        setFormData({ projectName: "", owner: "", ppn: "11", notes: "" });
-        setCustomFields([]);
-        setActiveAccordion("step1");
-        notify("Berhasil menyimpan data", "success");
-      },
-    });
+    createMutation.mutate(
+      { data, imageFile },
+      {
+        onSuccess: () => {
+          setFormData({ projectName: "", owner: "", ppn: "11", notes: "" });
+          setCustomFields([]);
+          setActiveAccordion("step1");
+          setImageFile(null); // reset image
+          notify("Berhasil menyimpan data", "success");
+        },
+      }
+    );
   };
   const navigate = useNavigate();
   return (
@@ -1420,6 +1446,8 @@ const CreateEstimation = () => {
               setFormData={setFormData}
               customFields={customFields}
               setCustomFields={setCustomFields}
+              imageFile={imageFile}
+              setImageFile={setImageFile}
             />
           </div>
         </div>

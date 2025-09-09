@@ -53,11 +53,11 @@ export default function SearchableSelect({
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     if (!query) return options;
-    const f = filterFn
-      ? filterFn
-      : (opt: Option, _q: string) =>
-          (opt.label ?? "").toLowerCase().includes(query) ||
-          (opt.value ?? "").toLowerCase().includes(query);
+    const f =
+      filterFn ??
+      ((opt: Option, _q: string) =>
+        (opt.label ?? "").toLowerCase().includes(query) ||
+        (opt.value ?? "").toLowerCase().includes(query));
     return options.filter((o) => f(o, query));
   }, [options, q, filterFn]);
 
@@ -87,8 +87,11 @@ export default function SearchableSelect({
     if (el) el.scrollIntoView({ block: "nearest" });
   }, [activeIdx]);
 
+  // Ukuran tanpa fixed height agar bisa wrap
   const sizeClasses =
-    size === "sm" ? "input-sm h-9 text-sm" : "h-11 text-[15px]"; // daisy keeps base sizing via .input
+    size === "sm"
+      ? "text-sm py-2 min-h-[36px]"
+      : "text-[15px] py-3 min-h-[44px]";
 
   const disabledCls = disabled ? "pointer-events-none opacity-60" : "";
 
@@ -135,7 +138,7 @@ export default function SearchableSelect({
     >
       <button
         type="button"
-        className={`input input-bordered w-full pr-10 text-black bg-white border-black flex items-center justify-between ${sizeClasses} ${disabledCls}`}
+        className={`input input-bordered w-full pr-10 text-black bg-white border-black flex items-start justify-between h-auto ${sizeClasses} ${disabledCls}`}
         onClick={() => {
           if (disabled) return;
           setOpen((v) => !v);
@@ -145,11 +148,13 @@ export default function SearchableSelect({
         aria-expanded={open}
       >
         <span
-          className={`truncate text-left ${current ? "" : "text-gray-500"}`}
+          className={`block text-left whitespace-normal break-words leading-snug ${
+            current ? "" : "text-gray-500"
+          }`}
         >
           {current ? current.label : placeholder}
         </span>
-        <BiChevronDown className="text-gray-500 absolute right-3 pointer-events-none" />
+        <BiChevronDown className="text-gray-500 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" />
       </button>
 
       {/* Clear button */}
@@ -181,7 +186,7 @@ export default function SearchableSelect({
               <input
                 ref={inputRef}
                 className={`input input-bordered w-full pl-8 pr-2 text-black bg-white border-black ${
-                  size === "sm" ? "input-sm h-9" : ""
+                  size === "sm" ? "input-sm" : ""
                 }`}
                 placeholder="Ketik untuk mencari..."
                 value={q}
@@ -219,7 +224,9 @@ export default function SearchableSelect({
                       active ? "bg-gray-100" : ""
                     } ${selected ? "font-medium" : ""}`}
                   >
-                    <div className="truncate">{opt.label}</div>
+                    <div className="whitespace-normal break-words leading-snug">
+                      {opt.label}
+                    </div>
                   </li>
                 );
               })

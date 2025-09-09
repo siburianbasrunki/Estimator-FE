@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import type { ImportHspSummary } from "../service/hsp";
+import type { AdminAllWithItemsFlat, ImportHspSummary } from "../service/hsp";
 import HspService from "../service/hsp";
 import { useParams } from "react-router-dom";
 import type { AhspDetailModel, ItemJobListResponse } from "../model/hsp";
@@ -44,7 +44,6 @@ export const useGetItemJob = (params: {
   return useQuery<ItemJobListResponse>({
     queryKey: ["itemJob", params],
     queryFn: () => HspService.getItemJob(params),
-    
   });
 };
 
@@ -52,6 +51,17 @@ export const useGetCategoryJob = () => {
   return useQuery({
     queryKey: ["categoryJob"],
     queryFn: () => HspService.getCategoryJob(),
+  });
+};
+export const useGetAdminAllWithItemsFlat = () => {
+  return useQuery<AdminAllWithItemsFlat>({
+    queryKey: ["adminAllWithItemsFlat"],
+    queryFn: () =>
+      HspService.getAdminAllWithItemsFlat({
+        scope: "ALL",
+        itemOrderBy: "kode",
+        itemOrderDir: "asc",
+      }),
   });
 };
 
@@ -71,7 +81,13 @@ export const useUpdateAhspComponent = () => {
   return useMutation<
     void,
     Error,
-    { componentId: string; coefficient?: number; priceOverride?: number | null }
+    {
+      componentId: string;
+      coefficient?: number;
+      priceOverride?: number | null;
+      // NEW
+      useAdminPrice?: boolean;
+    }
   >({
     mutationFn: ({ componentId, ...payload }) =>
       HspService.updateAhspComponent(componentId, payload),
@@ -96,7 +112,29 @@ export const useUpdateAhspOverhead = () => {
     onError: (e) => toast.error(e.message || "Gagal menyimpan overhead"),
   });
 };
-
+export const useToggleHspOverride = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ kode, active }: { kode: string; active: boolean }) =>
+      HspService.setHspOverrideActive(kode, active),
+    onSuccess: (_, vars) => {
+      toast.success(
+        vars.active ? "Pakai versi saya (USER)" : "Kembali pakai Admin"
+      );
+      qc.invalidateQueries({ queryKey: ["hspDetail", vars.kode] });
+      qc.invalidateQueries({ queryKey: ["hsp"] });
+    },
+    onError: (e: any) => toast.error(e?.message || "Gagal mengganti sumber"),
+  });
+};
+export const useToggleMasterOverride = () => {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ code, active }: { code: string; active: boolean }) =>
+      HspService.setMasterOverrideActive(code, active),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["master"] }),
+  });
+};
 export const useRecomputeHsp = () => {
   const qc = useQueryClient();
   const { code } = useParams();
