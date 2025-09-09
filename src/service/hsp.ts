@@ -143,7 +143,7 @@ const HspService = {
     // 3) GROUPED object -> flatten + dedupe by kode (prioritas USER)
     if (raw && typeof raw === "object") {
       const categories: Array<{ id: string; name: string }> = [];
-      const byKode = new Map<string, any>();
+      const itemsRaw: any[] = [];
 
       for (const [catName, arr] of Object.entries(raw)) {
         const list = Array.isArray(arr) ? (arr as any[]) : [];
@@ -151,21 +151,10 @@ const HspService = {
         const catId =
           first?.hspCategoryId ?? first?.categoryId ?? `name:${catName}`;
         categories.push({ id: catId, name: catName });
-
-        for (const it of list) {
-          const current = byKode.get(it.kode);
-          if (!current) {
-            byKode.set(it.kode, it);
-            continue;
-          }
-          const currIsUser = String(current.scope || "").startsWith("u:");
-          const nextIsUser = String(it.scope || "").startsWith("u:");
-          // kalau next USER dan current GLOBAL -> replace
-          if (!currIsUser && nextIsUser) byKode.set(it.kode, it);
-        }
+        for (const it of list) itemsRaw.push(it);
       }
 
-      const items = Array.from(byKode.values()).map(normalizeItem);
+      const items = itemsRaw.map(normalizeItem);
       return { categories, items };
     }
 
@@ -174,12 +163,16 @@ const HspService = {
 
     function normalizeItem(it: any) {
       return {
+        id: it.id,
         kode: it.kode,
         deskripsi: it.deskripsi,
         satuan: it.satuan ?? "",
         harga: Number(it.harga ?? 0),
         hspCategoryId: it.hspCategoryId ?? it.categoryId,
         categoryName: it.categoryName,
+        scope: it.scope,
+        ownerUserId: it.ownerUserId,
+        source: it.source,
       };
     }
   },
