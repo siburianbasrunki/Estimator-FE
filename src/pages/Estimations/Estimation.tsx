@@ -27,8 +27,10 @@ export const EstimationView = () => {
 
   const { mutateAsync: deleteEstimation, isPending } = useDeleteEstimation();
 
+  const showSkeleton = isLoading || isFetching;
+
   const isEmpty =
-    !isLoading &&
+    !showSkeleton &&
     (!estimation?.data ||
       !Array.isArray(estimation.data) ||
       estimation.data.length === 0);
@@ -54,7 +56,6 @@ export const EstimationView = () => {
       variant: "danger",
     });
     if (!ok) return;
-
     await deleteEstimation(id);
   };
 
@@ -121,7 +122,7 @@ export const EstimationView = () => {
         </div>
 
         {/* Loading (skeleton table) */}
-        {(isLoading || isFetching) && (
+        {showSkeleton && (
           <div className="p-4">
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -201,7 +202,7 @@ export const EstimationView = () => {
         )}
 
         {/* Empty */}
-        {!isLoading && isEmpty && (
+        {!showSkeleton && isEmpty && (
           <div className="p-4">
             <EmptyState
               title="Belum ada Estimation"
@@ -211,7 +212,7 @@ export const EstimationView = () => {
         )}
 
         {/* Table */}
-        {!isLoading && !isEmpty && (
+        {!showSkeleton && !isEmpty && (
           <>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -239,65 +240,67 @@ export const EstimationView = () => {
                   </tr>
                 </thead>
 
-                {estimation?.data.map((item: any) => (
-                  <tbody
-                    key={item.id}
-                    className="bg-white divide-y divide-gray-200"
-                  >
-                    <tr>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {estimation?.data.indexOf(item) + 1 + (page - 1) * limit}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.projectName || "-"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.projectOwner || "-"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {formatDateTime(item.createdAt) || "-"}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col">
-                          <p className="font-bold text-gray-700 text-sm">
-                            {item.author?.name || "-"}
-                          </p>
-                          <p className="text-gray-500 text-sm">
-                            {item.author?.email || "-"}
-                          </p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 border border-green-400">
-                          Submitted
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex gap-3 justify-end">
-                          <IoDocument
-                            className="text-blue-600 h-5 w-5 cursor-pointer"
-                            title="Detail"
-                            onClick={() => navigate(`/estimation/${item.id}`)}
-                          />
-                          <BiEdit
-                            className="text-green-600 h-5 w-5 cursor-pointer"
-                            title="Edit"
-                            onClick={() =>
-                              navigate(`/estimation/update/${item.id}`)
-                            }
-                          />
-                          <BiTrash
-                            className={`h-5 w-5 cursor-pointer ${
-                              isPending ? "text-red-300" : "text-red-600"
-                            }`}
-                            title="Delete"
-                            onClick={() => onDelete(item.id, item.projectName)}
-                          />
-                        </div>
-                      </td>
-                    </tr>
-                  </tbody>
-                ))}
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {estimation?.data.map((item: any, idx: number) => {
+                    const rowNumber = (page - 1) * limit + idx + 1;
+                    return (
+                      <tr key={item.id}>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {rowNumber}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {item.projectName || "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {item.projectOwner || "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {formatDateTime(item.createdAt) || "-"}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex flex-col">
+                            <p className="font-bold text-gray-700 text-sm">
+                              {item.author?.name || "-"}
+                            </p>
+                            <p className="text-gray-500 text-sm">
+                              {item.author?.email || "-"}
+                            </p>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800 border border-green-400">
+                            Submitted
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                          <div className="flex gap-3 justify-end">
+                            <IoDocument
+                              className="text-blue-600 h-5 w-5 cursor-pointer"
+                              title="Detail"
+                              onClick={() => navigate(`/estimation/${item.id}`)}
+                            />
+                            <BiEdit
+                              className="text-green-600 h-5 w-5 cursor-pointer"
+                              title="Edit"
+                              onClick={() =>
+                                navigate(`/estimation/update/${item.id}`)
+                              }
+                            />
+                            <BiTrash
+                              className={`h-5 w-5 cursor-pointer ${
+                                isPending ? "text-red-300" : "text-red-600"
+                              }`}
+                              title="Delete"
+                              onClick={() =>
+                                onDelete(item.id, item.projectName)
+                              }
+                            />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
               </table>
             </div>
 
