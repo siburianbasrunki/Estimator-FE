@@ -421,10 +421,10 @@ export const DetailEstimation: React.FC = () => {
               <div className="stat-value text-xl">{formatIDR(grandTotal)}</div>
             </div>
           </div>
-          <div className="flex gap-2 justify-end">
+          <div className="flex flex-col md:flex-row md:items-center gap-2 md:gap-3 justify-stretch md:justify-end flex-wrap">
             <button
               type="button"
-              className="btn bg-blue-400 hover:bg-blue-500 "
+              className="btn bg-blue-400 hover:bg-blue-500 w-full md:w-auto"
               onClick={() => navigate(`/estimation/update/${id}`)}
             >
               Update Estimation
@@ -432,18 +432,22 @@ export const DetailEstimation: React.FC = () => {
 
             <button
               type="button"
-              className={`btn btn-success ${downloadingExcel ? "loading" : ""}`}
+              className={`btn btn-success w-full md:w-auto ${
+                downloadingExcel ? "loading" : ""
+              }`}
               onClick={handleExportExcel}
-              // disabled={downloadingExcel || downloadingPdf}
+              disabled={downloadingExcel || downloadingPdf}
               aria-busy={downloadingExcel}
             >
               {downloadingExcel ? "Mempersiapkan Excel..." : "Export Excel"}
             </button>
 
-            <div className="dropdown dropdown-end">
+            <div className="dropdown md:dropdown-end w-full md:w-auto">
               <label
                 tabIndex={0}
-                className={`btn btn-outline ${downloadingPdf ? "loading" : ""}`}
+                className={`btn btn-outline w-full md:w-auto ${
+                  downloadingPdf ? "loading" : ""
+                }`}
                 aria-busy={downloadingPdf}
               >
                 {downloadingPdf ? "Mempersiapkan PDF..." : "Export PDF"}
@@ -455,23 +459,24 @@ export const DetailEstimation: React.FC = () => {
                   <path d="M5.25 7.5l4.5 4.5 4.5-4.5h-9z" />
                 </svg>
               </label>
+
+              {/* di mobile biarkan lebar 100%, di md pakai lebar tetap */}
               <ul
                 tabIndex={0}
-                className="dropdown-content menu p-2 shadow bg-white border border-gray-200 rounded-box w-56"
+                className="dropdown-content menu p-2 shadow bg-white border border-gray-200 rounded-box w-full md:w-56"
               >
                 <li>
                   <button
                     onClick={handleExportPdfRAB}
-                    // disabled={downloadingPdf}
+                    disabled={downloadingPdf}
                   >
                     RAB (dengan/ tanpa logo)
                   </button>
                 </li>
-
                 <li>
                   <button
                     onClick={() => handlePdfPick("volume")}
-                    // disabled={downloadingPdf}
+                    disabled={downloadingPdf}
                   >
                     Rekapitulasi Volume
                   </button>
@@ -479,7 +484,7 @@ export const DetailEstimation: React.FC = () => {
                 <li>
                   <button
                     onClick={() => handlePdfPick("jobitem")}
-                    // disabled={downloadingPdf}
+                    disabled={downloadingPdf}
                   >
                     Rekapitulasi Pekerjaan
                   </button>
@@ -487,7 +492,7 @@ export const DetailEstimation: React.FC = () => {
                 <li>
                   <button
                     onClick={() => handlePdfPick("kategori")}
-                    // disabled={downloadingPdf}
+                    disabled={downloadingPdf}
                   >
                     Rekapitulasi Kategori
                   </button>
@@ -495,7 +500,7 @@ export const DetailEstimation: React.FC = () => {
                 <li>
                   <button
                     onClick={() => handlePdfPick("ahsp")}
-                    // disabled={downloadingPdf}
+                    disabled={downloadingPdf}
                   >
                     AHSP
                   </button>
@@ -533,71 +538,164 @@ export const DetailEstimation: React.FC = () => {
                 : d.hargaSatuan * d.volume),
             0
           );
+
           return (
             <div
               key={section.id}
-              className="card bg-white border border-gray-200 shadow-sm overflow-hidden"
+              className="card bg-white border border-gray-200 shadow-sm"
             >
               <div className="collapse collapse-arrow">
                 <input type="checkbox" defaultChecked />
+
                 <div className="collapse-title font-semibold flex justify-between bg-gray-200">
-                  <span>{section.title}</span>
+                  <span className="truncate">{section.title}</span>
                   <span className="badge border border-gray-300 bg-gray-100 text-black">
                     {formatIDR(sectionSubtotal)}
                   </span>
                 </div>
-                <div className="collapse-content">
-                  <div className="overflow-x-auto">
-                    <table className="table">
-                      <thead className=" text-black">
-                        <tr>
-                          <th>No</th>
-                          <th>Deskripsi</th>
-                          <th>Kode</th>
-                          <th className="text-right">Volume</th>
-                          <th>Satuan</th>
-                          <th className="text-right">Harga Satuan</th>
-                          <th className="text-right">Harga Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {section.details.map((d, idx) => {
-                          const total =
-                            typeof d.hargaTotal === "number"
-                              ? d.hargaTotal
-                              : d.hargaSatuan * d.volume;
-                          return (
-                            <tr key={d.id}>
-                              <td>{idx + 1}</td>
-                              <td className="whitespace-pre-wrap">
-                                {d.deskripsi}
-                              </td>
-                              <td className="font-medium">{d.kode}</td>
-                              <td className="text-right">{d.volume}</td>
-                              <td>{d.satuan}</td>
-                              <td className="text-right">
+
+                {/* === MOBILE CARD LAYOUT (md kebawah) === */}
+                <div className="collapse-content !overflow-visible md:hidden">
+                  <div className="grid gap-2">
+                    {section.details.map((d, idx) => {
+                      const total =
+                        typeof d.hargaTotal === "number"
+                          ? d.hargaTotal
+                          : d.hargaSatuan * d.volume;
+
+                      return (
+                        <div
+                          key={d.id}
+                          className="border border-gray-200 rounded-lg p-3 bg-white"
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className="text-xs text-gray-500">
+                              #{idx + 1}
+                            </span>
+                            <span className="text-xs text-gray-500">
+                              {d.kode}
+                            </span>
+                          </div>
+                          <div className="font-medium whitespace-pre-wrap mb-2">
+                            {d.deskripsi}
+                          </div>
+                          <div className="text-sm grid grid-cols-2 gap-2">
+                            <div>
+                              <div className="text-gray-500 text-xs">
+                                Volume
+                              </div>
+                              <div className="font-medium">{d.volume}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500 text-xs">
+                                Satuan
+                              </div>
+                              <div className="font-medium">{d.satuan}</div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500 text-xs">
+                                Harga Satuan
+                              </div>
+                              <div className="font-medium">
                                 {formatIDR(d.hargaSatuan)}
-                              </td>
-                              <td className="text-right">{formatIDR(total)}</td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                      <tfoot>
-                        <tr>
-                          <td colSpan={4}></td>
-                          <td className="text-right text-black font-semibold">
-                            Subtotal
-                          </td>
-                          <td
-                            className="text-right font-bold text-black"
-                            colSpan={2}
-                          >
-                            {formatIDR(sectionSubtotal)}
-                          </td>
-                        </tr>
-                      </tfoot>
-                    </table>
+                              </div>
+                            </div>
+                            <div>
+                              <div className="text-gray-500 text-xs">
+                                Harga Total
+                              </div>
+                              <div className="font-bold">
+                                {formatIDR(total)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    <div className="flex justify-end pt-2">
+                      <div className="inline-flex items-center gap-3">
+                        <span className="text-black font-semibold">
+                          Subtotal
+                        </span>
+                        <span className="text-black font-bold">
+                          {formatIDR(sectionSubtotal)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* === DESKTOP TABLE LAYOUT (md ke atas) === */}
+                <div className="collapse-content !overflow-visible !p-0 hidden md:block">
+                  {/* Hilangkan padding luar agar scroller penuh lebar */}
+                  <div className="relative -mx-4 md:mx-0">
+                    <div className="overflow-x-auto w-full">
+                      <table className="table min-w-[960px] md:min-w-full">
+                        <thead className="text-black">
+                          <tr>
+                            <th className="whitespace-nowrap">No</th>
+                            <th className="whitespace-nowrap">Deskripsi</th>
+                            <th className="whitespace-nowrap">Kode</th>
+                            <th className="text-right whitespace-nowrap">
+                              Volume
+                            </th>
+                            <th className="whitespace-nowrap">Satuan</th>
+                            <th className="text-right whitespace-nowrap">
+                              Harga Satuan
+                            </th>
+                            <th className="text-right whitespace-nowrap">
+                              Harga Total
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {section.details.map((d, idx) => {
+                            const total =
+                              typeof d.hargaTotal === "number"
+                                ? d.hargaTotal
+                                : d.hargaSatuan * d.volume;
+                            return (
+                              <tr key={d.id}>
+                                <td className="whitespace-nowrap">{idx + 1}</td>
+                                <td className="whitespace-pre-wrap">
+                                  {d.deskripsi}
+                                </td>
+                                <td className="font-medium whitespace-nowrap">
+                                  {d.kode}
+                                </td>
+                                <td className="text-right whitespace-nowrap">
+                                  {d.volume}
+                                </td>
+                                <td className="whitespace-nowrap">
+                                  {d.satuan}
+                                </td>
+                                <td className="text-right whitespace-nowrap">
+                                  {formatIDR(d.hargaSatuan)}
+                                </td>
+                                <td className="text-right whitespace-nowrap">
+                                  {formatIDR(total)}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr>
+                            <td colSpan={4}></td>
+                            <td className="text-right text-black font-semibold">
+                              Subtotal
+                            </td>
+                            <td
+                              className="text-right font-bold text-black"
+                              colSpan={2}
+                            >
+                              {formatIDR(sectionSubtotal)}
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>

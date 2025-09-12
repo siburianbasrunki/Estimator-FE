@@ -386,7 +386,7 @@ export const AhspView: React.FC = () => {
           <div className="text-lg font-semibold">
             {fmtIDRWithSymbol(view.harga)}
           </div>
-          <div className="text-xs text-gray-500">(HSPItem.harga)</div>
+          {/* <div className="text-xs text-gray-500">(HSPItem.harga)</div> */}
         </div>
         <div className="rounded-xl border bg-white p-4 shadow-sm">
           <div className="text-xs uppercase text-gray-500">
@@ -395,7 +395,7 @@ export const AhspView: React.FC = () => {
           <div className="text-lg font-semibold">
             {fmtIDRWithSymbol(recipe?.computed.F ?? 0)}
           </div>
-          <div className="text-xs text-gray-500">D+E (live)</div>
+          {/* <div className="text-xs text-gray-500">D+E (live)</div> */}
         </div>
         <div className="rounded-xl border bg-white p-4 shadow-sm">
           <div className="text-xs uppercase text-gray-500">
