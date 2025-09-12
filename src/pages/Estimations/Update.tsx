@@ -8,7 +8,7 @@ import {
   BiCalculator,
   BiCopy,
 } from "react-icons/bi";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 
 /* dnd-kit */
 import {
@@ -1405,16 +1405,21 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
 const UpdateEstimation: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     data: detailEstimation,
     isLoading,
     isError,
   } = useEstimation(id || "");
   const updateMutation = useUpdateEstimation();
+  const initialStep =
+    (location.state as { openStep?: string } | null)?.openStep ||
+    (location.hash === "#step2" ? "step2" : "step1");
   const notify = useNotify();
   const [imageFile, setImageFile] = useState<File | null>(null);
   // Step accordion
-  const [activeAccordion, setActiveAccordion] = useState<string>("step1");
+  const [activeAccordion, setActiveAccordion] = useState<string>(initialStep);
+
   const toggleAccordion = (step: string) =>
     setActiveAccordion((prev) => (prev === step ? "" : step));
 
@@ -1428,6 +1433,9 @@ const UpdateEstimation: React.FC = () => {
   const [customFields, setCustomFields] = useState<CustomFieldUI[]>([]);
   const [seedSections, setSeedSections] = useState<Section[]>([]);
 
+  useEffect(() => {
+    if (location.hash === "#step2") setActiveAccordion("step2");
+  }, [location.hash]);
   // Seed dari API
   useEffect(() => {
     if (!detailEstimation) return;

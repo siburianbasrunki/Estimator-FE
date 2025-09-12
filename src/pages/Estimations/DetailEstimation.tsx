@@ -425,7 +425,11 @@ export const DetailEstimation: React.FC = () => {
             <button
               type="button"
               className="btn bg-blue-400 hover:bg-blue-500 w-full md:w-auto"
-              onClick={() => navigate(`/estimation/update/${id}`)}
+              onClick={() =>
+                navigate(`/estimation/update/${estimation.id}`, {
+                  state: { openStep: "step2" }, 
+                })
+              }
             >
               Update Estimation
             </button>
