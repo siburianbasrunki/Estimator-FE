@@ -778,25 +778,33 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
       harga: number;
       categoryId?: string;
       categoryName?: string;
+      scope?: string;
+      ownerUserId?: string;
     };
   };
 
   const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
     () =>
-      (itemJobList ?? []).map((it: any) => ({
-        kode: it.kode,
-        label: `${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
-          it.satuan ?? "-"
-        }`,
-        value: it.kode,
-        detail: {
-          deskripsi: it.deskripsi,
-          satuan: it.satuan ?? "",
-          harga: it.harga ?? 0,
-          categoryId: it.hspCategoryId,
-          categoryName: it.categoryName,
-        },
-      })),
+      (itemJobList ?? []).map((it: any) => {
+        
+        const unique = `${it.kode}::${it.ownerUserId ?? "GLOBAL"}`;
+        return {
+          kode: it.kode,
+          label: `${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
+            it.satuan ?? "-"
+          }`,
+          value: unique,
+          detail: {
+            deskripsi: it.deskripsi,
+            satuan: it.satuan ?? "",
+            harga: it.harga ?? 0,
+            categoryId: it.hspCategoryId,
+            categoryName: it.categoryName,
+            scope: it.scope,
+            ownerUserId: it.ownerUserId,
+          },
+        };
+      }),
     [itemJobList]
   );
 
@@ -845,7 +853,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         if (s.id !== sectionId) return s;
         const base: ItemRow = {
           id: uid(),
-          kode: source?.value || "",
+          kode: source?.kode || "",
           deskripsi: source?.detail.deskripsi || "",
           volume: 0,
           volumeDetails: [],
