@@ -1,9 +1,9 @@
-// src/components/hsp/AddComponentModal.tsx
 import React from "react";
 import type { GroupKey } from "../../model/hsp";
 import { useSearchMaster, useCreateAhspComponent } from "../../hooks/useHsp";
 import { fmtIDRPlain, parseNumber } from "../../helper/rupiah";
 import Portal from "../../components/Portal";
+import { useNavigate } from "react-router-dom"; // ⬅️ NEW
 
 type Props = {
   open: boolean;
@@ -11,7 +11,15 @@ type Props = {
   hspCode: string;
   group: GroupKey;
   onAdded?: () => void;
-  title: string; 
+  title: string;
+};
+
+type Picked = {
+  id: string;
+  code: string;
+  name: string;
+  unit: string;
+  price: number;
 };
 
 const AddComponentModal: React.FC<Props> = ({
@@ -22,17 +30,12 @@ const AddComponentModal: React.FC<Props> = ({
   onAdded,
   title,
 }) => {
+  const navigate = useNavigate(); // ⬅️ NEW
   const [q, setQ] = React.useState("");
   const [page, setPage] = React.useState(1);
   const [coef, setCoef] = React.useState("1");
   const [overridePrice, setOverridePrice] = React.useState<string>("");
-  const [selected, setSelected] = React.useState<{
-    id: string;
-    code: string;
-    name: string;
-    unit: string;
-    price: number;
-  } | null>(null);
+  const [selected, setSelected] = React.useState<Picked | null>(null); // single-select
 
   const list = useSearchMaster({ type: group, q, page, take: 10 });
   const createMut = useCreateAhspComponent();
@@ -52,12 +55,26 @@ const AddComponentModal: React.FC<Props> = ({
   const total = list.data?.pagination.total || 0;
   const lastPage = Math.max(1, Math.ceil(total / 10));
 
+  const toggleSelect = (it: any) => {
+    setSelected((prev) =>
+      prev?.id === it.id
+        ? null
+        : {
+            id: it.id,
+            code: it.code,
+            name: it.name,
+            unit: it.unit,
+            price: it.price,
+          }
+    );
+  };
+
   const add = async () => {
     if (!selected) return;
     await createMut.mutateAsync({
       code: hspCode,
       payload: {
-        group, 
+        group,
         masterItemId: selected.id,
         coefficient: parseNumber(coef || "1"),
         priceOverride:
@@ -68,11 +85,30 @@ const AddComponentModal: React.FC<Props> = ({
     onClose();
   };
 
+  const masterLink =
+    group === "LABOR"
+      ? "/master/upah"
+      : group === "MATERIAL"
+      ? "/master/bahan"
+      : null;
+
   return (
     <Portal>
       <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-gray-200/50 backdrop-blur-sm p-4">
         <div className="w-full max-w-3xl rounded-xl bg-white p-6 shadow-xl">
-          <div className="mb-4 text-lg font-semibold text-black">{title}</div>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="text-lg font-semibold text-black">{title}</div>
+            {masterLink && (
+              <button
+                type="button"
+                onClick={() => navigate(masterLink)} // ⬅️ open in same tab (SPA)
+                className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
+                title={`Buka halaman ${group === "LABOR" ? "Tenaga" : "Bahan"}`}
+              >
+                Kelola {group === "LABOR" ? "Tenaga" : "Bahan"}
+              </button>
+            )}
+          </div>
 
           <div className="mb-3 flex items-end gap-3">
             <div className="grow">
@@ -126,54 +162,60 @@ const AddComponentModal: React.FC<Props> = ({
                     </td>
                   </tr>
                 )}
-                {list.data?.data.map((it: any) => (
-                  <tr key={it.id} className="text-sm hover:bg-gray-50">
-                    <td className="border-t px-3 py-2">
-                      <input
-                        type="radio"
-                        name="pick"
-                        checked={selected?.id === it.id}
-                        onChange={() =>
-                          setSelected({
-                            id: it.id,
-                            code: it.code,
-                            name: it.name,
-                            unit: it.unit,
-                            price: it.price,
-                          })
-                        }
-                      />
-                    </td>
-                    <td className="border-t px-3 py-2 text-black">{it.code}</td>
-                    <td className="border-t px-3 py-2 text-black">{it.name}</td>
-                    <td className="border-t px-3 py-2 text-black">{it.unit}</td>
-                    <td className="border-t px-3 py-2 text-black">
-                      {fmtIDRPlain(it.price)}
-                    </td>
-                  </tr>
-                ))}
+                {list.data?.data.map((it: any) => {
+                  const checked = selected?.id === it.id;
+                  return (
+                    <tr key={it.id} className="text-sm hover:bg-gray-50">
+                      <td className="border-t px-3 py-2">
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={() => toggleSelect(it)}
+                        />
+                      </td>
+                      <td className="border-t px-3 py-2 text-black">
+                        {it.code}
+                      </td>
+                      <td className="border-t px-3 py-2 text-black">
+                        {it.name}
+                      </td>
+                      <td className="border-t px-3 py-2 text-black">
+                        {it.unit}
+                      </td>
+                      <td className="border-t px-3 py-2 text-black">
+                        {fmtIDRPlain(it.price)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
 
-          <div className="mt-2 flex items-center justify-end gap-2 text-sm text-black">
-            <button
-              className="rounded-md border px-3 py-1"
-              disabled={page <= 1 || list.isFetching}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              ← Prev
-            </button>
-            <div>
-              Hal {page} / {lastPage}
+          <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-sm text-black">
+            <div className="text-gray-600">
+              Dipilih:{" "}
+              <span className="font-semibold">{!!selected ? 1 : 0}</span> item
             </div>
-            <button
-              className="rounded-md border px-3 py-1"
-              disabled={page >= lastPage || list.isFetching}
-              onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
-            >
-              Next →
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                className="rounded-md border px-3 py-1"
+                disabled={page <= 1 || list.isFetching}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Prev
+              </button>
+              <div>
+                Hal {page} / {lastPage}
+              </div>
+              <button
+                className="rounded-md border px-3 py-1"
+                disabled={page >= lastPage || list.isFetching}
+                onClick={() => setPage((p) => Math.min(lastPage, p + 1))}
+              >
+                Next →
+              </button>
+            </div>
           </div>
 
           <div className="mt-4 grid gap-4 md:grid-cols-3">

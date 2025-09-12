@@ -13,7 +13,6 @@ import { useNavigate } from "react-router-dom";
 import Skeleton from "../../components/Skeleton";
 import EmptyState from "../../components/EmptyState";
 import { useNotify } from "../../components/Notify/notify";
-import { useProfile } from "../../hooks/useProfile";
 
 type ItemType = {
   kode: string;
@@ -43,8 +42,6 @@ export const HspView = () => {
     satuan: string;
   }>(null);
   const [openDelete, setOpenDelete] = useState<null | { kode: string }>(null);
-  const {data: profile} = useProfile();
-  console.log('profile', profile?.role);
   
   const { mutate: importHsp, isPending } = useImportHsp();
   const {
