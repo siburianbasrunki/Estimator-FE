@@ -19,6 +19,7 @@ type ItemType = {
   deskripsi: string;
   satuan: string;
   harga: number;
+  source?: "UUD" | "Sendiri" | null;
 };
 
 type HspDataMap = Record<string, ItemType[]>;
@@ -40,9 +41,10 @@ export const HspView = () => {
     hspCategoryId: string;
     deskripsi: string;
     satuan: string;
+    source?: "UUD" | "Sendiri" | null;
   }>(null);
   const [openDelete, setOpenDelete] = useState<null | { kode: string }>(null);
-  
+
   const { mutate: importHsp, isPending } = useImportHsp();
   const {
     data: allHsp,
@@ -153,14 +155,14 @@ export const HspView = () => {
 
     const ext = file.name.toLowerCase().split(".").pop();
     if (!["xlsx", "csv"].includes(ext || "")) {
-      notify("File harus .xlsx atau .csv", 'info');
+      notify("File harus .xlsx atau .csv", "info");
       return;
     }
 
     importHsp(file, {
       onSuccess: (res) => {
         if (res.status === "success") {
-          notify("Import sukses. Data akan dimuat ulang.", 'success');
+          notify("Import sukses. Data akan dimuat ulang.", "success");
           refetch();
         }
       },
@@ -271,7 +273,7 @@ export const HspView = () => {
                   {Array.from({ length: 2 })
                     .map((_, k) => (
                       <tr key={`kat-${k}`} className="bg-white">
-                        <td colSpan={6} className="px-6 py-3 bg-gray-100">
+                        <td colSpan={7} className="px-6 py-3 bg-gray-100">
                           <Skeleton.Line width="w-64" height="h-5" />
                         </td>
                       </tr>
@@ -336,8 +338,12 @@ export const HspView = () => {
                       Jenis Pekerjaan
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase">
+                      Sumber
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       Satuan
                     </th>
+
                     <th className="px-6 py-3 text-left text-xs font-medium uppercase">
                       Harga
                     </th>
@@ -349,7 +355,7 @@ export const HspView = () => {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {totalItems === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-6 py-6 text-center text-sm">
+                      <td colSpan={7} className="px-6 py-6 text-center text-sm">
                         <div className="p-4">
                           <EmptyState
                             title="Belum ada Harga Satuan Pekerjaan"
@@ -363,7 +369,7 @@ export const HspView = () => {
                   {pageRows.map((row) =>
                     row.type === "header" ? (
                       <tr key={`head-${row.kategori}`} className="bg-gray-100">
-                        <td colSpan={6} className="px-6 py-3 font-bold">
+                        <td colSpan={7} className="px-6 py-3 font-bold">
                           {row.kategori}
                         </td>
                       </tr>
@@ -377,6 +383,9 @@ export const HspView = () => {
                         </td>
                         <td className="px-6 py-4 text-sm">
                           {row.item.deskripsi}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {row.item.source || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {row.item.satuan}
@@ -405,6 +414,7 @@ export const HspView = () => {
                                   )?.id ?? "",
                                 deskripsi: row.item.deskripsi,
                                 satuan: row.item.satuan,
+                                source: (row.item as any).source ?? "UUD",
                               })
                             }
                           />
@@ -536,6 +546,18 @@ export const HspView = () => {
                   className="input input-bordered w-full text-black bg-white border-black"
                 />
               </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Sumber</label>
+                <select
+                  id="create-source"
+                  className="select select-bordered w-full text-black bg-white border-black"
+                  defaultValue="UUD"
+                >
+                  <option value="UUD">UUD</option>
+                  <option value="Sendiri">Sendiri</option>
+                </select>
+              </div>
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
               <button
@@ -559,14 +581,19 @@ export const HspView = () => {
                   const satuan = (
                     document.getElementById("create-satuan") as HTMLInputElement
                   )?.value.trim();
+                  const source = (
+                    document.getElementById(
+                      "create-source"
+                    ) as HTMLSelectElement
+                  )?.value as "UUD" | "Sendiri";
 
                   if (!hspCategoryId || !kode || !deskripsi) {
-                    notify("Kategori, Kode, dan Deskripsi wajib diisi", 'info');
+                    notify("Kategori, Kode, dan Deskripsi wajib diisi", "info");
                     return;
                   }
 
                   createItem.mutate(
-                    { hspCategoryId, kode, deskripsi, satuan },
+                    { hspCategoryId, kode, deskripsi, satuan, source },
                     {
                       onSuccess: () => {
                         setOpenCreate(false);
@@ -633,6 +660,19 @@ export const HspView = () => {
                   className="input input-bordered w-full text-black bg-white border-black"
                 />
               </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Sumber <span className="text-xs text-gray-500">(tag)</span>
+                </label>
+                <select
+                  id="edit-source"
+                  defaultValue={openEdit.source ?? "UUD"}
+                  className="select select-bordered w-full text-black bg-white border-black"
+                >
+                  <option value="UUD">UUD</option>
+                  <option value="Sendiri">Sendiri</option>
+                </select>
+              </div>
               <p className="text-xs">
                 Harga tidak dapat diubah di sini. Sistem mempertahankan harga
                 yang ada.
@@ -660,16 +700,24 @@ export const HspView = () => {
                   const satuan = (
                     document.getElementById("edit-satuan") as HTMLInputElement
                   )?.value.trim();
-
+                  const source = (
+                    document.getElementById("edit-source") as HTMLSelectElement
+                  )?.value as "UUD" | "Sendiri";
                   if (!hspCategoryId || !kode || !deskripsi) {
-                    notify("Kategori, Kode, dan Deskripsi wajib diisi" , 'info');
+                    notify("Kategori, Kode, dan Deskripsi wajib diisi", "info");
                     return;
                   }
 
                   updateItem.mutate(
                     {
                       kode: openEdit.kode,
-                      payload: { hspCategoryId, kode, deskripsi, satuan },
+                      payload: {
+                        hspCategoryId,
+                        kode,
+                        deskripsi,
+                        satuan,
+                        source,
+                      },
                     },
                     {
                       onSuccess: () => {
