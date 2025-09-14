@@ -9,6 +9,7 @@ interface SidebarProps {
 import Logo from "../assets/icon/Icon.png";
 import { FaUserTie, FaSitemap, FaPeopleCarryBox } from "react-icons/fa6";
 import { MdOutlinePriceChange, MdOutlineSubtitles } from "react-icons/md";
+import { FaTools } from "react-icons/fa";
 import { PiProjectorScreenChartDuotone } from "react-icons/pi";
 import { GiStakeHammer } from "react-icons/gi";
 import { useProfile } from "../hooks/useProfile";
@@ -50,6 +51,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       name: "Bahan Material",
       href: "/master/bahan",
       icon: GiStakeHammer,
+      show: true,
+    },
+    {
+      name: "Peralatan",
+      href: "/master/peralatan",
+      icon: FaTools,
       show: true,
     },
     {

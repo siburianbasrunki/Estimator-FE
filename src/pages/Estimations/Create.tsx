@@ -777,15 +777,10 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
     () =>
       (itemJobList ?? []).map((it: any) => {
-        const tag = it.ownerUserId
-          ? `USER`
-          : String(it.scope).startsWith("u:")
-          ? "USER"
-          : "GLOBAL";
         const unique = `${it.kode}::${it.ownerUserId ?? "GLOBAL"}`;
         return {
           kode: it.kode,
-          label: `[${tag}] ${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
+          label: ` ${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
             it.satuan ?? "-"
           }`,
           value: unique,
@@ -835,8 +830,8 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           deskripsi: source?.detail.deskripsi || "",
           volume: 0,
           volumeDetails: [],
-          volumeSource: "DETAIL", 
-          manualVolumeInput: "", 
+          volumeSource: "DETAIL",
+          manualVolumeInput: "",
           satuan: source?.detail.satuan || "",
           hargaSatuan: source?.detail.harga ?? 0,
           hargaSatuanInput:

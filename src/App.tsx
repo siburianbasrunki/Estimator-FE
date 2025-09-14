@@ -18,6 +18,7 @@ import BahanView from "./pages/MasterData/BahanView";
 import { NotifyProvider } from "./components/Notify/notify";
 import { ConfirmProvider } from "./components/ConfirmDialog";
 import UpdateEstimation from "./pages/Estimations/Update";
+import PeralatanView from "./pages/MasterData/PeralatanVies";
 
 function App() {
   return (
@@ -49,6 +50,7 @@ function App() {
               <Route path="hsp/ahsp/:code" element={<AhspView />} />
               <Route path="/master/upah" element={<UpahView />} />
               <Route path="/master/bahan" element={<BahanView />} />
+              <Route path="/master/peralatan" element={<PeralatanView />} />
               <Route path="users" element={<UserView />} />
               <Route path="category-job" element={<CategoryView />} />
               <Route path="item-job" element={<ItemJobsView />} />

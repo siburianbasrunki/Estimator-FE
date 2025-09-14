@@ -8,7 +8,7 @@ import {
   BiCalculator,
   BiCopy,
 } from "react-icons/bi";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 
 /* dnd-kit */
 import {
@@ -778,25 +778,33 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
       harga: number;
       categoryId?: string;
       categoryName?: string;
+      scope?: string;
+      ownerUserId?: string;
     };
   };
 
   const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
     () =>
-      (itemJobList ?? []).map((it: any) => ({
-        kode: it.kode,
-        label: `${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
-          it.satuan ?? "-"
-        }`,
-        value: it.kode,
-        detail: {
-          deskripsi: it.deskripsi,
-          satuan: it.satuan ?? "",
-          harga: it.harga ?? 0,
-          categoryId: it.hspCategoryId,
-          categoryName: it.categoryName,
-        },
-      })),
+      (itemJobList ?? []).map((it: any) => {
+        
+        const unique = `${it.kode}::${it.ownerUserId ?? "GLOBAL"}`;
+        return {
+          kode: it.kode,
+          label: `${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
+            it.satuan ?? "-"
+          }`,
+          value: unique,
+          detail: {
+            deskripsi: it.deskripsi,
+            satuan: it.satuan ?? "",
+            harga: it.harga ?? 0,
+            categoryId: it.hspCategoryId,
+            categoryName: it.categoryName,
+            scope: it.scope,
+            ownerUserId: it.ownerUserId,
+          },
+        };
+      }),
     [itemJobList]
   );
 
@@ -845,7 +853,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         if (s.id !== sectionId) return s;
         const base: ItemRow = {
           id: uid(),
-          kode: source?.value || "",
+          kode: source?.kode || "",
           deskripsi: source?.detail.deskripsi || "",
           volume: 0,
           volumeDetails: [],
@@ -1405,16 +1413,21 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
 const UpdateEstimation: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const {
     data: detailEstimation,
     isLoading,
     isError,
   } = useEstimation(id || "");
   const updateMutation = useUpdateEstimation();
+  const initialStep =
+    (location.state as { openStep?: string } | null)?.openStep ||
+    (location.hash === "#step2" ? "step2" : "step1");
   const notify = useNotify();
   const [imageFile, setImageFile] = useState<File | null>(null);
   // Step accordion
-  const [activeAccordion, setActiveAccordion] = useState<string>("step1");
+  const [activeAccordion, setActiveAccordion] = useState<string>(initialStep);
+
   const toggleAccordion = (step: string) =>
     setActiveAccordion((prev) => (prev === step ? "" : step));
 
@@ -1428,6 +1441,9 @@ const UpdateEstimation: React.FC = () => {
   const [customFields, setCustomFields] = useState<CustomFieldUI[]>([]);
   const [seedSections, setSeedSections] = useState<Section[]>([]);
 
+  useEffect(() => {
+    if (location.hash === "#step2") setActiveAccordion("step2");
+  }, [location.hash]);
   // Seed dari API
   useEffect(() => {
     if (!detailEstimation) return;

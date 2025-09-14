@@ -283,7 +283,9 @@ export const EstimationView = () => {
                               className="text-green-600 h-5 w-5 cursor-pointer"
                               title="Edit"
                               onClick={() =>
-                                navigate(`/estimation/update/${item.id}`)
+                                navigate(`/estimation/update/${item.id}`, {
+                                  state: { openStep: "step2" },
+                                })
                               }
                             />
                             <BiTrash
