@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BiEdit, BiPlus, BiTrash, BiUpload } from "react-icons/bi";
+import { BiDownload, BiEdit, BiPlus, BiTrash, BiUpload } from "react-icons/bi";
 import {
   useCreateHspItem,
   useDeleteHspItem,
@@ -14,7 +14,7 @@ import Skeleton from "../../components/Skeleton";
 import EmptyState from "../../components/EmptyState";
 import { useNotify } from "../../components/Notify/notify";
 import { useProfile } from "../../hooks/useProfile";
-
+import FileTemplateHSP from "../../assets/templateFile/templateHSP.xlsx";
 type ItemType = {
   kode: string;
   deskripsi: string;
@@ -205,18 +205,28 @@ export const HspView = () => {
               onChange={onFileChange}
             />
             {isAdmin && (
-              <button
-                onClick={onClickImport}
-                disabled={isPending}
-                className={`px-4 py-2 rounded-md text-sm text-white ${
-                  isPending
-                    ? "bg-blue-400"
-                    : "bg-blue-600 hover:bg-blue-700 cursor-pointer"
-                }`}
-              >
-                <BiUpload className="inline-block mr-1" />
-                {isPending ? "Importing..." : "Import"}
-              </button>
+              <>
+                <button
+                  onClick={onClickImport}
+                  disabled={isPending}
+                  className={`px-4 py-2 rounded-md text-sm text-white ${
+                    isPending
+                      ? "bg-blue-400"
+                      : "bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                  }`}
+                >
+                  <BiUpload className="inline-block mr-1" />
+                  {isPending ? "Importing..." : "Import"}
+                </button>
+                <a
+                  href={FileTemplateHSP}
+                  download="template-hsp.xlsx"
+                  className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:ring-offset-2"
+                >
+                  <BiDownload className="inline-block mr-1" />
+                  Template HSP
+                </a>
+              </>
             )}
             {selectedFileName && (
               <div className="text-xs self-center">
