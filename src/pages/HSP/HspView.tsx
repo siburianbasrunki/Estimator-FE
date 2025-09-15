@@ -13,6 +13,7 @@ import { useNavigate } from "react-router-dom";
 import Skeleton from "../../components/Skeleton";
 import EmptyState from "../../components/EmptyState";
 import { useNotify } from "../../components/Notify/notify";
+import { useProfile } from "../../hooks/useProfile";
 
 type ItemType = {
   kode: string;
@@ -34,7 +35,8 @@ export const HspView = () => {
   const createItem = useCreateHspItem();
   const updateItem = useUpdateHspItem();
   const deleteItem = useDeleteHspItem();
-
+  const profile = useProfile();
+  const isAdmin = profile?.data?.role === "ADMIN";
   const [openCreate, setOpenCreate] = useState(false);
   const [openEdit, setOpenEdit] = useState<null | {
     kode: string;
@@ -202,19 +204,20 @@ export const HspView = () => {
               ref={fileInputRef}
               onChange={onFileChange}
             />
-            <button
-              onClick={onClickImport}
-              disabled={isPending}
-              className={`px-4 py-2 rounded-md text-sm text-white ${
-                isPending
-                  ? "bg-blue-400"
-                  : "bg-blue-600 hover:bg-blue-700 cursor-pointer"
-              }`}
-            >
-              <BiUpload className="inline-block mr-1" />
-              {isPending ? "Importing..." : "Import"}
-            </button>
-
+            {isAdmin && (
+              <button
+                onClick={onClickImport}
+                disabled={isPending}
+                className={`px-4 py-2 rounded-md text-sm text-white ${
+                  isPending
+                    ? "bg-blue-400"
+                    : "bg-blue-600 hover:bg-blue-700 cursor-pointer"
+                }`}
+              >
+                <BiUpload className="inline-block mr-1" />
+                {isPending ? "Importing..." : "Import"}
+              </button>
+            )}
             {selectedFileName && (
               <div className="text-xs self-center">
                 File: <span className="font-medium">{selectedFileName}</span>

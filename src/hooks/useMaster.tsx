@@ -1,12 +1,53 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import HspService from "../service/hsp";
+import HspService, { type ImportMasterSummary } from "../service/hsp";
 import type {
   MasterCreatePayload,
   MasterItem,
   MasterType,
   MasterUpdatePayload,
 } from "../model/master";
+
+export const useImportMaster = (type: MasterType) => {
+  const qc = useQueryClient();
+  return useMutation<
+    ImportMasterSummary,
+    Error,
+    {
+      file: File;
+      useHargaFile?: boolean;
+      lockExistingPrice?: boolean;
+      preferDaily?: boolean; // dipakai jika LABOR
+    }
+  >({
+    mutationFn: ({
+      file,
+      useHargaFile = true,
+      lockExistingPrice = true,
+      preferDaily = true,
+    }) => {
+      if (type === "MATERIAL") {
+        return HspService.importMasterMaterials(file, {
+          useHargaFile,
+          lockExistingPrice,
+        });
+      }
+      if (type === "LABOR") {
+        return HspService.importMasterLabor(file, {
+          useHargaFile,
+          lockExistingPrice,
+          preferDaily,
+        });
+      }
+      throw new Error("Import hanya tersedia untuk MATERIAL & LABOR");
+    },
+    onSuccess: (res) => {
+      toast.success(res?.message || "Import selesai");
+      qc.invalidateQueries({ queryKey: ["master", type] });
+    },
+    onError: (e) => toast.error(e.message || "Gagal import"),
+  });
+};
 
 export const useListMaster = (
   type: MasterType,
@@ -40,7 +81,8 @@ export const useListMaster = (
       });
       return res;
     },
-    // keepPreviousData: true,
+    staleTime: 5 * 1000,            
+    refetchOnWindowFocus: false,    
   });
 };
 
@@ -72,6 +114,7 @@ export const useUpdateMaster = (type: MasterType) => {
     onError: (e) => toast.error(e.message || "Gagal memperbarui data"),
   });
 };
+
 export const useUpdateMasterByCode = (type: MasterType) => {
   const qc = useQueryClient();
   return useMutation<
@@ -100,6 +143,7 @@ export const useDeleteMasterByCode = (type: MasterType) => {
     onError: (e) => toast.error(e.message || "Gagal menghapus data"),
   });
 };
+
 export const useDeleteMaster = (type: MasterType) => {
   const qc = useQueryClient();
   return useMutation<void, Error, { id: string }>({
