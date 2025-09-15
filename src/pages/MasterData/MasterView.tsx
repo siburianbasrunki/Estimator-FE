@@ -15,11 +15,14 @@ import {
   BiChevronLeft,
   BiChevronRight,
   BiUpload,
+  BiDownload,
 } from "react-icons/bi";
 import Skeleton from "../../components/Skeleton";
 import EmptyState from "../../components/EmptyState";
 import useDebunce from "../../hooks/useDebunce";
 import { useProfile } from "../../hooks/useProfile";
+import FileTemplateUpah from "../../assets/templateFile/templateUpah.xlsx";
+import FileTemplateBahan from "../../assets/templateFile/templateBahan.xlsx";
 
 const LABEL: Record<MasterType, string> = {
   LABOR: "Upah / Tenaga",
@@ -40,7 +43,19 @@ export const MasterView: React.FC<Props> = ({ type }) => {
   const [orderDir, setOrderDir] = React.useState<"asc" | "desc">("asc");
   const [page, setPage] = React.useState(1);
   const [pageSize, setPageSize] = React.useState(20);
+  const templateHref =
+    type === "LABOR"
+      ? FileTemplateUpah
+      : type === "MATERIAL"
+      ? FileTemplateBahan
+      : undefined;
 
+  const templateFileName =
+    type === "LABOR"
+      ? "template-upah.xlsx"
+      : type === "MATERIAL"
+      ? "template-bahan.xlsx"
+      : "template.xlsx";
   const list = useListMaster(type, {
     q: debouncedQ,
     page,
@@ -179,20 +194,35 @@ export const MasterView: React.FC<Props> = ({ type }) => {
           {isAdmin && (
             <>
               {(type === "MATERIAL" || type === "LABOR") && (
-                <button
-                  onClick={() => {
-                    resetImport();
-                    setOpenImport(true);
-                  }}
-                  className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  <span className="inline-flex items-center gap-2">
-                    <BiUpload className="w-4 h-4" /> Import
-                  </span>
-                </button>
+                <>
+                  <button
+                    onClick={() => {
+                      resetImport();
+                      setOpenImport(true);
+                    }}
+                    className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-blue-400 focus:outline-none focus:ring-2 focus:ring-indigo-200 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <BiUpload className="w-4 h-4" /> Import
+                    </span>
+                  </button>
+
+                  {templateHref && (
+                    <a
+                      href={templateHref}
+                      download={templateFileName}
+                      className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200 focus:ring-offset-2"
+                    >
+                      <span className="inline-flex items-center gap-2">
+                        <BiDownload className="w-4 h-4" /> Template
+                      </span>
+                    </a>
+                  )}
+                </>
               )}
             </>
           )}
+
           <button
             onClick={() => setOpenCreate(true)}
             className="rounded-lg bg-green-400 px-4 py-2 text-sm font-semibold text-white transition hover:bg-green-500 focus:outline-none focus:ring-2 focus:ring-green-200 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none"
