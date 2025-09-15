@@ -14,6 +14,19 @@ import type {
   MasterUpdatePayload,
 } from "../model/master";
 
+export type ImportMasterCounts = {
+  created_global: number;
+  updated_global: number;
+  created_user: number;
+  updated_user: number;
+  updated_user_price: number;
+};
+
+export type ImportMasterOptions = {
+  useHargaFile: boolean;
+  lockExistingPrice: boolean;
+  preferDaily?: boolean;
+};
 export type ImportHspSummary = {
   status: "success" | "error";
   message?: string;
@@ -40,7 +53,77 @@ export type AdminAllWithItemsFlat = {
     categoryName?: string;
   }>;
 };
+async function importMasterMaterials(
+  file: File,
+  opts?: { useHargaFile?: boolean; lockExistingPrice?: boolean }
+): Promise<ImportMasterSummary> {
+  const { hsp } = getEndpoints();
+  const form = new FormData();
+  form.append("file", file);
+
+  const u = new URL(`${hsp}/master/import/materials`);
+  if (opts?.useHargaFile !== undefined)
+    u.searchParams.set("useHargaFile", String(!!opts.useHargaFile));
+  if (opts?.lockExistingPrice !== undefined)
+    u.searchParams.set("lockExistingPrice", String(!!opts.lockExistingPrice));
+
+  const res = await fetch(u.toString(), {
+    method: "POST",
+    headers: authHeader(),
+    body: form,
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json?.error || `Import failed (HTTP ${res.status})`);
+  }
+  return json as ImportMasterSummary;
+}
+export type ImportMasterSummary = {
+  status: "success" | "error";
+  message?: string;
+  summary?: {
+    options: ImportMasterOptions;
+    counts: ImportMasterCounts;
+    errors: Array<{ key?: string; code?: string; reason: string }>;
+  };
+  error?: string;
+  detail?: string;
+};
+
+async function importMasterLabor(
+  file: File,
+  opts?: {
+    useHargaFile?: boolean;
+    lockExistingPrice?: boolean;
+    preferDaily?: boolean;
+  }
+): Promise<ImportMasterSummary> {
+  const { hsp } = getEndpoints();
+  const form = new FormData();
+  form.append("file", file);
+
+  const u = new URL(`${hsp}/master/import/labor`);
+  if (opts?.useHargaFile !== undefined)
+    u.searchParams.set("useHargaFile", String(!!opts.useHargaFile));
+  if (opts?.lockExistingPrice !== undefined)
+    u.searchParams.set("lockExistingPrice", String(!!opts.lockExistingPrice));
+  if (opts?.preferDaily !== undefined)
+    u.searchParams.set("preferDaily", String(!!opts.preferDaily));
+
+  const res = await fetch(u.toString(), {
+    method: "POST",
+    headers: authHeader(),
+    body: form,
+  });
+  const json = await res.json();
+  if (!res.ok) {
+    throw new Error(json?.error || `Import failed (HTTP ${res.status})`);
+  }
+  return json as ImportMasterSummary;
+}
 const HspService = {
+  importMasterMaterials,
+  importMasterLabor,
   async importHsp(file: File): Promise<ImportHspSummary> {
     const { importHsp } = getEndpoints();
     const form = new FormData();
