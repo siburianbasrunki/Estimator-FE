@@ -15,6 +15,7 @@ import EmptyState from "../../components/EmptyState";
 import { useNotify } from "../../components/Notify/notify";
 import { useProfile } from "../../hooks/useProfile";
 import FileTemplateHSP from "../../assets/templateFile/templateHSP.xlsx";
+import { useGetSources } from "../../hooks/useHookFlagSource";
 type ItemType = {
   kode: string;
   deskripsi: string;
@@ -34,6 +35,8 @@ export const HspView = () => {
   const { data: categories } = useGetCategoryJob();
   const createItem = useCreateHspItem();
   const updateItem = useUpdateHspItem();
+  const { data: sources } = useGetSources();
+  const sourceOptions = (sources ?? []).map((s) => s.label);
   const deleteItem = useDeleteHspItem();
   const profile = useProfile();
   const isAdmin = profile?.data?.role === "ADMIN";
@@ -536,6 +539,13 @@ export const HspView = () => {
                   ))}
                 </select>
               </div>
+              <button
+                type="button"
+                onClick={() => navigate("/category-job")}
+                className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 w-full"
+              >
+                Tambah Kategori
+              </button>
               <div>
                 <label className="block text-sm font-medium mb-1">Kode</label>
                 <input
@@ -565,10 +575,21 @@ export const HspView = () => {
                 <select
                   id="create-source"
                   className="select select-bordered w-full text-black bg-white border-black"
-                  defaultValue="UUD"
+                  defaultValue={sourceOptions[0] ?? ""}
                 >
-                  <option value="UUD">UUD</option>
-                  <option value="Sendiri">Sendiri</option>
+                  {sourceOptions.length === 0 ? (
+                    <>
+                      <option value="" disabled>
+                        Tidak ada sumber aktif
+                      </option>
+                    </>
+                  ) : (
+                    sourceOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
             </div>
@@ -679,11 +700,20 @@ export const HspView = () => {
                 </label>
                 <select
                   id="edit-source"
-                  defaultValue={openEdit.source ?? "UUD"}
+                  defaultValue={openEdit.source ?? sourceOptions[0] ?? ""}
                   className="select select-bordered w-full text-black bg-white border-black"
                 >
-                  <option value="UUD">UUD</option>
-                  <option value="Sendiri">Sendiri</option>
+                  {sourceOptions.length === 0 ? (
+                    <option value="" disabled>
+                      Tidak ada sumber aktif
+                    </option>
+                  ) : (
+                    sourceOptions.map((opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    ))
+                  )}
                 </select>
               </div>
               <p className="text-xs">

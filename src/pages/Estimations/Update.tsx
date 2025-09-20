@@ -1,4 +1,3 @@
-// src/pages/estimation/UpdateEstimation.tsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BiEdit,
@@ -61,7 +60,6 @@ const formatIDR = (n: number = 0) =>
 const mapJenisApiToUi = (v?: string): "penjumlahan" | "pengurangan" =>
   v === "SUB" ? "pengurangan" : "penjumlahan";
 
-// Normalisasi input angka
 const sanitizeMoneyInput = (v: string) =>
   v
     .replace(/[^\d.,]/g, "")
@@ -96,11 +94,9 @@ type ItemRow = {
   kode: string;
   deskripsi: string;
 
-  // DETAIL (hasil modal)
   volume: number;
   volumeDetails?: VolumeDetailRow[];
 
-  // NEW: mode volume
   volumeSource?: VolumeSource; // "MANUAL" | "DETAIL"
   manualVolumeInput?: string; // input string manual
 

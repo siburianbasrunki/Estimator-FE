@@ -101,7 +101,7 @@ const AddComponentModal: React.FC<Props> = ({
             {masterLink && (
               <button
                 type="button"
-                onClick={() => navigate(masterLink)} // ⬅️ open in same tab (SPA)
+                onClick={() => navigate(masterLink)} 
                 className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50"
                 title={`Buka halaman ${group === "LABOR" ? "Tenaga" : "Bahan"}`}
               >

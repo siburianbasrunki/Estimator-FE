@@ -8,7 +8,6 @@ function buildEstimationFormData(
 ) {
   const fd = new FormData();
 
-  // field primitif
   if (data.projectName != null)
     fd.append("projectName", String(data.projectName));
   if (data.owner != null) fd.append("owner", String(data.owner));
@@ -206,12 +205,10 @@ const EstimationService = {
         method: "POST",
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
-          // NOTE: jangan set Content-Type manual untuk FormData
         } as any,
         body: fd,
       });
     } else {
-      // tetap dukung tanpa logo via POST tanpa body
       res = await fetch(`${estimation}/${id}/download/excel`, {
         method: "POST",
         headers: {

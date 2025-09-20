@@ -19,6 +19,7 @@ import { NotifyProvider } from "./components/Notify/notify";
 import { ConfirmProvider } from "./components/ConfirmDialog";
 import UpdateEstimation from "./pages/Estimations/Update";
 import PeralatanView from "./pages/MasterData/PeralatanVies";
+import SourceManagement from "./pages/Sumber/SumberView";
 
 function App() {
   return (
@@ -52,6 +53,7 @@ function App() {
               <Route path="/master/bahan" element={<BahanView />} />
               <Route path="/master/peralatan" element={<PeralatanView />} />
               <Route path="users" element={<UserView />} />
+              <Route path="source" element={<SourceManagement />} />
               <Route path="category-job" element={<CategoryView />} />
               <Route path="item-job" element={<ItemJobsView />} />
             </Route>
