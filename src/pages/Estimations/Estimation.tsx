@@ -59,7 +59,6 @@ export const EstimationView = () => {
     await deleteEstimation(id);
   };
 
-  // Reset ke page 1 saat ganti search
   useEffect(() => {
     setPage(1);
   }, [debouncedSearch]);

@@ -1,4 +1,3 @@
-// pages/creates.tsx
 import { useMemo, useState } from "react";
 import Input from "../../components/input";
 import ImageProyek from "../../assets/images/image 1.png";

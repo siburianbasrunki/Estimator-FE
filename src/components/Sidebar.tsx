@@ -8,7 +8,7 @@ interface SidebarProps {
 
 import Logo from "../assets/icon/Icon.png";
 import { FaUserTie, FaSitemap, FaPeopleCarryBox } from "react-icons/fa6";
-import { MdOutlinePriceChange, MdOutlineSubtitles } from "react-icons/md";
+import { MdOutlinePriceChange, MdOutlineSubtitles, MdSource } from "react-icons/md";
 import { FaTools } from "react-icons/fa";
 import { PiProjectorScreenChartDuotone } from "react-icons/pi";
 import { GiStakeHammer } from "react-icons/gi";
@@ -58,6 +58,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       href: "/master/peralatan",
       icon: FaTools,
       show: true,
+    },
+    {
+      name: "Manajemen Sumber HSP",
+      href: "/source",
+      icon: MdSource,
+      show: isAdmin,
     },
     {
       name: "Manajemen User",
