@@ -592,6 +592,13 @@ export const HspView = () => {
                   )}
                 </select>
               </div>
+              <button
+                type="button"
+                onClick={() => navigate("/source")}
+                className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 w-full"
+              >
+                Tambah Sumber
+              </button>
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
               <button
@@ -668,6 +675,13 @@ export const HspView = () => {
                   ))}
                 </select>
               </div>
+              <button
+                type="button"
+                onClick={() => navigate("/category")}
+                className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 w-full"
+              >
+                Tambah Kategori
+              </button>
               <div>
                 <label className="block text-sm font-medium mb-1">Kode</label>
                 <input
@@ -716,10 +730,13 @@ export const HspView = () => {
                   )}
                 </select>
               </div>
-              <p className="text-xs">
-                Harga tidak dapat diubah di sini. Sistem mempertahankan harga
-                yang ada.
-              </p>
+              <button
+                type="button"
+                onClick={() => navigate("/source")}
+                className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 w-full"
+              >
+                Tambah Sumber
+              </button>
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
               <button
