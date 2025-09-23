@@ -247,7 +247,7 @@ export const EstimationView = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {rowNumber}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer" onClick={() => navigate(`/estimation/${item.id}`)}>
                           {item.projectName || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
