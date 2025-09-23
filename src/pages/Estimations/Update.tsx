@@ -28,6 +28,7 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { BsThreeDotsVertical } from "react-icons/bs";
 
 /* App components & hooks */
 import Input from "../../components/input";
@@ -513,8 +514,73 @@ function SortableItemRow({
       </td>
 
       {/* Aksi + drag handle */}
+      {/* Aksi + drag handle */}
       <td className="px-4 py-3 text-sm">
         <div className="flex items-center gap-2">
+          {/* Drag handle */}
+
+          {/* Menu kebab */}
+          <div className="dropdown dropdown-end">
+            <button
+              tabIndex={0}
+              className="btn btn-ghost btn-xs bg-white"
+              aria-label="Aksi lainnya"
+              title="Aksi lainnya"
+            >
+              <BsThreeDotsVertical className="text-lg text-black" />
+            </button>
+
+            <ul
+              tabIndex={0}
+              className="dropdown-content z-[1] menu p-2 shadow bg-white text-black rounded-box w-44"
+            >
+              {!item.isEditing ? (
+                <li>
+                  <button
+                    onClick={() => onEditToggle(item.id, true)}
+                    className="justify-start"
+                    title="Edit baris"
+                  >
+                    <BiEdit className="text-blue-600" />
+                    <span>Edit</span>
+                  </button>
+                </li>
+              ) : (
+                <li>
+                  <button
+                    onClick={() => onEditToggle(item.id, false)}
+                    className="justify-start"
+                    title="Simpan baris"
+                  >
+                    <BiSave className="text-green-600" />
+                    <span>Simpan</span>
+                  </button>
+                </li>
+              )}
+
+              <li>
+                <button
+                  onClick={() => onCopy(item.id)}
+                  className="justify-start"
+                  title="Salin item"
+                >
+                  <BiCopy className="text-indigo-600" />
+                  <span>Salin</span>
+                </button>
+              </li>
+
+              <li>
+                <button
+                  onClick={() => onDelete(item.id)}
+                  className="justify-start"
+                  title="Hapus baris"
+                >
+                  <BiTrash className="text-red-600" />
+                  <span>Hapus</span>
+                </button>
+              </li>
+            </ul>
+          </div>
           <button
             className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-gray-600 text-xl bg-white"
             title="Drag"
@@ -523,44 +589,6 @@ function SortableItemRow({
             {...listeners}
           >
             ≡
-          </button>
-
-          <button
-            onClick={() => onCopy(item.id)}
-            className="btn btn-ghost btn-xs text-indigo-600 text-lg bg-white"
-            title="Salin item"
-            aria-label="Salin item"
-          >
-            <BiCopy />
-          </button>
-
-          {!item.isEditing ? (
-            <button
-              onClick={() => onEditToggle(item.id, true)}
-              className="btn btn-ghost btn-xs text-blue-600 text-lg bg-white"
-              title="Edit"
-              aria-label="Edit baris"
-            >
-              <BiEdit />
-            </button>
-          ) : (
-            <button
-              onClick={() => onEditToggle(item.id, false)}
-              className="btn btn-ghost btn-xs text-green-600 text-lg bg-white"
-              title="Simpan"
-              aria-label="Simpan baris"
-            >
-              <BiSave />
-            </button>
-          )}
-
-          <button
-            onClick={() => onDelete(item.id)}
-            className="btn btn-ghost btn-xs text-red-600 text-lg bg-white"
-            title="Hapus"
-            aria-label="Hapus baris"
-          >
-            <BiTrash />
           </button>
         </div>
       </td>
@@ -782,7 +810,6 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   const DropdownPekerjaan: PekerjaanDropdown[] = useMemo(
     () =>
       (itemJobList ?? []).map((it: any) => {
-        
         const unique = `${it.kode}::${it.ownerUserId ?? "GLOBAL"}`;
         return {
           kode: it.kode,
@@ -864,7 +891,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           hargaTotal: 0,
           isEditing: true,
         };
-        return { ...s, items: [base, ...s.items] };
+        return { ...s, items: [...s.items, base] };
       })
     );
   };
@@ -1153,7 +1180,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
       prev.map((s) => (s.id === sectionId ? { ...s, title } : s))
     );
   };
-
+  const { isPending } = useUpdateEstimation();
   /* --------------------------------- Render -------------------------------- */
   return (
     <div className="bg-white rounded-xl shadow p-4 sm:p-6">
@@ -1382,8 +1409,12 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           </div>
 
           <div className="flex flex-wrap gap-2 justify-end">
-            <Button variant="success" onClick={handleSaveAllData}>
-              Simpan Perubahan
+            <Button
+              variant="success"
+              onClick={handleSaveAllData}
+              disabled={isPending}
+            >
+              {isPending ? "Menyimpan..." : "Simpan Perubahan"}
             </Button>
           </div>
         </div>
