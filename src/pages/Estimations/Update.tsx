@@ -383,6 +383,8 @@ function SortableItemRow({
   onCopy,
   onUpdateField,
   onOpenVolumeModal,
+  kodeOptions,
+  onChangeKode,
 }: {
   idxInSection: number;
   item: ItemRow;
@@ -391,6 +393,8 @@ function SortableItemRow({
   onCopy: (id: string) => void;
   onUpdateField: (id: string, field: keyof ItemRow, value: any) => void;
   onOpenVolumeModal: (item: ItemRow) => void;
+  kodeOptions: Option[];
+  onChangeKode: (id: string, kodeBaru: string) => void;
 }) {
   const {
     attributes,
@@ -427,7 +431,6 @@ function SortableItemRow({
       className={`align-top ${isDragging ? "bg-blue-50" : ""}`}
     >
       <td className="px-4 py-3 text-sm text-gray-500">{idxInSection + 1}</td>
-
       {/* Uraian */}
       <td className="px-4 py-3 text-sm text-gray-800 min-w-[280px]">
         {item.isEditing ? (
@@ -443,7 +446,20 @@ function SortableItemRow({
           <span className="break-words">{item.deskripsi || "-"}</span>
         )}
       </td>
-
+      {/* Kode */}
+      <td className="px-4 py-3 text-sm text-gray-800 w-40">
+        {item.isEditing ? (
+          <SearchableSelect
+            options={kodeOptions}
+            value={item.kode ?? ""}
+            onChange={(v) => v && onChangeKode(item.id, v)}
+            placeholder="Pilih Kode"
+            size="sm"
+          />
+        ) : (
+          <span className="font-mono">{item.kode || "-"}</span>
+        )}
+      </td>
       {/* Volume: input manual + tombol Detail (modal) */}
       <td className="px-4 py-3 text-sm text-gray-800">
         <div className="flex items-center gap-2">
@@ -469,7 +485,6 @@ function SortableItemRow({
           </button>
         </div>
       </td>
-
       {/* Satuan (Searchable) */}
       <td className="px-4 py-3 text-sm text-gray-800 w-36">
         {item.isEditing ? (
@@ -484,7 +499,6 @@ function SortableItemRow({
           item.satuan || "-"
         )}
       </td>
-
       {/* Harga Satuan */}
       <td className="px-4 py-3 text-sm text-gray-800">
         {item.isEditing ? (
@@ -507,12 +521,10 @@ function SortableItemRow({
           formatIDR(item.hargaSatuan)
         )}
       </td>
-
       {/* Harga Total */}
       <td className="px-4 py-3 text-sm font-semibold text-gray-900">
         {formatIDR(item.hargaTotal)}
       </td>
-
       {/* Aksi + drag handle */}
       {/* Aksi + drag handle */}
       <td className="px-4 py-3 text-sm">
@@ -684,7 +696,7 @@ function SortableSectionHeader({
         )}
       </td>
 
-      <td colSpan={4}></td>
+      <td colSpan={5}></td>
 
       <td className="">
         <div className="flex gap-2 items-center">
@@ -780,6 +792,36 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   const itemJobList = hspAll?.items ?? [];
   const categories = hspAll?.categories ?? [];
 
+  const KodeOptions: Option[] = useMemo(() => {
+    const uniq = new Set<string>();
+    const out: Option[] = [];
+    for (const it of itemJobList) {
+      const k = it?.kode ?? "";
+      if (!k || uniq.has(k)) continue;
+      uniq.add(k);
+      out.push({ label: k, value: k });
+    }
+    return out;
+  }, [itemJobList]);
+
+  const changeItemKode = (id: string, kodeBaru: string) => {
+    const job = itemJobList.find((it: any) => it?.kode === kodeBaru);
+    const hargaBaru = Number(job?.harga ?? 0);
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((i) => {
+          if (i.id !== id) return i;
+          const next: ItemRow = { ...i, kode: kodeBaru };
+          next.hargaSatuan = hargaBaru;
+          next.hargaSatuanInput = undefined; // sinkron ke angka final
+          const volEff = getEffectiveVolume(next);
+          next.hargaTotal = volEff * hargaBaru;
+          return next;
+        }),
+      }))
+    );
+  };
   const CategoryOptions: Option[] = useMemo(
     () =>
       (categories ?? [])
@@ -1267,7 +1309,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
             onDragOver={handleDragOver}
             collisionDetection={closestCorners}
           >
-            <table className="table min-w-[1100px]">
+            <table className="table min-w-[1200px]">
               <thead className="bg-gray-50 sticky top-0 z-[1]">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
@@ -1275,6 +1317,9 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                     Uraian Pekerjaan
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Kode
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                     Vol
@@ -1298,7 +1343,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                 {sections.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-6 py-8 text-center text-sm text-gray-500"
                     >
                       Belum ada kategori.
@@ -1328,7 +1373,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                     {/* DROPPABLE: header (drop ke atas list) */}
                     <DroppableRow
                       droppableId={`section-${section.id}`}
-                      colSpan={7}
+                      colSpan={8}
                     />
 
                     {/* Items */}
@@ -1342,13 +1387,15 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                         onCopy={copyItem}
                         onUpdateField={updateItemField}
                         onOpenVolumeModal={openVolumeModal}
+                        kodeOptions={KodeOptions}
+                        onChangeKode={changeItemKode}
                       />
                     ))}
 
                     {/* DROPPABLE: bawah (akhir list) */}
                     <DroppableRow
                       droppableId={`dropzone-${section.id}`}
-                      colSpan={7}
+                      colSpan={8}
                       showHint={section.items.length === 0}
                     />
 
@@ -1356,7 +1403,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                     {!!section.items.length && (
                       <tr className="bg-gray-50">
                         <td
-                          colSpan={5}
+                          colSpan={6}
                           className="px-4 py-3 text-sm text-right text-gray-700"
                         >
                           Subtotal {section.title}

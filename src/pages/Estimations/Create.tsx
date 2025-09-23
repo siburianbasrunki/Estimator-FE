@@ -377,6 +377,8 @@ function SortableItemRow({
   onCopy,
   onUpdateField,
   onOpenVolumeModal,
+  kodeOptions,
+  onChangeKode,
 }: {
   idxInSection: number;
   item: ItemRow;
@@ -385,6 +387,8 @@ function SortableItemRow({
   onCopy: (id: string) => void;
   onUpdateField: (id: string, field: keyof ItemRow, value: any) => void;
   onOpenVolumeModal: (item: ItemRow) => void;
+  kodeOptions: Option[];
+  onChangeKode: (id: string, kodeBaru: string) => void;
 }) {
   const {
     attributes,
@@ -437,7 +441,19 @@ function SortableItemRow({
           <span className="break-words">{item.deskripsi || "-"}</span>
         )}
       </td>
-
+      <td className="px-4 py-3 text-sm text-gray-800 w-40">
+        {item.isEditing ? (
+          <SearchableSelect
+            options={kodeOptions}
+            value={item.kode ?? ""}
+            onChange={(v) => v && onChangeKode(item.id, v)}
+            placeholder="Pilih Kode"
+            size="sm"
+          />
+        ) : (
+          <span className="font-mono">{item.kode || "-"}</span>
+        )}
+      </td>
       {/* Volume: input langsung + tombol Detail */}
       <td className="px-4 py-3 text-sm text-gray-800">
         <div className="flex items-center gap-2">
@@ -687,7 +703,7 @@ function SortableSectionHeader({
         )}
       </td>
 
-      <td colSpan={4}></td>
+      <td colSpan={5}></td>
 
       {/* Aksi header kategori */}
       <td>
@@ -777,7 +793,39 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   const { data: hspAll, isLoading } = useGetAdminAllWithItemsFlat();
   const itemJobList = hspAll?.items ?? [];
   const categories = hspAll?.categories ?? [];
+  // Opsi unik untuk dropdown KODE (ambil harga default untuk kode tsb)
+  const KodeOptions: Option[] = useMemo(() => {
+    const byKode = new Map<string, { harga: number }>();
+    for (const it of itemJobList) {
+      const k = it?.kode ?? "";
+      if (!k) continue;
+      if (!byKode.has(k)) byKode.set(k, { harga: Number(it?.harga ?? 0) });
+    }
+    return Array.from(byKode.keys()).map((k) => ({ label: k, value: k }));
+  }, [itemJobList]);
 
+  // Ganti kode: hanya update kode & hargaSatuan (recalc total). Lainnya tetap.
+  const changeItemKode = (id: string, kodeBaru: string) => {
+    // cari harga untuk kodeBaru (ambil first match)
+    const found = itemJobList.find((it: any) => it?.kode === kodeBaru);
+    const newHarga = Number(found?.harga ?? 0);
+    setSections((prev) =>
+      prev.map((s) => ({
+        ...s,
+        items: s.items.map((i) => {
+          if (i.id !== id) return i;
+          const next = { ...i, kode: kodeBaru } as ItemRow;
+          // set hargaSatuan dari kode, bersihkan input edit supaya konsisten
+          next.hargaSatuan = newHarga;
+          next.hargaSatuanInput = undefined;
+          // Recalc total pakai volume efektif
+          const effVol = getEffectiveVolume(next);
+          next.hargaTotal = effVol * newHarga;
+          return next;
+        }),
+      }))
+    );
+  };
   const CategoryOptions: Option[] = useMemo(
     () =>
       (categories ?? []).map((c: { name: string }) => ({
@@ -1249,6 +1297,9 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                     Uraian Pekerjaan
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
+                    Kode
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
                     Vol
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
@@ -1270,7 +1321,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                 {sections.length === 0 && (
                   <tr>
                     <td
-                      colSpan={7}
+                      colSpan={8}
                       className="px-6 py-8 text-center text-sm text-gray-500"
                     >
                       Belum ada kategori. Tambahkan kategori pekerjaan terlebih
@@ -1301,7 +1352,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                     {/* DROPPABLE: header (drop ke atas list) */}
                     <DroppableRow
                       droppableId={`section-${section.id}`}
-                      colSpan={7}
+                      colSpan={8}
                     />
 
                     {/* Items */}
@@ -1315,6 +1366,8 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                         onCopy={copyItem}
                         onUpdateField={updateItemField}
                         onOpenVolumeModal={openVolumeModal}
+                        kodeOptions={KodeOptions}
+                        onChangeKode={changeItemKode}
                       />
                     ))}
 
