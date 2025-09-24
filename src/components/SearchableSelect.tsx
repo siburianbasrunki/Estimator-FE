@@ -1,13 +1,7 @@
-// components/SearchableSelect.tsx
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { BiChevronDown, BiSearch, BiX } from "react-icons/bi";
 
-export type Option = {
-  label: string;
-  value: string;
-  // optional field for passing through
-  [key: string]: any;
-};
+export type Option = { label: string; value: string; [key: string]: any };
 
 type Props = {
   options: Option[];
@@ -20,8 +14,8 @@ type Props = {
   className?: string;
   size?: "sm" | "md";
   clearable?: boolean;
-  /** custom filter, default: label/value includes q (case-insensitive) */
   filterFn?: (opt: Option, q: string) => boolean;
+  isButton?: ReactNode; 
 };
 
 export default function SearchableSelect({
@@ -36,6 +30,7 @@ export default function SearchableSelect({
   size = "md",
   clearable = true,
   filterFn,
+  isButton, 
 }: Props) {
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -53,11 +48,13 @@ export default function SearchableSelect({
   const filtered = useMemo(() => {
     const query = q.trim().toLowerCase();
     if (!query) return options;
-    const f =
+
+    const f: (opt: Option, q: string) => boolean =
       filterFn ??
-      ((opt: Option, _q: string) =>
-        (opt.label ?? "").toLowerCase().includes(query) ||
-        (opt.value ?? "").toLowerCase().includes(query));
+      ((opt: Option, qArg: string) =>
+        (opt.label ?? "").toLowerCase().includes(qArg) ||
+        (opt.value ?? "").toLowerCase().includes(qArg));
+
     return options.filter((o) => f(o, query));
   }, [options, q, filterFn]);
 
@@ -75,25 +72,24 @@ export default function SearchableSelect({
     return () => document.removeEventListener("mousedown", onDocClick);
   }, []);
 
-  // ensure active index within bounds
   useEffect(() => {
     if (activeIdx >= filtered.length) setActiveIdx(filtered.length - 1);
   }, [filtered.length, activeIdx]);
 
-  // auto scroll into view when activeIdx changes
   useEffect(() => {
     if (!listRef.current || activeIdx < 0) return;
     const el = listRef.current.querySelectorAll<HTMLLIElement>("li")[activeIdx];
     if (el) el.scrollIntoView({ block: "nearest" });
   }, [activeIdx]);
 
-  // Ukuran tanpa fixed height agar bisa wrap
   const sizeClasses =
     size === "sm"
       ? "text-sm py-2 min-h-[36px]"
       : "text-[15px] py-3 min-h-[44px]";
-
   const disabledCls = disabled ? "pointer-events-none opacity-60" : "";
+
+  const showClear = !!(clearable && current && !disabled);
+  const rightPadCls = showClear ? "pr-16" : "pr-10";
 
   const handlePick = (opt: Option) => {
     onChange(opt?.value, opt);
@@ -138,7 +134,7 @@ export default function SearchableSelect({
     >
       <button
         type="button"
-        className={`input input-bordered w-full pr-10 text-black bg-white border-black flex items-start justify-between h-auto ${sizeClasses} ${disabledCls}`}
+        className={`input input-bordered w-full ${rightPadCls} text-black bg-white border-black flex items-start justify-between h-auto ${sizeClasses} ${disabledCls}`}
         onClick={() => {
           if (disabled) return;
           setOpen((v) => !v);
@@ -158,10 +154,10 @@ export default function SearchableSelect({
       </button>
 
       {/* Clear button */}
-      {clearable && current && !disabled && (
+      {showClear && (
         <button
           type="button"
-          className={`absolute right-9 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100`}
+          className="absolute right-9 top-1/2 -translate-y-1/2 p-1 rounded hover:bg-gray-100"
           onClick={(e) => {
             e.stopPropagation();
             onChange(undefined, undefined);
@@ -176,7 +172,6 @@ export default function SearchableSelect({
         </button>
       )}
 
-      {/* Dropdown */}
       {open && (
         <div className="absolute z-50 mt-1 w-full rounded-xl border border-gray-200 bg-white shadow-xl">
           {/* Search box */}
@@ -232,6 +227,10 @@ export default function SearchableSelect({
               })
             )}
           </ul>
+
+          {isButton && (
+            <div className="p-2 border-t border-gray-200">{isButton}</div>
+          )}
         </div>
       )}
     </div>

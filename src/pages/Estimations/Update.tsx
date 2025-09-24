@@ -654,7 +654,7 @@ function SortableSectionHeader({
     transform: CSS.Transform.toString(transform),
     transition,
   };
-
+  const navigate = useNavigate();
   return (
     <tr
       ref={setNodeRef}
@@ -714,6 +714,16 @@ function SortableSectionHeader({
               loading={isLoadingItems}
               size="sm"
               clearable={false}
+              isButton={
+                <>
+                  <button
+                    className="w-full px-3 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-500"
+                    onClick={() => navigate("/hsp")}
+                  >
+                    Kelola HSP
+                  </button>
+                </>
+              }
             />
           </div>
 
