@@ -45,7 +45,7 @@ export const useCreateEstimation = () => {
 
 export const useUpdateEstimation = () => {
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
+  // const navigate = useNavigate();
   return useMutation({
     mutationFn: ({
       id,
@@ -60,7 +60,7 @@ export const useUpdateEstimation = () => {
       queryClient.invalidateQueries({ queryKey: ["estimations"] });
       queryClient.invalidateQueries({ queryKey: ["estimation", variables.id] });
       toast("Estimation updated successfully");
-      navigate(`/estimation`);
+      // navigate(`/estimation`);
     },
     onError: (error: Error) => {
       toast(error.message);

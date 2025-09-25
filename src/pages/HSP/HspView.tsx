@@ -16,6 +16,8 @@ import { useNotify } from "../../components/Notify/notify";
 import { useProfile } from "../../hooks/useProfile";
 import FileTemplateHSP from "../../assets/templateFile/templateHSP.xlsx";
 import { useGetSources } from "../../hooks/useHookFlagSource";
+import { useGetUnits } from "../../hooks/useHookUnits";
+import SearchableSelect from "../../components/SearchableSelect";
 type ItemType = {
   kode: string;
   deskripsi: string;
@@ -29,12 +31,32 @@ type HspDataMap = Record<string, ItemType[]>;
 export const HspView = () => {
   const [search, setSearch] = useState("");
   const [selectedFileName, setSelectedFileName] = useState<string>("");
+
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { data: units, isLoading: isLoadingUnits } = useGetUnits("");
+  const unitOptions = useMemo(
+    () =>
+      (units ?? []).map((u: any) => ({
+        label: u.code,
+        value: u.code,
+      })),
+    [units]
+  );
+  const [createUnit, setCreateUnit] = useState<string>("");
+  const [editUnit, setEditUnit] = useState<string>("");
+
   const navigate = useNavigate();
   const notify = useNotify();
   const { data: categories } = useGetCategoryJob();
-  const createItem = useCreateHspItem();
-  const updateItem = useUpdateHspItem();
+  const categoryOptions = useMemo(
+    () => (categories ?? []).map((c) => ({ label: c.name, value: c.id })),
+    [categories]
+  );
+  const [selectedCategoryId, setSelectedCategoryId] = useState<
+    string | undefined
+  >(undefined);
+  const  {isPending: isPendingCreate, mutateAsync: createItemAsync} = useCreateHspItem();
+  const { mutateAsync: updateItemAsync , isPending: isPendingUpdate} = useUpdateHspItem();
   const { data: sources } = useGetSources();
   const sourceOptions = (sources ?? []).map((s) => s.label);
   const deleteItem = useDeleteHspItem();
@@ -49,7 +71,11 @@ export const HspView = () => {
     source?: "UUD" | "Sendiri" | null;
   }>(null);
   const [openDelete, setOpenDelete] = useState<null | { kode: string }>(null);
-
+  const catNameToId = useMemo(() => {
+    const m = new Map<string, string>();
+    (categories ?? []).forEach((c) => m.set(c.name, c.id));
+    return m;
+  }, [categories]);
   const { mutate: importHsp, isPending } = useImportHsp();
   const {
     data: allHsp,
@@ -68,15 +94,27 @@ export const HspView = () => {
     if (!raw) return {};
     return (raw as any).data ?? (raw as HspDataMap);
   }, [allHsp]);
-
+  useEffect(() => {
+    setEditUnit(openEdit?.satuan || "");
+  }, [openEdit]);
   // Filter pencarian
   const filteredData: HspDataMap = useMemo(() => {
     if (!hspData || Object.keys(hspData).length === 0) return {};
-    if (!search.trim()) return hspData;
 
-    const q = search.toLowerCase();
-    return Object.entries(hspData).reduce((acc, [kategori, items]) => {
-      const matchKategori = kategori.toLowerCase().includes(q);
+    const q = (search || "").toLowerCase();
+
+    return Object.entries(hspData).reduce((acc, [kategoriNama, items]) => {
+      const catId = catNameToId.get(kategoriNama);
+      if (selectedCategoryId && catId !== selectedCategoryId) {
+        return acc;
+      }
+
+      if (!q.trim()) {
+        if (items.length > 0) acc[kategoriNama] = items;
+        return acc;
+      }
+
+      const matchKategori = kategoriNama.toLowerCase().includes(q);
       const filtered = items.filter(
         (item) =>
           matchKategori ||
@@ -84,11 +122,15 @@ export const HspView = () => {
           item.deskripsi.toLowerCase().includes(q) ||
           item.satuan.toLowerCase().includes(q)
       );
-      if (filtered.length > 0) acc[kategori] = filtered;
+
+      if (filtered.length > 0) acc[kategoriNama] = filtered;
       return acc;
     }, {} as HspDataMap);
-  }, [hspData, search]);
+  }, [hspData, search, selectedCategoryId, catNameToId]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [search, selectedCategoryId, Object.keys(filteredData).length]);
   // ===== Pagination =====
   const [page, setPage] = useState(1);
   const [pageSize] = useState(10); // fixed 10/halaman (bisa kamu ubah kalau perlu)
@@ -181,14 +223,25 @@ export const HspView = () => {
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {/* Toolbar */}
         <div className="p-4 border-b border-gray-200 flex flex-col md:flex-row gap-4 justify-between items-start md:items-center">
-          <div className="w-full md:w-auto">
-            <input
-              type="text"
-              className="block w-full pl-3 pr-3 py-2 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              placeholder="Cari kategori / kode / deskripsi / satuan..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
+          <div className="w-full md:w-auto flex items-center justify-between gap-4">
+            <div>
+              <input
+                type="text"
+                className="block w-full h-9 px-3 border border-gray-300 rounded-md leading-5 text-black placeholder-gray-500 focus:outline-none focus:ring-blue-500 focus:border-blue-500 text-sm"
+                placeholder="Cari kategori / kode / deskripsi / satuan..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </div>
+            <div>
+              <SearchableSelect
+                options={categoryOptions}
+                value={selectedCategoryId}
+                onChange={(val) => setSelectedCategoryId(val)}
+                placeholder="Filter kategori…"
+                size="sm"
+              />
+            </div>
           </div>
 
           <div className="w-full md:w-auto flex flex-col sm:flex-row gap-3">
@@ -564,9 +617,24 @@ export const HspView = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Satuan</label>
-                <input
-                  id="create-satuan"
-                  className="input input-bordered w-full text-black bg-white border-black"
+                <SearchableSelect
+                  options={unitOptions}
+                  value={createUnit}
+                  onChange={(v) => setCreateUnit(v || "")}
+                  placeholder={isLoadingUnits ? "Memuat..." : "Pilih satuan"}
+                  size="sm"
+                  zIndex={2000}
+                  isButton={
+                    <>
+                      <button
+                        onClick={() => navigate("/units")}
+                        className="btn bg-green-500 btn-sm w-full"
+                        title="Tambah item manual"
+                      >
+                        <BiPlus className="mr-1 text-white" /> Units
+                      </button>
+                    </>
+                  }
                 />
               </div>
 
@@ -619,9 +687,7 @@ export const HspView = () => {
                   const deskripsi = (
                     document.getElementById("create-desc") as HTMLInputElement
                   )?.value.trim();
-                  const satuan = (
-                    document.getElementById("create-satuan") as HTMLInputElement
-                  )?.value.trim();
+                  const satuan = (createUnit || "").trim();
                   const source = (
                     document.getElementById(
                       "create-source"
@@ -633,7 +699,7 @@ export const HspView = () => {
                     return;
                   }
 
-                  createItem.mutate(
+                  createItemAsync(
                     { hspCategoryId, kode, deskripsi, satuan, source },
                     {
                       onSuccess: () => {
@@ -644,7 +710,7 @@ export const HspView = () => {
                   );
                 }}
               >
-                Simpan
+                {isPendingCreate ? "Menyimpan..." : "Simpan"}
               </button>
             </div>
           </div>
@@ -702,10 +768,24 @@ export const HspView = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Satuan</label>
-                <input
-                  id="edit-satuan"
-                  defaultValue={openEdit.satuan}
-                  className="input input-bordered w-full text-black bg-white border-black"
+                <SearchableSelect
+                  options={unitOptions}
+                  value={editUnit}
+                  onChange={(v) => setEditUnit(v || "")}
+                  placeholder={isLoadingUnits ? "Memuat..." : "Pilih satuan"}
+                  size="sm"
+                  zIndex={2000}
+                  isButton={
+                    <>
+                      <button
+                        onClick={() => navigate("/units")}
+                        className="btn bg-green-500 btn-sm w-full"
+                        title="Tambah item manual"
+                      >
+                        <BiPlus className="mr-1 text-white" /> Units
+                      </button>
+                    </>
+                  }
                 />
               </div>
               <div>
@@ -757,9 +837,7 @@ export const HspView = () => {
                   const deskripsi = (
                     document.getElementById("edit-desc") as HTMLInputElement
                   )?.value.trim();
-                  const satuan = (
-                    document.getElementById("edit-satuan") as HTMLInputElement
-                  )?.value.trim();
+                  const satuan = (editUnit || "").trim();
                   const source = (
                     document.getElementById("edit-source") as HTMLSelectElement
                   )?.value as "UUD" | "Sendiri";
@@ -768,7 +846,7 @@ export const HspView = () => {
                     return;
                   }
 
-                  updateItem.mutate(
+                  updateItemAsync(
                     {
                       kode: openEdit.kode,
                       payload: {
@@ -788,7 +866,7 @@ export const HspView = () => {
                   );
                 }}
               >
-                Simpan
+                {isPendingUpdate ? "Menyimpan..." : "Simpan"}
               </button>
             </div>
           </div>

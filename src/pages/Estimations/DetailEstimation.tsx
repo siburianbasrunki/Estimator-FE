@@ -294,23 +294,42 @@ export const DetailEstimation: React.FC = () => {
   };
   const { subtotal, ppnAmount, grandTotal, itemCount } = useMemo(() => {
     const items = estimation?.items ?? [];
-    const sub = items.reduce((sum, it) => {
-      return (
-        sum +
-        it.details.reduce(
-          (s, d) =>
-            s +
-            (typeof d.hargaTotal === "number"
-              ? d.hargaTotal
-              : d.hargaSatuan * d.volume),
+
+    const sumDetails = (arr: any[] = []) =>
+      arr.reduce((s, d) => {
+        const total =
+          typeof d?.hargaTotal === "number"
+            ? d.hargaTotal
+            : (Number(d?.hargaSatuan) || 0) * (Number(d?.volume) || 0);
+        return s + total;
+      }, 0);
+
+    const sectionSubtotal = (sec: any) => {
+      const fromSectionDetails = sumDetails(sec?.details);
+      const fromGroups =
+        (sec?.groups ?? []).reduce(
+          (acc: number, g: any) => acc + sumDetails(g?.details),
           0
-        )
-      );
-    }, 0);
+        ) || 0;
+      return fromSectionDetails + fromGroups;
+    };
+
+    const sub = items.reduce((acc, sec) => acc + sectionSubtotal(sec), 0);
     const ppnPct = estimation?.ppn ?? 0;
     const ppn = Math.round(sub * (ppnPct / 100));
     const grand = sub + ppn;
-    const count = items.reduce((acc, it) => acc + it.details.length, 0);
+
+    const count = items.reduce((acc, sec) => {
+      const direct = Array.isArray(sec?.details) ? sec.details.length : 0;
+      const viaGroups =
+        (sec?.groups ?? []).reduce(
+          (n: number, g: any) =>
+            n + (Array.isArray(g?.details) ? g.details.length : 0),
+          0
+        ) || 0;
+      return acc + direct + viaGroups;
+    }, 0);
+
     return {
       subtotal: sub,
       ppnAmount: ppn,
@@ -427,7 +446,7 @@ export const DetailEstimation: React.FC = () => {
               className="btn bg-blue-400 hover:bg-blue-500 w-full md:w-auto"
               onClick={() =>
                 navigate(`/estimation/update/${estimation.id}`, {
-                  state: { openStep: "step2" }, 
+                  state: { openStep: "step2" },
                 })
               }
             >
@@ -534,152 +553,239 @@ export const DetailEstimation: React.FC = () => {
           </div>
         )}
         {estimation.items?.map((section) => {
-          const sectionSubtotal = section.details.reduce(
-            (s, d) =>
-              s +
-              (typeof d.hargaTotal === "number"
-                ? d.hargaTotal
-                : d.hargaSatuan * d.volume),
-            0
-          );
+  const sumDetails = (arr: any[] = []) =>
+    arr.reduce((s, d) => {
+      const total =
+        typeof d?.hargaTotal === "number"
+          ? d.hargaTotal
+          : (Number(d?.hargaSatuan) || 0) * (Number(d?.volume) || 0);
+      return s + total;
+    }, 0);
 
-          return (
-            <div
-              key={section.id}
-              className="card bg-white border border-gray-200 shadow-sm"
-            >
-              <div className="collapse collapse-arrow">
-                <input type="checkbox" defaultChecked />
+  const hasGroups = Array.isArray(section.groups) && section.groups.length > 0;
+  const sectionSubtotal =
+    (hasGroups
+      ? (section.groups || []).reduce(
+          (acc: number, g: any) => acc + sumDetails(g.details),
+          0
+        )
+      : sumDetails(section.details)) || 0;
 
-                <div className="collapse-title font-semibold flex justify-between bg-gray-200">
-                  <span className="truncate">{section.title}</span>
-                  <span className="badge border border-gray-300 bg-gray-100 text-black">
-                    {formatIDR(sectionSubtotal)}
-                  </span>
+  return (
+    <div
+      key={section.id}
+      className="card bg-white border border-gray-200 shadow-sm"
+    >
+      <div className="collapse collapse-arrow">
+        <input type="checkbox" defaultChecked />
+
+        <div className="collapse-title font-semibold flex justify-between bg-gray-200">
+          <span className="truncate">{section.title}</span>
+          <span className="badge border border-gray-300 bg-gray-100 text-black">
+            {formatIDR(sectionSubtotal)}
+          </span>
+        </div>
+
+        {/* === MOBILE (md kebawah) === */}
+        <div className="collapse-content !overflow-visible md:hidden">
+          {!hasGroups ? (
+            // ======= Fallback: details langsung di section =======
+            <div className="grid gap-2">
+              {(section.details || []).map((d, idx) => {
+                const total =
+                  typeof d.hargaTotal === "number"
+                    ? d.hargaTotal
+                    : d.hargaSatuan * d.volume;
+                return (
+                  <div key={d.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-gray-500">#{idx + 1}</span>
+                      <span className="text-xs text-gray-500">{d.kode}</span>
+                    </div>
+                    <div className="font-medium whitespace-pre-wrap mb-2">{d.deskripsi}</div>
+                    <div className="text-sm grid grid-cols-2 gap-2">
+                      <div>
+                        <div className="text-gray-500 text-xs">Volume</div>
+                        <div className="font-medium">{d.volume}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs">Satuan</div>
+                        <div className="font-medium">{d.satuan}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs">Harga Satuan</div>
+                        <div className="font-medium">{formatIDR(d.hargaSatuan)}</div>
+                      </div>
+                      <div>
+                        <div className="text-gray-500 text-xs">Harga Total</div>
+                        <div className="font-bold">{formatIDR(total)}</div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-end pt-2">
+                <div className="inline-flex items-center gap-3">
+                  <span className="text-black font-semibold">Subtotal</span>
+                  <span className="text-black font-bold">{formatIDR(sectionSubtotal)}</span>
                 </div>
+              </div>
+            </div>
+          ) : (
+            // ======= Format baru: groups =======
+            <div className="space-y-3">
+              {section.groups?.map((grp, gIdx) => {
+                const groupSubtotal = sumDetails(grp.details || []);
+                return (
+                  <div key={grp.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-semibold">{grp.title || `Group ${gIdx + 1}`}</div>
+                      <span className="badge border border-gray-300 bg-gray-100 text-black">
+                        {formatIDR(groupSubtotal)}
+                      </span>
+                    </div>
 
-                {/* === MOBILE CARD LAYOUT (md kebawah) === */}
-                <div className="collapse-content !overflow-visible md:hidden">
-                  <div className="grid gap-2">
-                    {section.details.map((d, idx) => {
+                    <div className="grid gap-2">
+                      {(grp.details || []).map((d: any, idx: number) => {
+                        const total =
+                          typeof d.hargaTotal === "number"
+                            ? d.hargaTotal
+                            : d.hargaSatuan * d.volume;
+                        return (
+                          <div key={d.id} className="border border-gray-200 rounded-lg p-3 bg-white">
+                            <div className="flex items-center justify-between mb-1">
+                              <span className="text-xs text-gray-500">#{idx + 1}</span>
+                              <span className="text-xs text-gray-500">{d.kode}</span>
+                            </div>
+                            <div className="font-medium whitespace-pre-wrap mb-2">{d.deskripsi}</div>
+                            <div className="text-sm grid grid-cols-2 gap-2">
+                              <div>
+                                <div className="text-gray-500 text-xs">Volume</div>
+                                <div className="font-medium">{d.volume}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500 text-xs">Satuan</div>
+                                <div className="font-medium">{d.satuan}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500 text-xs">Harga Satuan</div>
+                                <div className="font-medium">{formatIDR(d.hargaSatuan)}</div>
+                              </div>
+                              <div>
+                                <div className="text-gray-500 text-xs">Harga Total</div>
+                                <div className="font-bold">{formatIDR(total)}</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+
+              <div className="flex justify-end pt-2">
+                <div className="inline-flex items-center gap-3">
+                  <span className="text-black font-semibold">Subtotal</span>
+                  <span className="text-black font-bold">{formatIDR(sectionSubtotal)}</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* === DESKTOP (md ke atas) === */}
+        <div className="collapse-content !overflow-visible !p-0 hidden md:block">
+          {!hasGroups ? (
+            // ======= Fallback: details langsung di section =======
+            <div className="relative -mx-4 md:mx-0">
+              <div className="overflow-x-auto w-full">
+                <table className="table min-w-[960px] md:min-w-full">
+                  <thead className="text-black">
+                    <tr>
+                      <th>No</th>
+                      <th>Deskripsi</th>
+                      <th>Kode</th>
+                      <th className="text-right">Volume</th>
+                      <th>Satuan</th>
+                      <th className="text-right">Harga Satuan</th>
+                      <th className="text-right">Harga Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(section.details || []).map((d, idx) => {
                       const total =
                         typeof d.hargaTotal === "number"
                           ? d.hargaTotal
                           : d.hargaSatuan * d.volume;
-
                       return (
-                        <div
-                          key={d.id}
-                          className="border border-gray-200 rounded-lg p-3 bg-white"
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs text-gray-500">
-                              #{idx + 1}
-                            </span>
-                            <span className="text-xs text-gray-500">
-                              {d.kode}
-                            </span>
-                          </div>
-                          <div className="font-medium whitespace-pre-wrap mb-2">
-                            {d.deskripsi}
-                          </div>
-                          <div className="text-sm grid grid-cols-2 gap-2">
-                            <div>
-                              <div className="text-gray-500 text-xs">
-                                Volume
-                              </div>
-                              <div className="font-medium">{d.volume}</div>
-                            </div>
-                            <div>
-                              <div className="text-gray-500 text-xs">
-                                Satuan
-                              </div>
-                              <div className="font-medium">{d.satuan}</div>
-                            </div>
-                            <div>
-                              <div className="text-gray-500 text-xs">
-                                Harga Satuan
-                              </div>
-                              <div className="font-medium">
-                                {formatIDR(d.hargaSatuan)}
-                              </div>
-                            </div>
-                            <div>
-                              <div className="text-gray-500 text-xs">
-                                Harga Total
-                              </div>
-                              <div className="font-bold">
-                                {formatIDR(total)}
-                              </div>
-                            </div>
-                          </div>
-                        </div>
+                        <tr key={d.id}>
+                          <td>{idx + 1}</td>
+                          <td className="whitespace-pre-wrap">{d.deskripsi}</td>
+                          <td className="font-medium whitespace-nowrap">{d.kode}</td>
+                          <td className="text-right whitespace-nowrap">{d.volume}</td>
+                          <td className="whitespace-nowrap">{d.satuan}</td>
+                          <td className="text-right whitespace-nowrap">{formatIDR(d.hargaSatuan)}</td>
+                          <td className="text-right whitespace-nowrap">{formatIDR(total)}</td>
+                        </tr>
                       );
                     })}
-
-                    <div className="flex justify-end pt-2">
-                      <div className="inline-flex items-center gap-3">
-                        <span className="text-black font-semibold">
-                          Subtotal
-                        </span>
-                        <span className="text-black font-bold">
-                          {formatIDR(sectionSubtotal)}
-                        </span>
-                      </div>
+                  </tbody>
+                  <tfoot>
+                    <tr>
+                      <td colSpan={4}></td>
+                      <td className="text-right text-black font-semibold">Subtotal</td>
+                      <td className="text-right font-bold text-black" colSpan={2}>
+                        {formatIDR(sectionSubtotal)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          ) : (
+            // ======= Format baru: groups =======
+            <div className="space-y-4">
+              {section.groups?.map((grp, gIdx) => {
+                const groupSubtotal = sumDetails(grp.details || []);
+                return (
+                  <div key={grp.id} className="relative -mx-4 md:mx-0 border-t border-gray-200 pt-4">
+                    <div className="flex items-center justify-between px-4 md:px-4 mb-2 ">
+                      <div className="font-semibold">{grp.title || `Group ${gIdx + 1}`}</div>
+                      <span className="badge border border-gray-300 bg-gray-100 text-black">
+                        {formatIDR(groupSubtotal)}
+                      </span>
                     </div>
-                  </div>
-                </div>
 
-                {/* === DESKTOP TABLE LAYOUT (md ke atas) === */}
-                <div className="collapse-content !overflow-visible !p-0 hidden md:block">
-                  {/* Hilangkan padding luar agar scroller penuh lebar */}
-                  <div className="relative -mx-4 md:mx-0">
                     <div className="overflow-x-auto w-full">
                       <table className="table min-w-[960px] md:min-w-full">
                         <thead className="text-black">
                           <tr>
-                            <th className="whitespace-nowrap">No</th>
-                            <th className="whitespace-nowrap">Deskripsi</th>
-                            <th className="whitespace-nowrap">Kode</th>
-                            <th className="text-right whitespace-nowrap">
-                              Volume
-                            </th>
-                            <th className="whitespace-nowrap">Satuan</th>
-                            <th className="text-right whitespace-nowrap">
-                              Harga Satuan
-                            </th>
-                            <th className="text-right whitespace-nowrap">
-                              Harga Total
-                            </th>
+                            <th>No</th>
+                            <th>Deskripsi</th>
+                            <th>Kode</th>
+                            <th className="text-right">Volume</th>
+                            <th>Satuan</th>
+                            <th className="text-right">Harga Satuan</th>
+                            <th className="text-right">Harga Total</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {section.details.map((d, idx) => {
+                          {(grp.details || []).map((d: any, idx: number) => {
                             const total =
                               typeof d.hargaTotal === "number"
                                 ? d.hargaTotal
                                 : d.hargaSatuan * d.volume;
                             return (
                               <tr key={d.id}>
-                                <td className="whitespace-nowrap">{idx + 1}</td>
-                                <td className="whitespace-pre-wrap">
-                                  {d.deskripsi}
-                                </td>
-                                <td className="font-medium whitespace-nowrap">
-                                  {d.kode}
-                                </td>
-                                <td className="text-right whitespace-nowrap">
-                                  {d.volume}
-                                </td>
-                                <td className="whitespace-nowrap">
-                                  {d.satuan}
-                                </td>
-                                <td className="text-right whitespace-nowrap">
-                                  {formatIDR(d.hargaSatuan)}
-                                </td>
-                                <td className="text-right whitespace-nowrap">
-                                  {formatIDR(total)}
-                                </td>
+                                <td>{idx + 1}</td>
+                                <td className="whitespace-pre-wrap">{d.deskripsi}</td>
+                                <td className="font-medium whitespace-nowrap">{d.kode}</td>
+                                <td className="text-right whitespace-nowrap">{d.volume}</td>
+                                <td className="whitespace-nowrap">{d.satuan}</td>
+                                <td className="text-right whitespace-nowrap">{formatIDR(d.hargaSatuan)}</td>
+                                <td className="text-right whitespace-nowrap">{formatIDR(total)}</td>
                               </tr>
                             );
                           })}
@@ -687,25 +793,32 @@ export const DetailEstimation: React.FC = () => {
                         <tfoot>
                           <tr>
                             <td colSpan={4}></td>
-                            <td className="text-right text-black font-semibold">
-                              Subtotal
-                            </td>
-                            <td
-                              className="text-right font-bold text-black"
-                              colSpan={2}
-                            >
-                              {formatIDR(sectionSubtotal)}
+                            <td className="text-right text-black font-semibold">Subtotal {grp.title}</td>
+                            <td className="text-right font-bold text-black" colSpan={2}>
+                              {formatIDR(groupSubtotal)}
                             </td>
                           </tr>
                         </tfoot>
                       </table>
                     </div>
                   </div>
+                );
+              })}
+
+              {/* subtotal section keseluruhan (akumulasi semua group) */}
+              <div className="flex justify-end px-4 md:px-3 mb-2">
+                <div className="inline-flex items-center gap-3">
+                  <span className="text-black font-semibold">Subtotal</span>
+                  <span className="text-black font-bold">{formatIDR(sectionSubtotal)}</span>
                 </div>
               </div>
             </div>
-          );
-        })}
+          )}
+        </div>
+      </div>
+    </div>
+  );
+})}
       </div>
 
       {/* Modal Export (Excel/PDF) */}

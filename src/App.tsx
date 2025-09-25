@@ -20,6 +20,7 @@ import { ConfirmProvider } from "./components/ConfirmDialog";
 import UpdateEstimation from "./pages/Estimations/Update";
 import PeralatanView from "./pages/MasterData/PeralatanVies";
 import SourceManagement from "./pages/Sumber/SumberView";
+import UnitManagement from "./pages/Units/UnitView";
 
 function App() {
   return (
@@ -54,6 +55,7 @@ function App() {
               <Route path="/master/peralatan" element={<PeralatanView />} />
               <Route path="users" element={<UserView />} />
               <Route path="source" element={<SourceManagement />} />
+              <Route path="units" element={<UnitManagement />} />
               <Route path="category-job" element={<CategoryView />} />
               <Route path="item-job" element={<ItemJobsView />} />
             </Route>
