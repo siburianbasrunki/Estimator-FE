@@ -55,8 +55,8 @@ export const HspView = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<
     string | undefined
   >(undefined);
-  const createItem = useCreateHspItem();
-  const updateItem = useUpdateHspItem();
+  const  {isPending: isPendingCreate, mutateAsync: createItemAsync} = useCreateHspItem();
+  const { mutateAsync: updateItemAsync , isPending: isPendingUpdate} = useUpdateHspItem();
   const { data: sources } = useGetSources();
   const sourceOptions = (sources ?? []).map((s) => s.label);
   const deleteItem = useDeleteHspItem();
@@ -699,7 +699,7 @@ export const HspView = () => {
                     return;
                   }
 
-                  createItem.mutate(
+                  createItemAsync(
                     { hspCategoryId, kode, deskripsi, satuan, source },
                     {
                       onSuccess: () => {
@@ -710,7 +710,7 @@ export const HspView = () => {
                   );
                 }}
               >
-                Simpan
+                {isPendingCreate ? "Menyimpan..." : "Simpan"}
               </button>
             </div>
           </div>
@@ -846,7 +846,7 @@ export const HspView = () => {
                     return;
                   }
 
-                  updateItem.mutate(
+                  updateItemAsync(
                     {
                       kode: openEdit.kode,
                       payload: {
@@ -866,7 +866,7 @@ export const HspView = () => {
                   );
                 }}
               >
-                Simpan
+                {isPendingUpdate ? "Menyimpan..." : "Simpan"}
               </button>
             </div>
           </div>
