@@ -10,7 +10,6 @@ import {
   BiCopy,
 } from "react-icons/bi";
 import Button from "../../components/Button";
-import { UnitList } from "../../stores/units";
 import { useCreateEstimation } from "../../hooks/useEstimation";
 import { useGetAdminAllWithItemsFlat } from "../../hooks/useHsp";
 import type { Option } from "../../components/SearchableSelect";
@@ -44,6 +43,7 @@ import VolModal from "./VolumeModal";
 import { BackButton } from "../../components/BackButton";
 import { useNavigate } from "react-router-dom";
 import { useNotify } from "../../components/Notify/notify";
+import { useGetUnits } from "../../hooks/useHookUnits";
 
 /* ------------------------------ Helpers ------------------------------ */
 const uid = () =>
@@ -427,6 +427,8 @@ function SortableItemCard({
   onOpenVolumeModal,
   kodeOptions,
   onChangeKode,
+  unitOptions,
+  unitsLoading,
 }: {
   /** string indeks yang sudah diformat (a, b, c / 1, 2, 3) */
   itemIndexDisplay: string;
@@ -438,6 +440,8 @@ function SortableItemCard({
   onOpenVolumeModal: (item: ItemRow) => void;
   kodeOptions: Option[];
   onChangeKode: (id: string, kodeBaru: string) => void;
+  unitOptions: Option[];
+  unitsLoading: boolean;
 }) {
   const {
     attributes,
@@ -453,20 +457,11 @@ function SortableItemCard({
     transition,
   };
 
-  const unitOptions: Option[] = useMemo(
-    () =>
-      (UnitList ?? []).map((u: { label: string; value: string }) => ({
-        label: u.value,
-        value: u.value,
-      })),
-    []
-  );
-
   const volInputDisplay =
     item.volumeSource === "MANUAL"
       ? item.manualVolumeInput ?? ""
       : String(Number(item.volume || 0));
-
+  const navigate = useNavigate();
   return (
     <div
       ref={setNodeRef}
@@ -599,8 +594,20 @@ function SortableItemCard({
                   options={unitOptions}
                   value={item.satuan ?? ""}
                   onChange={(v) => onUpdateField(item.id, "satuan", v ?? "")}
-                  placeholder="Pilih Satuan"
+                  placeholder={unitsLoading ? "Memuat..." : "Pilih Satuan"}
+                  loading={!!unitsLoading}
                   size="sm"
+                  isButton={
+                    <>
+                      <button
+                        onClick={() => navigate("/units")}
+                        className="btn bg-green-500 btn-sm w-full"
+                        title="Tambah item manual"
+                      >
+                        <BiPlus className="mr-1 text-white" /> Units
+                      </button>
+                    </>
+                  }
                 />
               ) : (
                 <div className="text-sm text-gray-800">
@@ -724,9 +731,7 @@ function SortableGroupHeaderCard({
           >
             ≡
           </button>
-          <div className="text-sm text-slate-600">
-            {groupIndexArabic}
-          </div>
+          <div className="text-sm text-slate-600">{groupIndexArabic}</div>
           <div className="font-semibold text-slate-800">
             {group.isEditingTitle ? (
               <input
@@ -1004,8 +1009,7 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   const [isManualSection, setIsManualSection] = useState(false);
   const [selectedSectionFromList, setSelectedSectionFromList] = useState("");
   const [manualSectionTitle, setManualSectionTitle] = useState("");
-
-  // Volume modal state
+  const { data: units, isLoading: isLoadingUnits } = useGetUnits("");
   const [volModalOpen, setVolModalOpen] = useState(false);
   const [volTargetItemId, setVolTargetItemId] = useState<string | null>(null);
   const [volTargetItemLabel, setVolTargetItemLabel] = useState<
@@ -1014,7 +1018,14 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   const [volInitialRows, setVolInitialRows] = useState<
     VolumeDetailRow[] | undefined
   >(undefined);
-
+  const UnitOptions: Option[] = useMemo(
+    () =>
+      (units ?? []).map((u) => ({
+        label: u.code,
+        value: u.code,
+      })),
+    [units]
+  );
   const { data: hspAll, isLoading: isLoadingHsp } =
     useGetAdminAllWithItemsFlat();
   const itemJobList = hspAll?.items ?? [];
@@ -2002,6 +2013,8 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
                                   onOpenVolumeModal={openVolumeModal}
                                   kodeOptions={KodeOptions}
                                   onChangeKode={changeItemKode}
+                                  unitOptions={UnitOptions}
+                                  unitsLoading={isLoadingUnits}
                                 />
                               ))}
                             </div>
@@ -2053,6 +2066,8 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
                               onOpenVolumeModal={openVolumeModal}
                               kodeOptions={KodeOptions}
                               onChangeKode={changeItemKode}
+                              unitOptions={UnitOptions}
+                              unitsLoading={isLoadingUnits}
                             />
                           ))}
                         </div>

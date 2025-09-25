@@ -6,7 +6,12 @@ import type {
   MasterType,
   MasterUpdatePayload,
 } from "../../model/master";
-
+import SearchableSelect, {
+  type Option,
+} from "../../components/SearchableSelect";
+import { BiPlus } from "react-icons/bi";
+import { useNavigate } from "react-router-dom";
+import { useGetUnits } from "../../hooks/useHookUnits";
 type Props = {
   mode: "create" | "edit";
   type: MasterType;
@@ -59,7 +64,16 @@ export const MasterForm: React.FC<Props> = ({
   // recompute saat edit
   const [recompute, setRecompute] = React.useState(false);
   const [submitting, setSubmitting] = React.useState(false);
+  const { data: units, isLoading: isLoadingUnits } = useGetUnits('');
 
+  const unitOptions: Option[] = React.useMemo(
+    () =>
+      (units ?? []).map((u: any) => ({
+        label: u.label ?? u.value ?? u.name ?? u.code ?? String(u),
+        value: u.value ?? u.label ?? u.code ?? u.name ?? String(u),
+      })),
+    [units]
+  );
   // Auto hitung hourly dari daily ÷ jam/hari
   React.useEffect(() => {
     if (!isLabor(type)) return;
@@ -139,6 +153,7 @@ export const MasterForm: React.FC<Props> = ({
       setSubmitting(false);
     }
   };
+  const navigate = useNavigate();
 
   return (
     <form onSubmit={submit} className="space-y-4">
@@ -177,12 +192,31 @@ export const MasterForm: React.FC<Props> = ({
           <label className="block text-sm font-medium text-gray-700">
             Satuan
           </label>
-          <input
-            className="mt-1 w-full rounded-md border px-3 py-2 text-black border-black placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-            value={unit}
-            onChange={(e) => setUnit(e.target.value)}
-            placeholder={isLabor(type) ? "OH" : ""}
-            required
+          <SearchableSelect
+            className="mt-1 z-[2000]"
+            options={unitOptions}
+            value={unit || undefined}
+            onChange={(v) => setUnit(v ?? (isLabor(type) ? "OH" : ""))}
+            placeholder={
+              isLoadingUnits
+                ? "Memuat..."
+                : isLabor(type)
+                ? "OH"
+                : "Pilih satuan"
+            }
+            size="sm"
+            clearable={false}
+            isButton={
+              <>
+                <button
+                  onClick={() => navigate("/units")}
+                  className="btn bg-green-500 btn-sm w-full"
+                  title="Tambah item manual"
+                >
+                  <BiPlus className="mr-1 text-white" /> Units
+                </button>
+              </>
+            }
           />
         </div>
 

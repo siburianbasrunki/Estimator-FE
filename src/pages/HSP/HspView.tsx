@@ -16,6 +16,7 @@ import { useNotify } from "../../components/Notify/notify";
 import { useProfile } from "../../hooks/useProfile";
 import FileTemplateHSP from "../../assets/templateFile/templateHSP.xlsx";
 import { useGetSources } from "../../hooks/useHookFlagSource";
+import { useGetUnits } from "../../hooks/useHookUnits";
 import SearchableSelect from "../../components/SearchableSelect";
 type ItemType = {
   kode: string;
@@ -32,6 +33,17 @@ export const HspView = () => {
   const [selectedFileName, setSelectedFileName] = useState<string>("");
 
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const { data: units, isLoading: isLoadingUnits } = useGetUnits("");
+  const unitOptions = useMemo(
+    () =>
+      (units ?? []).map((u: any) => ({
+        label: u.code,
+        value: u.code,
+      })),
+    [units]
+  );
+  const [createUnit, setCreateUnit] = useState<string>("");
+  const [editUnit, setEditUnit] = useState<string>("");
 
   const navigate = useNavigate();
   const notify = useNotify();
@@ -82,7 +94,9 @@ export const HspView = () => {
     if (!raw) return {};
     return (raw as any).data ?? (raw as HspDataMap);
   }, [allHsp]);
-
+  useEffect(() => {
+    setEditUnit(openEdit?.satuan || "");
+  }, [openEdit]);
   // Filter pencarian
   const filteredData: HspDataMap = useMemo(() => {
     if (!hspData || Object.keys(hspData).length === 0) return {};
@@ -603,9 +617,24 @@ export const HspView = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Satuan</label>
-                <input
-                  id="create-satuan"
-                  className="input input-bordered w-full text-black bg-white border-black"
+                <SearchableSelect
+                  options={unitOptions}
+                  value={createUnit}
+                  onChange={(v) => setCreateUnit(v || "")}
+                  placeholder={isLoadingUnits ? "Memuat..." : "Pilih satuan"}
+                  size="sm"
+                  zIndex={2000}
+                  isButton={
+                    <>
+                      <button
+                        onClick={() => navigate("/units")}
+                        className="btn bg-green-500 btn-sm w-full"
+                        title="Tambah item manual"
+                      >
+                        <BiPlus className="mr-1 text-white" /> Units
+                      </button>
+                    </>
+                  }
                 />
               </div>
 
@@ -658,9 +687,7 @@ export const HspView = () => {
                   const deskripsi = (
                     document.getElementById("create-desc") as HTMLInputElement
                   )?.value.trim();
-                  const satuan = (
-                    document.getElementById("create-satuan") as HTMLInputElement
-                  )?.value.trim();
+                  const satuan = (createUnit || "").trim();
                   const source = (
                     document.getElementById(
                       "create-source"
@@ -741,10 +768,24 @@ export const HspView = () => {
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">Satuan</label>
-                <input
-                  id="edit-satuan"
-                  defaultValue={openEdit.satuan}
-                  className="input input-bordered w-full text-black bg-white border-black"
+                <SearchableSelect
+                  options={unitOptions}
+                  value={editUnit}
+                  onChange={(v) => setEditUnit(v || "")}
+                  placeholder={isLoadingUnits ? "Memuat..." : "Pilih satuan"}
+                  size="sm"
+                  zIndex={2000}
+                  isButton={
+                    <>
+                      <button
+                        onClick={() => navigate("/units")}
+                        className="btn bg-green-500 btn-sm w-full"
+                        title="Tambah item manual"
+                      >
+                        <BiPlus className="mr-1 text-white" /> Units
+                      </button>
+                    </>
+                  }
                 />
               </div>
               <div>
@@ -796,9 +837,7 @@ export const HspView = () => {
                   const deskripsi = (
                     document.getElementById("edit-desc") as HTMLInputElement
                   )?.value.trim();
-                  const satuan = (
-                    document.getElementById("edit-satuan") as HTMLInputElement
-                  )?.value.trim();
+                  const satuan = (editUnit || "").trim();
                   const source = (
                     document.getElementById("edit-source") as HTMLSelectElement
                   )?.value as "UUD" | "Sendiri";

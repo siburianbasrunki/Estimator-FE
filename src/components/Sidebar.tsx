@@ -17,6 +17,7 @@ import {
 import { FaTools } from "react-icons/fa";
 import { PiProjectorScreenChartDuotone } from "react-icons/pi";
 import { GiStakeHammer } from "react-icons/gi";
+import { SiMaterialdesignicons } from "react-icons/si";
 import { useProfile } from "../hooks/useProfile";
 
 type NavItem = {
@@ -78,6 +79,12 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             href: "/source",
             icon: MdSource,
             show: isAdmin,
+          },
+          {
+            name: "Manajement Units",
+            href: "/units",
+            icon: SiMaterialdesignicons,
+            // show: isAdmin,
           },
         ],
       },

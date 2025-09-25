@@ -34,7 +34,7 @@ import { CSS } from "@dnd-kit/utilities";
 import Input from "../../components/input";
 import Button from "../../components/Button";
 import ImageProyek from "../../assets/images/image 1.png";
-import { UnitList } from "../../stores/units";
+import { useGetUnits } from "../../hooks/useHookUnits";
 
 import VolModal from "./VolumeModal";
 import type { VolumeDetailRow, ExtraCol } from "./VolumeModal";
@@ -440,6 +440,8 @@ function SortableItemCard({
   onOpenVolumeModal,
   kodeOptions,
   onChangeKode,
+  unitOptions,
+  unitsLoading,
 }: {
   indexText: string; // label nomor kiri (a,b,c / 1,2,3)
   item: ItemRow;
@@ -450,6 +452,8 @@ function SortableItemCard({
   onOpenVolumeModal: (item: ItemRow) => void;
   kodeOptions: Option[];
   onChangeKode: (id: string, kodeBaru: string) => void;
+  unitOptions: Option[];
+  unitsLoading?: boolean;
 }) {
   const {
     attributes,
@@ -465,20 +469,11 @@ function SortableItemCard({
     transition,
   };
 
-  const unitOptions: Option[] = useMemo(
-    () =>
-      (UnitList ?? []).map((u: { label: string; value: string }) => ({
-        label: u.value,
-        value: u.value,
-      })),
-    []
-  );
-
   const volInputDisplay =
     item.volumeSource === "MANUAL"
       ? item.manualVolumeInput ?? ""
       : String(Number(item.volume || 0));
-
+  const navigate = useNavigate();
   return (
     <div
       ref={setNodeRef}
@@ -611,8 +606,20 @@ function SortableItemCard({
                   options={unitOptions}
                   value={item.satuan ?? ""}
                   onChange={(v) => onUpdateField(item.id, "satuan", v ?? "")}
-                  placeholder="Pilih Satuan"
+                  placeholder={unitsLoading ? "Memuat..." : "Pilih Satuan"}
+                  loading={!!unitsLoading}
                   size="sm"
+                  isButton={
+                    <>
+                      <button
+                        onClick={() => navigate("/units")}
+                        className="btn bg-green-500 btn-sm w-full"
+                        title="Tambah item manual"
+                      >
+                        <BiPlus className="mr-1 text-white" /> Units
+                      </button>
+                    </>
+                  }
                 />
               ) : (
                 <div className="text-sm text-gray-800 text-center">
@@ -1001,6 +1008,15 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   const [volInitialRows, setVolInitialRows] = useState<
     VolumeDetailRow[] | undefined
   >(undefined);
+  const { data: units, isLoading: isLoadingUnits } = useGetUnits("");
+  const UnitOptions: Option[] = useMemo(
+    () =>
+      (units ?? []).map((u) => ({
+        label: u.code,
+        value: u.code,
+      })),
+    [units]
+  );
 
   const { data: hspAll, isLoading: isLoadingHsp } =
     useGetAdminAllWithItemsFlat();
@@ -2042,6 +2058,8 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                                   onOpenVolumeModal={openVolumeModal}
                                   kodeOptions={KodeOptions}
                                   onChangeKode={changeItemKode}
+                                  unitOptions={UnitOptions}
+                                  unitsLoading={isLoadingUnits}
                                 />
                               ))}
                             </div>
@@ -2092,6 +2110,8 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                               onOpenVolumeModal={openVolumeModal}
                               kodeOptions={KodeOptions}
                               onChangeKode={changeItemKode}
+                              unitOptions={UnitOptions}
+                              unitsLoading={isLoadingUnits}
                             />
                           ))}
                         </div>
