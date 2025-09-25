@@ -1,5 +1,4 @@
-import { BiChevronLeft, BiChevronRight, BiEdit, BiTrash } from "react-icons/bi";
-import { IoDocument } from "react-icons/io5";
+import { BiChevronLeft, BiChevronRight } from "react-icons/bi";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useState } from "react";
 import { useEstimations, useDeleteEstimation } from "../../hooks/useEstimation";
@@ -8,6 +7,7 @@ import EmptyState from "../../components/EmptyState";
 import { useConfirm } from "../../components/ConfirmDialog";
 import useDebounce from "../../hooks/useDebunce";
 import Skeleton from "../../components/Skeleton";
+import { RowActions } from "../../components/RowAction";
 
 export const EstimationView = () => {
   const navigate = useNavigate();
@@ -247,7 +247,10 @@ export const EstimationView = () => {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {rowNumber}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer" onClick={() => navigate(`/estimation/${item.id}`)}>
+                        <td
+                          className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 cursor-pointer"
+                          onClick={() => navigate(`/estimation/${item.id}`)}
+                        >
                           {item.projectName || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
@@ -272,31 +275,18 @@ export const EstimationView = () => {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <div className="flex gap-3 justify-end">
-                            <IoDocument
-                              className="text-blue-600 h-5 w-5 cursor-pointer"
-                              title="Detail"
-                              onClick={() => navigate(`/estimation/${item.id}`)}
-                            />
-                            <BiEdit
-                              className="text-green-600 h-5 w-5 cursor-pointer"
-                              title="Edit"
-                              onClick={() =>
-                                navigate(`/estimation/update/${item.id}`, {
-                                  state: { openStep: "step2" },
-                                })
-                              }
-                            />
-                            <BiTrash
-                              className={`h-5 w-5 cursor-pointer ${
-                                isPending ? "text-red-300" : "text-red-600"
-                              }`}
-                              title="Delete"
-                              onClick={() =>
-                                onDelete(item.id, item.projectName)
-                              }
-                            />
-                          </div>
+                          <RowActions
+                            id={item.id}
+                            name={item.projectName}
+                            isDeleting={isPending}
+                            onDetail={() => navigate(`/estimation/${item.id}`)}
+                            onEdit={() =>
+                              navigate(`/estimation/update/${item.id}`, {
+                                state: { openStep: "step2" },
+                              })
+                            }
+                            onDelete={() => onDelete(item.id, item.projectName)}
+                          />
                         </td>
                       </tr>
                     );

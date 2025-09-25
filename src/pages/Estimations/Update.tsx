@@ -15,12 +15,13 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
   useDroppable,
   defaultDropAnimation,
   DragOverlay,
   type DragEndEvent,
   type DragOverEvent,
+  pointerWithin,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -28,7 +29,6 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { BsThreeDotsVertical } from "react-icons/bs";
 
 /* App components & hooks */
 import Input from "../../components/input";
@@ -69,12 +69,53 @@ const sanitizeMoneyInput = (v: string) =>
 const toNumber = (v?: string) =>
   v == null || v.trim() === "" ? 0 : Number(v) || 0;
 
-/** NEW: volume efektif mengikuti mode - MANUAL > DETAIL */
+/** Volume efektif mengikuti mode - MANUAL > DETAIL */
 type VolumeSource = "MANUAL" | "DETAIL";
 const getEffectiveVolume = (i: ItemRow) =>
   (i.volumeSource === "MANUAL"
     ? Math.max(0, toNumber(i.manualVolumeInput || "0"))
     : Math.max(0, Number(i.volume || 0))) || 0;
+
+/** Numbering helpers */
+const toRoman = (num: number): string => {
+  if (num <= 0) return "";
+  const romans: [number, string][] = [
+    [1000, "M"],
+    [900, "CM"],
+    [500, "D"],
+    [400, "CD"],
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let n = num;
+  let out = "";
+  for (const [val, sym] of romans) {
+    while (n >= val) {
+      out += sym;
+      n -= val;
+    }
+  }
+  return out;
+};
+
+/** 0 -> 'a', 1 -> 'b', ..., 25 -> 'z', 26 -> 'aa', dst */
+const alphaLabel = (index0: number): string => {
+  let n = index0 + 1; // convert to 1-based
+  let s = "";
+  while (n > 0) {
+    n--; // 0..25
+    s = String.fromCharCode(97 + (n % 26)) + s;
+    n = Math.floor(n / 26);
+  }
+  return s;
+};
 
 /* ------------------------------ Types ------------------------------ */
 interface CustomFieldUI {
@@ -90,6 +131,7 @@ interface ProjectProfile {
   notes: string;
   customFields: Record<string, string>;
 }
+
 type ItemRow = {
   id: string;
   kode: string;
@@ -107,10 +149,20 @@ type ItemRow = {
   hargaTotal: number;
   isEditing?: boolean;
 };
+
+type Group = {
+  id: string;
+  title: string; // contoh: "Cor Beton Sloof 20x25 cm"
+  items: ItemRow[]; // contoh: Pembesian, Bekisting, Beton
+  isEditingTitle?: boolean;
+};
+
 type Section = {
   id: string;
-  title: string;
-  items: ItemRow[];
+  title: string; // contoh: "IV PEKERJAAN BETON"
+  // Bisa kosong (pakai format item lama) atau berisi banyak groups
+  groups?: Group[];
+  items?: ItemRow[]; // fallback format lama
   isEditingTitle?: boolean;
 };
 
@@ -348,35 +400,38 @@ const UpdateStepOne = ({
   );
 };
 
-/* ---------------------- Table utilities / rows ---------------------- */
-function DroppableRow({
+/* ---------------------- Droppable zone (div, non-table) ---------------------- */
+function DroppableZone({
   droppableId,
-  colSpan,
   showHint = false,
+  className = "",
 }: {
   droppableId: string;
-  colSpan: number;
   showHint?: boolean;
+  className?: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: droppableId });
   return (
-    <tr ref={setNodeRef}>
-      <td colSpan={colSpan}>
-        <div
-          className={`h-8 transition-all rounded ${
-            isOver ? "border-2 border-dashed border-primary/70" : "border-0"
-          } ${showHint ? "text-xs text-gray-400 italic py-1" : ""}`}
-        >
-          {isOver ? "Lepas di sini" : showHint ? "Drop di sini" : null}
+    <div
+      ref={setNodeRef}
+      className={`h-9 rounded transition-all ${
+        isOver
+          ? "border-2 border-dashed border-primary/70 bg-primary/5"
+          : "border border-dashed border-transparent"
+      } ${className}`}
+    >
+      {showHint && !isOver ? (
+        <div className="text-[11px] text-gray-400 italic px-2 py-1">
+          Drop di sini
         </div>
-      </td>
-    </tr>
+      ) : null}
+    </div>
   );
 }
 
-/** ITEM ROW — id dnd "item-<id>" (dengan mode volume: MANUAL/DETAIL) */
-function SortableItemRow({
-  idxInSection,
+/* --------------------------- Item Card (job) --------------------------- */
+function SortableItemCard({
+  indexText,
   item,
   onEditToggle,
   onDelete,
@@ -386,7 +441,7 @@ function SortableItemRow({
   kodeOptions,
   onChangeKode,
 }: {
-  idxInSection: number;
+  indexText: string; // label nomor kiri (a,b,c / 1,2,3)
   item: ItemRow;
   onEditToggle: (id: string, editing: boolean) => void;
   onDelete: (id: string) => void;
@@ -425,202 +480,200 @@ function SortableItemRow({
       : String(Number(item.volume || 0));
 
   return (
-    <tr
+    <div
       ref={setNodeRef}
       style={style}
-      className={`align-top ${isDragging ? "bg-blue-50" : ""}`}
+      className={`rounded-lg border p-3 sm:p-4 bg-white ${
+        isDragging ? "ring-2 ring-primary/50 bg-blue-50/40" : "border-gray-200"
+      }`}
     >
-      <td className="px-4 py-3 text-sm text-gray-500">{idxInSection + 1}</td>
-      {/* Uraian */}
-      <td className="px-4 py-3 text-sm text-gray-800 min-w-[280px]">
-        {item.isEditing ? (
-          <input
-            className="input input-bordered input-sm w-full text-black bg-white border-black"
-            value={item.deskripsi}
-            onChange={(e) =>
-              onUpdateField(item.id, "deskripsi", e.target.value)
-            }
-            placeholder="Nama / deskripsi pekerjaan"
-          />
-        ) : (
-          <span className="break-words">{item.deskripsi || "-"}</span>
-        )}
-      </td>
-      {/* Kode */}
-      <td className="px-4 py-3 text-sm text-gray-800 w-40">
-        {item.isEditing ? (
-          <SearchableSelect
-            options={kodeOptions}
-            value={item.kode ?? ""}
-            onChange={(v) => v && onChangeKode(item.id, v)}
-            placeholder="Pilih Kode"
-            size="sm"
-          />
-        ) : (
-          <span className="font-mono">{item.kode || "-"}</span>
-        )}
-      </td>
-      {/* Volume: input manual + tombol Detail (modal) */}
-      <td className="px-4 py-3 text-sm text-gray-800">
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            step="any"
-            className="input input-bordered input-sm w-28 text-right text-black bg-white border-black"
-            value={volInputDisplay}
-            onChange={(e) => {
-              // switch ke MANUAL & update nilai
-              onUpdateField(item.id, "volumeSource", "MANUAL");
-              onUpdateField(item.id, "manualVolumeInput", e.target.value);
-            }}
-            placeholder="0.00"
-          />
-          <button
-            className="btn btn-ghost btn-xs text-blue-600 bg-white"
-            title="Detail Volume"
-            onClick={() => onOpenVolumeModal(item)}
-          >
-            <BiCalculator className="mr-1" /> Detail
-          </button>
-        </div>
-      </td>
-      {/* Satuan (Searchable) */}
-      <td className="px-4 py-3 text-sm text-gray-800 w-36">
-        {item.isEditing ? (
-          <SearchableSelect
-            options={unitOptions}
-            value={item.satuan ?? ""}
-            onChange={(v) => onUpdateField(item.id, "satuan", v ?? "")}
-            placeholder="Pilih Satuan"
-            size="sm"
-          />
-        ) : (
-          item.satuan || "-"
-        )}
-      </td>
-      {/* Harga Satuan */}
-      <td className="px-4 py-3 text-sm text-gray-800">
-        {item.isEditing ? (
-          <input
-            type="text"
-            inputMode="decimal"
-            className="input input-bordered input-sm w-36 text-black bg-white border-black"
-            value={item.hargaSatuanInput ?? ""}
-            onChange={(e) =>
-              onUpdateField(item.id, "hargaSatuanInput", e.target.value)
-            }
-            onBlur={() => onEditToggle(item.id, false)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape")
-                onEditToggle(item.id, false);
-            }}
-            placeholder="0"
-          />
-        ) : (
-          formatIDR(item.hargaSatuan)
-        )}
-      </td>
-      {/* Harga Total */}
-      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-        {formatIDR(item.hargaTotal)}
-      </td>
-      {/* Aksi + drag handle */}
-      {/* Aksi + drag handle */}
-      <td className="px-4 py-3 text-sm">
-        <div className="flex items-center gap-2">
-          {/* Drag handle */}
+      <div className="flex items-start gap-3">
+        {/* No / drag handle */}
+        <button
+          className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-gray-600 text-xl"
+          title="Drag"
+          aria-label="Drag untuk memindahkan"
+          {...attributes}
+          {...listeners}
+        >
+          ≡
+        </button>
+        <div className="text-xs text-gray-500 min-w-6 pt-1">{indexText}</div>
 
-          {/* Menu kebab */}
-          <div className="dropdown dropdown-end">
-            <button
-              tabIndex={0}
-              className="btn btn-ghost btn-xs bg-white"
-              aria-label="Aksi lainnya"
-              title="Aksi lainnya"
-            >
-              <BsThreeDotsVertical className="text-lg text-black" />
-            </button>
-
-            <ul
-              tabIndex={0}
-              className="dropdown-content z-[1] menu p-2 shadow bg-white text-black rounded-box w-44"
-            >
-              {!item.isEditing ? (
-                <li>
-                  <button
-                    onClick={() => onEditToggle(item.id, true)}
-                    className="justify-start"
-                    title="Edit baris"
-                  >
-                    <BiEdit className="text-blue-600" />
-                    <span>Edit</span>
-                  </button>
-                </li>
+        {/* Content */}
+        <div className="flex-1 space-y-2">
+          {/* Uraian & aksi */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div className="flex-1">
+              {item.isEditing ? (
+                <input
+                  className="input input-bordered input-sm w-full text-black bg-white border-black"
+                  value={item.deskripsi}
+                  onChange={(e) =>
+                    onUpdateField(item.id, "deskripsi", e.target.value)
+                  }
+                  placeholder="Nama / deskripsi pekerjaan"
+                />
               ) : (
-                <li>
-                  <button
-                    onClick={() => onEditToggle(item.id, false)}
-                    className="justify-start"
-                    title="Simpan baris"
-                  >
-                    <BiSave className="text-green-600" />
-                    <span>Simpan</span>
-                  </button>
-                </li>
+                <div className="font-medium text-gray-800 break-words">
+                  {item.deskripsi || "-"}
+                </div>
+              )}
+            </div>
+
+            {/* Aksi */}
+            <div className="flex items-center gap-2">
+              {!item.isEditing ? (
+                <button
+                  onClick={() => onEditToggle(item.id, true)}
+                  className="btn btn-ghost btn-xs text-blue-600"
+                  title="Edit"
+                >
+                  <BiEdit className="text-lg" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => onEditToggle(item.id, false)}
+                  className="btn btn-ghost btn-xs text-green-600"
+                  title="Simpan"
+                >
+                  <BiSave className="text-lg" />
+                </button>
               )}
 
-              <li>
-                <button
-                  onClick={() => onCopy(item.id)}
-                  className="justify-start"
-                  title="Salin item"
-                >
-                  <BiCopy className="text-indigo-600" />
-                  <span>Salin</span>
-                </button>
-              </li>
-
-              <li>
-                <button
-                  onClick={() => onDelete(item.id)}
-                  className="justify-start"
-                  title="Hapus baris"
-                >
-                  <BiTrash className="text-red-600" />
-                  <span>Hapus</span>
-                </button>
-              </li>
-            </ul>
+              <button
+                onClick={() => onCopy(item.id)}
+                className="btn btn-ghost btn-xs text-indigo-600"
+                title="Salin"
+              >
+                <BiCopy className="text-lg" />
+              </button>
+              <button
+                onClick={() => onDelete(item.id)}
+                className="btn btn-ghost btn-xs text-red-600"
+                title="Hapus"
+              >
+                <BiTrash className="text-lg" />
+              </button>
+            </div>
           </div>
-          <button
-            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-gray-600 text-xl bg-white"
-            title="Drag"
-            aria-label="Drag untuk memindahkan"
-            {...attributes}
-            {...listeners}
-          >
-            ≡
-          </button>
+
+          {/* Grid field: Kode, Vol + Detail, Satuan, Harga Satuan, Total */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Kode</div>
+              {item.isEditing ? (
+                <SearchableSelect
+                  options={kodeOptions}
+                  value={item.kode ?? ""}
+                  onChange={(v) => v && onChangeKode(item.id, v)}
+                  placeholder="Pilih Kode"
+                  size="sm"
+                />
+              ) : (
+                <div className="font-mono text-sm text-gray-800">
+                  {item.kode || "-"}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Volume</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  className="input input-bordered input-sm w-28 text-right text-black bg-white border-black"
+                  value={volInputDisplay}
+                  onChange={(e) => {
+                    onUpdateField(item.id, "volumeSource", "MANUAL");
+                    onUpdateField(item.id, "manualVolumeInput", e.target.value);
+                  }}
+                  placeholder="0.00"
+                />
+                <button
+                  className="btn btn-ghost btn-xs text-blue-600"
+                  title="Detail Volume"
+                  onClick={() => onOpenVolumeModal(item)}
+                >
+                  <BiCalculator className="mr-1" /> Detail
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] text-center text-gray-500 mb-1">
+                Satuan
+              </div>
+              {item.isEditing ? (
+                <SearchableSelect
+                  options={unitOptions}
+                  value={item.satuan ?? ""}
+                  onChange={(v) => onUpdateField(item.id, "satuan", v ?? "")}
+                  placeholder="Pilih Satuan"
+                  size="sm"
+                />
+              ) : (
+                <div className="text-sm text-gray-800 text-center">
+                  {item.satuan || "-"}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Harga Satuan</div>
+              {item.isEditing ? (
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input input-bordered input-sm w-full text-black bg-white border-black"
+                  value={item.hargaSatuanInput ?? ""}
+                  onChange={(e) =>
+                    onUpdateField(item.id, "hargaSatuanInput", e.target.value)
+                  }
+                  onBlur={() => onEditToggle(item.id, false)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Escape")
+                      onEditToggle(item.id, false);
+                  }}
+                  placeholder="0"
+                />
+              ) : (
+                <div className="text-sm font-medium text-gray-800">
+                  {formatIDR(item.hargaSatuan)}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Harga Total</div>
+              <div className="text-sm font-semibold text-gray-800">
+                {formatIDR(item.hargaTotal)}
+              </div>
+            </div>
+          </div>
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
-/** SECTION HEADER — draggable & editable (id dnd: "sec-<id>") */
-function SortableSectionHeader({
-  section,
+/* ---------------------- Group Header (Title) - Card ---------------------- */
+function SortableGroupHeaderCard({
+  sectionId,
+  group,
   index,
   isLoadingItems,
   PekerjaanOptions,
   DropdownPekerjaan,
-  addItemToSection,
-  deleteSection,
-  onToggleEditTitle,
-  onChangeTitle,
+  addItemToGroup,
+  deleteGroup,
+  onToggleEditGroupTitle,
+  onChangeGroupTitle,
 }: {
-  section: Section;
+  sectionId: string;
+  group: Group;
   index: number;
   isLoadingItems: boolean;
   PekerjaanOptions: Option[];
@@ -636,10 +689,167 @@ function SortableSectionHeader({
       categoryName?: string;
     };
   }[];
-  addItemToSection: (sectionId: string, source?: any) => void;
+  addItemToGroup: (sectionId: string, groupId: string, source?: any) => void;
+  deleteGroup: (sectionId: string, groupId: string) => void;
+  onToggleEditGroupTitle: (
+    sectionId: string,
+    groupId: string,
+    editing: boolean
+  ) => void;
+  onChangeGroupTitle: (
+    sectionId: string,
+    groupId: string,
+    title: string
+  ) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `grp-${group.id}` });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-lg px-3 py-2 bg-slate-50 border ${
+        isDragging ? "opacity-80 border-slate-300" : "border-slate-200"
+      }`}
+    >
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <button
+            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-black text-xl"
+            title="Urutkan Title"
+            aria-label="Drag Title"
+            {...attributes}
+            {...listeners}
+          >
+            ≡
+          </button>
+          <div className="text-sm text-slate-600">{index + 1}</div>
+          <div className="font-semibold text-slate-800">
+            {group.isEditingTitle ? (
+              <input
+                autoFocus
+                className="input input-bordered input-sm text-black bg-white border-black"
+                value={group.title}
+                onChange={(e) =>
+                  onChangeGroupTitle(sectionId, group.id, e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape") {
+                    onToggleEditGroupTitle(sectionId, group.id, false);
+                  }
+                }}
+                onBlur={() =>
+                  onToggleEditGroupTitle(sectionId, group.id, false)
+                }
+                placeholder="Judul (mis. Cor Beton Sloof 20x25 cm)"
+              />
+            ) : (
+              group.title || "Title"
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="w-72">
+            <SearchableSelect
+              options={PekerjaanOptions}
+              value={""}
+              onChange={(v) => {
+                if (!v) return;
+                const sel = DropdownPekerjaan.find((it) => it.value === v);
+                if (sel) addItemToGroup(sectionId, group.id, sel);
+              }}
+              placeholder={isLoadingItems ? "Memuat..." : "Tambah item HSP"}
+              loading={isLoadingItems}
+              size="sm"
+              clearable={false}
+            />
+          </div>
+          <button
+            onClick={() => addItemToGroup(sectionId, group.id)}
+            className="btn btn-solid btn-sm"
+            title="Tambah item manual"
+          >
+            <BiPlus className="mr-1" /> Item
+          </button>
+
+          {!group.isEditingTitle ? (
+            <button
+              onClick={() => onToggleEditGroupTitle(sectionId, group.id, true)}
+              className="btn btn-ghost btn-xs text-blue-600"
+              title="Edit Title"
+            >
+              <BiEdit className="text-lg" />
+            </button>
+          ) : (
+            <button
+              onClick={() => onToggleEditGroupTitle(sectionId, group.id, false)}
+              className="btn btn-ghost btn-xs text-green-600"
+              title="Simpan Title"
+            >
+              <BiSave className="text-lg" />
+            </button>
+          )}
+
+          <button
+            onClick={() => deleteGroup(sectionId, group.id)}
+            className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
+            title="Hapus Title"
+          >
+            <BiTrash className="text-lg" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ----------------------- Section Header (Kategori) - Card ----------------------- */
+function SortableSectionHeaderCard({
+  section,
+  index,
+  addGroup,
+  deleteSection,
+  onToggleEditTitle,
+  onChangeTitle,
+  isLoadingItems,
+  PekerjaanOptions,
+  DropdownPekerjaan,
+  addItemToSection,
+}: {
+  section: Section;
+  index: number;
+  addGroup: (sectionId: string) => void;
   deleteSection: (sectionId: string) => void;
   onToggleEditTitle: (id: string, editing: boolean) => void;
   onChangeTitle: (id: string, title: string) => void;
+  isLoadingItems: boolean;
+  PekerjaanOptions: Option[];
+  DropdownPekerjaan: {
+    kode: string;
+    label: string;
+    value: string;
+    detail: {
+      deskripsi: string;
+      satuan: string;
+      harga: number;
+      categoryId?: string;
+      categoryName?: string;
+    };
+  }[];
+  addItemToSection: (sectionId: string, source?: any) => void;
 }) {
   const {
     attributes,
@@ -654,17 +864,19 @@ function SortableSectionHeader({
     transform: CSS.Transform.toString(transform),
     transition,
   };
-  const navigate = useNavigate();
+
   return (
-    <tr
+    <div
       ref={setNodeRef}
       style={style}
-      className={`bg-blue-50/70 ${isDragging ? "opacity-80" : ""}`}
+      className={`rounded-xl border p-4 sm:p-5 bg-blue-50/50 ${
+        isDragging ? "opacity-80 border-blue-300" : "border-blue-200"
+      }`}
     >
-      <td className="px-4 py-3 text-sm font-semibold text-blue-700">
-        <div className="flex items-end gap-2">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+        <div className="flex items-center gap-3">
           <button
-            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
+            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-1 text-2xl text-black"
             title="Drag kategori"
             aria-label="Drag kategori"
             {...attributes}
@@ -672,71 +884,67 @@ function SortableSectionHeader({
           >
             ≡
           </button>
-          {String.fromCharCode(65 + index)}
-        </div>
-      </td>
-
-      <td className="px-4 py-3 text-sm font-bold text-blue-800">
-        {section.isEditingTitle ? (
-          <input
-            autoFocus
-            className="input input-bordered input-sm w-full text-black bg-white border-black"
-            value={section.title}
-            onChange={(e) => onChangeTitle(section.id, e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") {
-                onToggleEditTitle(section.id, false);
-              }
-            }}
-            onBlur={() => onToggleEditTitle(section.id, false)}
-            placeholder="Judul kategori"
-          />
-        ) : (
-          <span>{section.title}</span>
-        )}
-      </td>
-
-      <td colSpan={5}></td>
-
-      <td className="">
-        <div className="flex gap-2 items-center">
-          {/* Tambah dari HSP (Searchable) */}
-          <div className="w-72">
-            <SearchableSelect
-              options={PekerjaanOptions}
-              value={""}
-              onChange={(v) => {
-                if (!v) return;
-                const sel = DropdownPekerjaan.find((it) => it.value === v);
-                if (sel) addItemToSection(section.id, sel);
-              }}
-              placeholder={isLoadingItems ? "Memuat..." : "Tambah dari HSP"}
-              loading={isLoadingItems}
-              size="sm"
-              clearable={false}
-              isButton={
-                <>
-                  <button
-                    className="w-full px-3 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-500"
-                    onClick={() => navigate("/hsp")}
-                  >
-                    Kelola HSP
-                  </button>
-                </>
-              }
-            />
+          <div className="text-blue-700 font-semibold">
+            {toRoman(index + 1)}
           </div>
 
-          {/* Tambah manual */}
+          <div className="text-blue-800 font-bold">
+            {section.isEditingTitle ? (
+              <input
+                autoFocus
+                className="input input-bordered input-sm text-black bg-white border-black"
+                value={section.title}
+                onChange={(e) => onChangeTitle(section.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape")
+                    onToggleEditTitle(section.id, false);
+                }}
+                onBlur={() => onToggleEditTitle(section.id, false)}
+                placeholder="Judul kategori (mis. IV PEKERJAAN BETON)"
+              />
+            ) : (
+              section.title
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => addItemToSection(section.id)}
-            className="btn btn-solid btn-sm"
-            title="Tambah Manual"
+            onClick={() => addGroup(section.id)}
+            className="btn btn-success btn-xs text-white"
+            title="Tambah Title"
           >
-            <BiPlus className="mr-1" /> Manual
+            <BiPlus className="mr-1" /> Title
           </button>
 
-          {/* Edit / Simpan judul kategori */}
+          {/* Saat tidak ada group -> izinkan tambah item langsung */}
+          {!(section.groups && section.groups.length) && (
+            <>
+              <div className="w-72">
+                <SearchableSelect
+                  options={PekerjaanOptions}
+                  value={""}
+                  onChange={(v) => {
+                    if (!v) return;
+                    const sel = DropdownPekerjaan.find((it) => it.value === v);
+                    if (sel) addItemToSection(section.id, sel);
+                  }}
+                  placeholder={isLoadingItems ? "Memuat..." : "Tambah item HSP"}
+                  loading={isLoadingItems}
+                  size="sm"
+                  clearable={false}
+                />
+              </div>
+              <button
+                onClick={() => addItemToSection(section.id)}
+                className="btn btn-solid btn-xs"
+                title="Tambah item manual"
+              >
+                <BiPlus className="mr-1" /> Item
+              </button>
+            </>
+          )}
+
           {!section.isEditingTitle ? (
             <button
               onClick={() => onToggleEditTitle(section.id, true)}
@@ -755,7 +963,6 @@ function SortableSectionHeader({
             </button>
           )}
 
-          {/* Hapus kategori */}
           <button
             onClick={() => deleteSection(section.id)}
             className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
@@ -764,8 +971,8 @@ function SortableSectionHeader({
             <BiTrash className="text-lg" />
           </button>
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
@@ -786,8 +993,6 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   const [isManualSection, setIsManualSection] = useState(false);
   const [selectedSectionFromList, setSelectedSectionFromList] = useState("");
   const [manualSectionTitle, setManualSectionTitle] = useState("");
-
-  // Volume modal state
   const [volModalOpen, setVolModalOpen] = useState(false);
   const [volTargetItemId, setVolTargetItemId] = useState<string | null>(null);
   const [volTargetItemLabel, setVolTargetItemLabel] = useState<
@@ -820,11 +1025,24 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) => {
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== id) return i;
+            const next: ItemRow = { ...i, kode: kodeBaru };
+            next.hargaSatuan = hargaBaru;
+            next.hargaSatuanInput = undefined;
+            const volEff = getEffectiveVolume(next);
+            next.hargaTotal = volEff * hargaBaru;
+            return next;
+          }),
+        })),
+        // fallback lama
+        items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
           const next: ItemRow = { ...i, kode: kodeBaru };
           next.hargaSatuan = hargaBaru;
-          next.hargaSatuanInput = undefined; // sinkron ke angka final
+          next.hargaSatuanInput = undefined;
           const volEff = getEffectiveVolume(next);
           next.hargaTotal = volEff * hargaBaru;
           return next;
@@ -832,6 +1050,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
       }))
     );
   };
+
   const CategoryOptions: Option[] = useMemo(
     () =>
       (categories ?? [])
@@ -888,18 +1107,42 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     [DropdownPekerjaan]
   );
 
+  /* Seed state awal dari props (dukung format lama & groups) */
   useEffect(() => {
     setSections(
-      (initialSections || []).map((s) => ({
-        ...s,
-        isEditingTitle: false,
-        items: (s.items || []).map((d) => ({
-          ...d,
-          // default: pakai DETAIL; manual kosong
-          volumeSource: "DETAIL",
-          manualVolumeInput: "",
-        })),
-      }))
+      (initialSections || []).map((s) => {
+        const hasGroups = Array.isArray(s.groups) && s.groups.length > 0;
+
+        const seededGroups: Group[] | undefined = hasGroups
+          ? (s.groups as Group[]).map((g) => ({
+              id: g.id || uid(),
+              title: g.title || "",
+              isEditingTitle: false,
+              items: (g.items || []).map((d) => ({
+                ...d,
+                volumeSource: "DETAIL",
+                manualVolumeInput: "",
+              })),
+            }))
+          : undefined;
+
+        const seededItems: ItemRow[] | undefined =
+          !hasGroups && Array.isArray(s.items)
+            ? (s.items as ItemRow[]).map((d) => ({
+                ...d,
+                volumeSource: "DETAIL",
+                manualVolumeInput: "",
+              }))
+            : undefined;
+
+        return {
+          id: s.id,
+          title: s.title,
+          isEditingTitle: false,
+          groups: seededGroups, // undefined jika memang tidak ada Title
+          items: seededItems, // terisi untuk kategori tanpa Title
+        };
+      })
     );
   }, [initialSections]);
 
@@ -911,7 +1154,13 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     if (!title) return;
     setSections((prev) => [
       ...prev,
-      { id: uid(), title, items: [], isEditingTitle: false },
+      {
+        id: uid(),
+        title,
+        isEditingTitle: false,
+        groups: [], // default pakai groups
+        items: undefined,
+      },
     ]);
     setIsAddingSection(false);
     setIsManualSection(false);
@@ -922,10 +1171,113 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   const deleteSection = (sectionId: string) =>
     setSections((prev) => prev.filter((s) => s.id !== sectionId));
 
+  /* Groups */
+  const addGroup = (sectionId: string) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const groups = s.groups ?? [];
+        return {
+          ...s,
+          groups: [
+            ...groups,
+            { id: uid(), title: "Title Baru", items: [], isEditingTitle: true },
+          ],
+          items: undefined, // beralih ke mode groups
+        };
+      })
+    );
+  };
+
+  const deleteGroup = (sectionId: string, groupId: string) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? { ...s, groups: (s.groups || []).filter((g) => g.id !== groupId) }
+          : s
+      )
+    );
+  };
+
+  const onToggleEditGroupTitle = (
+    sectionId: string,
+    groupId: string,
+    editing: boolean
+  ) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              groups: (s.groups || []).map((g) =>
+                g.id === groupId ? { ...g, isEditingTitle: editing } : g
+              ),
+            }
+          : s
+      )
+    );
+  };
+
+  const onChangeGroupTitle = (
+    sectionId: string,
+    groupId: string,
+    title: string
+  ) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              groups: (s.groups || []).map((g) =>
+                g.id === groupId ? { ...g, title } : g
+              ),
+            }
+          : s
+      )
+    );
+  };
+
+  /* Items pada Group */
+  const addItemToGroup = (
+    sectionId: string,
+    groupId: string,
+    source?: PekerjaanDropdown
+  ) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const groups = (s.groups || []).map((g) => {
+          if (g.id !== groupId) return g;
+          const base: ItemRow = {
+            id: uid(),
+            kode: source?.kode || "",
+            deskripsi: source?.detail.deskripsi || "",
+            volume: 0,
+            volumeDetails: [],
+            volumeSource: "DETAIL",
+            manualVolumeInput: "",
+            satuan: source?.detail.satuan || "",
+            hargaSatuan: source?.detail.harga ?? 0,
+            hargaSatuanInput:
+              source?.detail.harga && source.detail.harga > 0
+                ? String(source.detail.harga)
+                : "",
+            hargaTotal: 0,
+            isEditing: true,
+          };
+          return { ...g, items: [...g.items, base] };
+        });
+        return { ...s, groups, items: undefined };
+      })
+    );
+  };
+
+  // Items langsung pada Section (tanpa Title)
   const addItemToSection = (sectionId: string, source?: PekerjaanDropdown) => {
     setSections((prev) =>
       prev.map((s) => {
         if (s.id !== sectionId) return s;
+        const items = s.items ? [...s.items] : [];
         const base: ItemRow = {
           id: uid(),
           kode: source?.kode || "",
@@ -943,14 +1295,26 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           hargaTotal: 0,
           isEditing: true,
         };
-        return { ...s, items: [...s.items, base] };
+        items.push(base);
+        return {
+          ...s,
+          groups: s.groups && s.groups.length > 0 ? s.groups : [],
+          items,
+        };
       })
     );
   };
 
   const deleteItem = (itemId: string) => {
     setSections((prev) =>
-      prev.map((s) => ({ ...s, items: s.items.filter((i) => i.id !== itemId) }))
+      prev.map((s) => ({
+        ...s,
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.filter((i) => i.id !== itemId),
+        })),
+        items: (s.items || []).filter((i) => i.id !== itemId), // fallback lama
+      }))
     );
   };
 
@@ -958,9 +1322,31 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) => {
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== id) return i;
+            if (editing) {
+              const hsInput =
+                i.hargaSatuan > 0
+                  ? String(i.hargaSatuan)
+                  : i.hargaSatuanInput ?? "";
+              return { ...i, isEditing: true, hargaSatuanInput: hsInput };
+            } else {
+              const hs = toNumber(i.hargaSatuanInput);
+              const volEff = getEffectiveVolume(i);
+              return {
+                ...i,
+                isEditing: false,
+                hargaSatuan: hs,
+                hargaSatuanInput: undefined,
+                hargaTotal: volEff * hs,
+              };
+            }
+          }),
+        })),
+        items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
-
           if (editing) {
             const hsInput =
               i.hargaSatuan > 0
@@ -987,10 +1373,33 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) => {
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== id) return i;
+
+            if (field === "hargaSatuanInput") {
+              const input = sanitizeMoneyInput(String(value));
+              const hs = toNumber(input);
+              const next = { ...i, hargaSatuanInput: input } as ItemRow;
+              next.hargaTotal = getEffectiveVolume(next) * hs;
+              return next;
+            }
+
+            const next: ItemRow = { ...i, [field]: value } as ItemRow;
+
+            const hs =
+              typeof next.hargaSatuanInput === "string"
+                ? toNumber(next.hargaSatuanInput)
+                : Number(next.hargaSatuan || 0);
+
+            next.hargaTotal = getEffectiveVolume(next) * hs;
+            return next;
+          }),
+        })),
+        items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
 
-          // khusus input harga satuan (string sanitasi)
           if (field === "hargaSatuanInput") {
             const input = sanitizeMoneyInput(String(value));
             const hs = toNumber(input);
@@ -999,14 +1408,11 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
             return next;
           }
 
-          // field lain (termasuk volumeSource & manualVolumeInput & volume & volumeDetails)
           const next: ItemRow = { ...i, [field]: value } as ItemRow;
-
           const hs =
             typeof next.hargaSatuanInput === "string"
               ? toNumber(next.hargaSatuanInput)
               : Number(next.hargaSatuan || 0);
-
           next.hargaTotal = getEffectiveVolume(next) * hs;
           return next;
         }),
@@ -1014,26 +1420,53 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     );
   };
 
-  /* -------------------------- Copy item -------------------------- */
   const copyItem = (itemId: string) => {
     setSections((prev) =>
       prev.map((s) => {
-        const idx = s.items.findIndex((i) => i.id === itemId);
-        if (idx === -1) return s;
-        const src = s.items[idx];
-        const clone: ItemRow = {
-          ...src,
-          id: uid(),
-          isEditing: true,
-          hargaSatuanInput: src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
-          volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
-          volumeSource: src.volumeSource ?? "DETAIL",
-          manualVolumeInput: src.manualVolumeInput ?? "",
-          hargaTotal: getEffectiveVolume(src) * (Number(src.hargaSatuan) || 0),
-        } as ItemRow;
-        const items = [...s.items];
-        items.splice(idx + 1, 0, clone);
-        return { ...s, items };
+        const next = { ...s };
+        if (next.groups?.length) {
+          next.groups = next.groups.map((g) => {
+            const idx = g.items.findIndex((i) => i.id === itemId);
+            if (idx === -1) return g;
+            const src = g.items[idx];
+            const clone: ItemRow = {
+              ...src,
+              id: uid(),
+              isEditing: true,
+              hargaSatuanInput:
+                src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
+              volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
+              volumeSource: src.volumeSource ?? "DETAIL",
+              manualVolumeInput: src.manualVolumeInput ?? "",
+              hargaTotal:
+                getEffectiveVolume(src) * (Number(src.hargaSatuan) || 0),
+            };
+            const items = [...g.items];
+            items.splice(idx + 1, 0, clone);
+            return { ...g, items };
+          });
+        } else if (next.items?.length) {
+          const idx = next.items.findIndex((i) => i.id === itemId);
+          if (idx !== -1) {
+            const src = next.items[idx];
+            const clone: ItemRow = {
+              ...src,
+              id: uid(),
+              isEditing: true,
+              hargaSatuanInput:
+                src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
+              volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
+              volumeSource: src.volumeSource ?? "DETAIL",
+              manualVolumeInput: src.manualVolumeInput ?? "",
+              hargaTotal:
+                getEffectiveVolume(src) * (Number(src.hargaSatuan) || 0),
+            };
+            const items = [...next.items];
+            items.splice(idx + 1, 0, clone);
+            next.items = items;
+          }
+        }
+        return next;
       })
     );
   };
@@ -1054,22 +1487,38 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) => {
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== itemId) return i;
+            const volume = Number(totalVol || 0);
+            const next: ItemRow = {
+              ...i,
+              volume,
+              volumeDetails: rows,
+              volumeSource: "DETAIL",
+            };
+            const hs =
+              typeof next.hargaSatuanInput === "string"
+                ? toNumber(next.hargaSatuanInput)
+                : Number(next.hargaSatuan || 0);
+            next.hargaTotal = getEffectiveVolume(next) * hs;
+            return next;
+          }),
+        })),
+        items: (s.items || []).map((i) => {
           if (i.id !== itemId) return i;
-
           const volume = Number(totalVol || 0);
           const next: ItemRow = {
             ...i,
             volume,
             volumeDetails: rows,
-            volumeSource: "DETAIL", // hasil modal -> DETAIL
+            volumeSource: "DETAIL",
           };
-
           const hs =
             typeof next.hargaSatuanInput === "string"
               ? toNumber(next.hargaSatuanInput)
               : Number(next.hargaSatuan || 0);
-
           next.hargaTotal = getEffectiveVolume(next) * hs;
           return next;
         }),
@@ -1079,22 +1528,70 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
 
   /* --------------------------- Drag & Drop Logic -------------------------- */
   const isSectionId = (dndId: string) => dndId.startsWith("sec-");
+  const isGroupId = (dndId: string) => dndId.startsWith("grp-");
   const isItemId = (dndId: string) => dndId.startsWith("item-");
   const rawSectionId = (dndId: string) => dndId.replace(/^sec-/, "");
+  const rawGroupId = (dndId: string) => dndId.replace(/^grp-/, "");
   const rawItemId = (dndId: string) => dndId.replace(/^item-/, "");
 
-  const findSectionIdByItemDndId = (itemDndId: string) => {
+  const findPathByItemDndId = (itemDndId: string) => {
     const itemId = rawItemId(itemDndId);
-    for (const s of sections)
-      if (s.items.some((i) => i.id === itemId)) return s.id;
+    for (const s of sections) {
+      if (s.groups?.length) {
+        for (const g of s.groups) {
+          if (g.items.some((i) => i.id === itemId))
+            return { sectionId: s.id, groupId: g.id };
+        }
+      }
+      if (s.items?.some((i) => i.id === itemId)) return { sectionId: s.id };
+    }
     return null;
   };
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
-      activationConstraint: { distance: 5 }, // samakan dengan create
+      activationConstraint: { distance: 5 },
     })
   );
+  const splitTail = (s: string) => {
+    const p = s.lastIndexOf("-");
+    return p === -1 ? [s, ""] : [s.slice(0, p), s.slice(p + 1)];
+  };
+
+  // Drop ke row droppable ghead-/gdrop-
+  const parseGroupOverId = (overId: string) => {
+    if (!overId.startsWith("ghead-") && !overId.startsWith("gdrop-"))
+      return null;
+    const kind = overId.startsWith("ghead-") ? "head" : "drop";
+    const rest = overId.replace(/^ghead-/, "").replace(/^gdrop-/, ""); // "<sectionId>-<groupId>"
+    const [sectionId, groupId] = splitTail(rest);
+    return { kind, sectionId, groupId };
+  };
+
+  // Drop ke row droppable section-/dropzone-
+  const parseSectionOverId = (overId: string) => {
+    if (overId.startsWith("section-")) {
+      return {
+        kind: "section" as const,
+        sectionId: overId.slice("section-".length),
+      };
+    }
+    if (overId.startsWith("dropzone-")) {
+      return {
+        kind: "dropzone" as const,
+        sectionId: overId.slice("dropzone-".length),
+      };
+    }
+    return null;
+  };
+
+  // Cari sectionId dari groupId saat over = "grp-<groupId>"
+  const findSectionIdByGroupId = (groupId: string, data: Section[]) => {
+    for (const s of data) {
+      if (s.groups?.some((g) => g.id === groupId)) return s.id;
+    }
+    return null;
+  };
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -1104,7 +1601,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     const overId = String(over.id);
     if (activeId === overId) return;
 
-    // Reorder KATEGORI (sec-*)
+    // --- Reorder Section (sec-*)
     if (isSectionId(activeId) && isSectionId(overId)) {
       const fromId = rawSectionId(activeId);
       const toId = rawSectionId(overId);
@@ -1113,53 +1610,139 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         const fromIdx = next.findIndex((s) => s.id === fromId);
         const toIdx = next.findIndex((s) => s.id === toId);
         if (fromIdx < 0 || toIdx < 0) return prev;
-        const [moved] = next.splice(fromIdx, 1);
-        next.splice(toIdx, 0, moved);
+        const [m] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, m);
         return next;
       });
       return;
     }
 
-    // Drag ITEM (item-*)
+    // --- Reorder Group di dalam Section yang sama (grp-*)
+    if (isGroupId(activeId) && isGroupId(overId)) {
+      const fromG = rawGroupId(activeId);
+      const toG = rawGroupId(overId);
+      setSections((prev) =>
+        prev.map((s) => {
+          if (!s.groups?.length) return s;
+          const idxFrom = s.groups.findIndex((g) => g.id === fromG);
+          const idxTo = s.groups.findIndex((g) => g.id === toG);
+          if (idxFrom < 0 || idxTo < 0) return s;
+          const arr = [...s.groups];
+          const [m] = arr.splice(idxFrom, 1);
+          arr.splice(idxTo, 0, m);
+          return { ...s, groups: arr };
+        })
+      );
+      return;
+    }
+
+    // --- Item drag (item-*)
     if (!isItemId(activeId)) return;
-    const isOverItem = isItemId(overId);
-    const isOverSectionTop = overId.startsWith("section-");
-    const isOverSectionBottom = overId.startsWith("dropzone-");
 
-    const fromSectionId = findSectionIdByItemDndId(activeId);
-    if (!fromSectionId) return;
+    const activePath = findPathByItemDndId(activeId);
+    if (!activePath) return;
 
-    const toSectionId = isOverItem
-      ? findSectionIdByItemDndId(overId)!
-      : isOverSectionTop
-      ? overId.replace("section-", "")
-      : isOverSectionBottom
-      ? overId.replace("dropzone-", "")
-      : null;
+    // Tentukan target container
+    const overIsItem = isItemId(overId);
+    const overGroupRow = parseGroupOverId(overId); // ghead-/gdrop-
+    const overSectionRow = parseSectionOverId(overId); // section-/dropzone-
+    const overIsGroupHeader = isGroupId(overId); // grp-<groupId>
+    const overIsSectionHeader = isSectionId(overId); // sec-<sectionId>
+
+    let toSectionId: string | undefined;
+    let toGroupId: string | undefined;
+
+    if (overIsItem) {
+      const p = findPathByItemDndId(overId);
+      toSectionId = p?.sectionId;
+      toGroupId = p?.groupId;
+    } else if (overGroupRow) {
+      toSectionId = overGroupRow.sectionId;
+      toGroupId = overGroupRow.groupId;
+    } else if (overIsGroupHeader) {
+      const gId = rawGroupId(overId);
+      toSectionId = findSectionIdByGroupId(gId, sections) || undefined;
+      toGroupId = gId;
+    } else if (overSectionRow) {
+      toSectionId = overSectionRow.sectionId;
+      toGroupId = undefined;
+    } else if (overIsSectionHeader) {
+      toSectionId = rawSectionId(overId);
+      toGroupId = undefined;
+    }
 
     if (!toSectionId) return;
 
     const activeItemId = rawItemId(activeId);
-    const overItemId = isOverItem ? rawItemId(overId) : null;
+    const overItemId = overIsItem ? rawItemId(overId) : null;
 
     setSections((prev) => {
-      const next = prev.map((s) => ({ ...s, items: [...s.items] }));
-      const from = next.find((s) => s.id === fromSectionId)!;
-      const to = next.find((s) => s.id === toSectionId)!;
+      // clone shallow agar aman untuk mutate array items
+      const next = prev.map((s) => ({
+        ...s,
+        groups: s.groups?.map((g) => ({ ...g, items: [...g.items] })),
+        items: s.items ? [...s.items] : undefined,
+      }));
 
-      const fromIdx = from.items.findIndex((i) => i.id === activeItemId);
-      if (fromIdx < 0) return prev;
-
-      const [moved] = from.items.splice(fromIdx, 1);
-
-      if (isOverItem && overItemId) {
-        const overIdx = to.items.findIndex((i) => i.id === overItemId);
-        to.items.splice(overIdx, 0, moved);
-      } else if (isOverSectionTop) {
-        to.items.unshift(moved);
-      } else if (isOverSectionBottom) {
-        to.items.push(moved);
+      // 1) Ambil item dari sumber
+      let moving: ItemRow | null = null;
+      for (const s of next) {
+        if (s.id !== activePath.sectionId) continue;
+        if (activePath.groupId && s.groups?.length) {
+          const g = s.groups.find((x) => x.id === activePath.groupId);
+          if (g) {
+            const idx = g.items.findIndex((i) => i.id === activeItemId);
+            if (idx >= 0) [moving] = g.items.splice(idx, 1);
+          }
+        } else if (s.items) {
+          const idx = s.items.findIndex((i) => i.id === activeItemId);
+          if (idx >= 0) [moving] = s.items.splice(idx, 1);
+        }
       }
+      if (!moving) return prev;
+
+      // 2) Taruh ke tujuan
+      const targetSection = next.find((s) => s.id === toSectionId);
+      if (!targetSection) return prev;
+
+      if (toGroupId && targetSection.groups?.length) {
+        const g = targetSection.groups.find((x) => x.id === toGroupId);
+        if (!g) return prev;
+
+        // Jika drop di item → sisip sebelum item
+        if (overIsItem && overItemId) {
+          const idx = g.items.findIndex((i) => i.id === overItemId);
+          g.items.splice(idx < 0 ? g.items.length : idx, 0, moving);
+        } else if (overGroupRow?.kind === "head") {
+          // drop di ghead- (atas group) → prepend
+          g.items.unshift(moving);
+        } else if (overIsGroupHeader) {
+          // drop di header group → append
+          g.items.push(moving);
+        } else {
+          // gdrop- atau area lain di group → append
+          g.items.push(moving);
+        }
+      } else {
+        // Section tanpa group
+        targetSection.items = targetSection.items || [];
+
+        if (overIsItem && overItemId) {
+          const idx = targetSection.items.findIndex((i) => i.id === overItemId);
+          targetSection.items.splice(
+            idx < 0 ? targetSection.items.length : idx,
+            0,
+            moving
+          );
+        } else if (overSectionRow?.kind === "section" || overIsSectionHeader) {
+          // drop di header/atas list → prepend
+          targetSection.items.unshift(moving);
+        } else {
+          // dropzone- atau area lain → append
+          targetSection.items.push(moving);
+        }
+      }
+
       return next;
     });
   };
@@ -1167,46 +1750,94 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   const handleDragOver = (_e: DragOverEvent) => {};
 
   /* ------------------------------ Aggregations ----------------------------- */
-  const subtotal = sections.reduce(
-    (acc, s) =>
-      acc + s.items.reduce((t, i) => t + Number(i.hargaTotal ?? 0), 0),
-    0
-  );
+  const subtotal = sections.reduce((sectAcc, s) => {
+    const fromGroups =
+      s.groups?.reduce(
+        (acc, g) =>
+          acc + g.items.reduce((t, i) => t + Number(i.hargaTotal || 0), 0),
+        0
+      ) || 0;
+    const fromItems =
+      s.items?.reduce((t, i) => t + Number(i.hargaTotal || 0), 0) || 0;
+    return sectAcc + fromGroups + fromItems;
+  }, 0);
+
   const ppnPct = Math.max(0, Number(projectProfile.ppn || "0"));
   const ppnAmount = (subtotal * ppnPct) / 100;
   const grandTotal = subtotal + ppnAmount;
 
+  /* ------------------------------ Save payload ----------------------------- */
   const handleSaveAllData = () => {
-    const estimationItem = sections.map((s) => ({
-      title: s.title,
-      item: s.items.map((i) => {
-        const effectiveVol = getEffectiveVolume(i);
-        const isManual = i.volumeSource === "MANUAL";
+    const estimationItem = sections.map((s) => {
+      // Jika pakai groups
+      if (s.groups && s.groups.length > 0) {
         return {
-          kode: i.kode,
-          nama: i.deskripsi,
-          satuan: i.satuan,
-          harga: i.hargaSatuan,
-          volume: effectiveVol,
-          hargaTotal: effectiveVol * Number(i.hargaSatuan || 0),
-          details: isManual
-            ? []
-            : (i.volumeDetails || []).map((d) => ({
-                nama: d.uraian,
-                jenis: d.jenis,
-                panjang: d.panjang,
-                lebar: d.lebar,
-                tinggi: d.tinggi,
-                jumlah: d.jumlah,
-                volume: Number(Number(d.volume).toFixed(2)),
-                extras: (d.extras || []).map((ex: ExtraCol) => ({
-                  name: ex.name,
-                  value: ex.value,
-                })),
-              })),
+          title: s.title,
+          groups: s.groups.map((g) => ({
+            title: g.title,
+            items: g.items.map((i) => {
+              const effectiveVol = getEffectiveVolume(i);
+              const isManual = i.volumeSource === "MANUAL";
+              return {
+                kode: i.kode,
+                nama: i.deskripsi,
+                satuan: i.satuan,
+                harga: i.hargaSatuan,
+                volume: effectiveVol,
+                hargaTotal: effectiveVol * Number(i.hargaSatuan || 0),
+                details: isManual
+                  ? []
+                  : (i.volumeDetails || []).map((d) => ({
+                      nama: d.uraian,
+                      jenis: d.jenis,
+                      panjang: d.panjang,
+                      lebar: d.lebar,
+                      tinggi: d.tinggi,
+                      jumlah: d.jumlah,
+                      volume: Number(Number(d.volume).toFixed(2)),
+                      extras: (d.extras || []).map((ex: ExtraCol) => ({
+                        name: ex.name,
+                        value: ex.value,
+                      })),
+                    })),
+              };
+            }),
+          })),
         };
-      }),
-    }));
+      }
+
+      // Fallback format lama: langsung items di section
+      return {
+        title: s.title,
+        item: (s.items || []).map((i) => {
+          const effectiveVol = getEffectiveVolume(i);
+          const isManual = i.volumeSource === "MANUAL";
+          return {
+            kode: i.kode,
+            nama: i.deskripsi,
+            satuan: i.satuan,
+            harga: i.hargaSatuan,
+            volume: effectiveVol,
+            hargaTotal: effectiveVol * Number(i.hargaSatuan || 0),
+            details: isManual
+              ? []
+              : (i.volumeDetails || []).map((d) => ({
+                  nama: d.uraian,
+                  jenis: d.jenis,
+                  panjang: d.panjang,
+                  lebar: d.lebar,
+                  tinggi: d.tinggi,
+                  jumlah: d.jumlah,
+                  volume: Number(Number(d.volume).toFixed(2)),
+                  extras: (d.extras || []).map((ex: ExtraCol) => ({
+                    name: ex.name,
+                    value: ex.value,
+                  })),
+                })),
+          };
+        }),
+      };
+    });
 
     const dataToSave = {
       projectName: projectProfile.projectName,
@@ -1219,6 +1850,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
     onSave(dataToSave);
   };
 
+  /* --------------------------- Section handlers --------------------------- */
   const toggleEditSectionTitle = (sectionId: string, editing: boolean) => {
     setSections((prev) =>
       prev.map((s) =>
@@ -1232,7 +1864,9 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
       prev.map((s) => (s.id === sectionId ? { ...s, title } : s))
     );
   };
+
   const { isPending } = useUpdateEstimation();
+
   /* --------------------------------- Render -------------------------------- */
   return (
     <div className="bg-white rounded-xl shadow p-4 sm:p-6">
@@ -1310,134 +1944,189 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
         )}
       </div>
 
-      {/* TABLE + DnD — STRUKTUR DISAMAKAN DENGAN CREATE */}
-      <div className="collapse bg-transparent shadow-none">
-        <div className="overflow-x-auto rounded-lg border border-gray-200 h-[500px]">
-          <DndContext
-            sensors={sensors}
-            onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
-            collisionDetection={closestCorners}
-          >
-            <table className="table min-w-[1200px]">
-              <thead className="bg-gray-50 sticky top-0 z-[1]">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    No
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Uraian Pekerjaan
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Kode
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Vol
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Satuan
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Harga Satuan
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Harga Total
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
+      {/* CARD LIST + DnD */}
+      <div className="space-y-4">
+        <DndContext
+          sensors={sensors}
+          onDragEnd={handleDragEnd}
+          onDragOver={handleDragOver}
+          collisionDetection={pointerWithin}
+          autoScroll={{
+            enabled: true,
+            acceleration: 12,
+            interval: 10,
+            threshold: { x: 0.2, y: 0.2 },
+          }}
+          measuring={{
+            droppable: {
+              strategy: MeasuringStrategy.Always,
+            },
+          }}
+        >
+          {sections.length === 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+              Belum ada kategori.
+            </div>
+          )}
 
-              <tbody className="bg-white">
-                {sections.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-6 py-8 text-center text-sm text-gray-500"
-                    >
-                      Belum ada kategori.
-                    </td>
-                  </tr>
-                )}
+          {sections.map((section, sIdx) => {
+            const groups = section.groups || [];
+            const fallbackItems = section.items || [];
 
-                {sections.map((section, sIdx) => (
-                  <SortableContext
-                    key={section.id}
-                    items={section.items.map((i) => `item-${i.id}`)}
-                    strategy={rectSortingStrategy}
-                  >
-                    {/* Header Kategori (draggable + editable) */}
-                    <SortableSectionHeader
+            return (
+              <SortableContext
+                key={section.id}
+                items={[
+                  ...groups.map((g) => `grp-${g.id}`),
+                  ...groups.flatMap((g) => g.items.map((i) => `item-${i.id}`)),
+                  ...fallbackItems.map((i) => `item-${i.id}`),
+                ]}
+                strategy={rectSortingStrategy}
+              >
+                {/* Kategori Card */}
+                <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                  {/* Header kategori */}
+                  <div className="p-4 border-b border-gray-200">
+                    <SortableSectionHeaderCard
                       section={section}
                       index={sIdx}
+                      addGroup={addGroup}
+                      deleteSection={deleteSection}
+                      onToggleEditTitle={toggleEditSectionTitle}
+                      onChangeTitle={changeSectionTitle}
                       isLoadingItems={isLoadingHsp}
                       PekerjaanOptions={PekerjaanOptions}
                       DropdownPekerjaan={DropdownPekerjaan}
                       addItemToSection={addItemToSection}
-                      deleteSection={deleteSection}
-                      onToggleEditTitle={toggleEditSectionTitle}
-                      onChangeTitle={changeSectionTitle}
                     />
+                  </div>
 
-                    {/* DROPPABLE: header (drop ke atas list) */}
-                    <DroppableRow
-                      droppableId={`section-${section.id}`}
-                      colSpan={8}
-                    />
+                  {/* Body kategori */}
+                  <div className="p-4 space-y-4">
+                    {/* Jika punya groups (Title) */}
+                    {groups.length > 0 ? (
+                      <>
+                        {groups.map((group, gIdx) => (
+                          <React.Fragment key={group.id}>
+                            {/* Header Title */}
+                            <SortableGroupHeaderCard
+                              sectionId={section.id}
+                              group={group}
+                              index={gIdx}
+                              isLoadingItems={isLoadingHsp}
+                              PekerjaanOptions={PekerjaanOptions}
+                              DropdownPekerjaan={DropdownPekerjaan}
+                              addItemToGroup={addItemToGroup}
+                              deleteGroup={deleteGroup}
+                              onToggleEditGroupTitle={onToggleEditGroupTitle}
+                              onChangeGroupTitle={onChangeGroupTitle}
+                            />
 
-                    {/* Items */}
-                    {section.items.map((item, idxInSection) => (
-                      <SortableItemRow
-                        key={item.id}
-                        idxInSection={idxInSection}
-                        item={item}
-                        onEditToggle={toggleEditItem}
-                        onDelete={deleteItem}
-                        onCopy={copyItem}
-                        onUpdateField={updateItemField}
-                        onOpenVolumeModal={openVolumeModal}
-                        kodeOptions={KodeOptions}
-                        onChangeKode={changeItemKode}
-                      />
-                    ))}
+                            {/* Dropzone atas group */}
+                            <DroppableZone
+                              droppableId={`ghead-${section.id}-${group.id}`}
+                              className="my-2"
+                            />
 
-                    {/* DROPPABLE: bawah (akhir list) */}
-                    <DroppableRow
-                      droppableId={`dropzone-${section.id}`}
-                      colSpan={8}
-                      showHint={section.items.length === 0}
-                    />
+                            {/* Items */}
+                            <div className="space-y-3">
+                              {group.items.map((item, idxInGroup) => (
+                                <SortableItemCard
+                                  key={item.id}
+                                  indexText={alphaLabel(idxInGroup)} // a, b, c, ...
+                                  item={item}
+                                  onEditToggle={toggleEditItem}
+                                  onDelete={deleteItem}
+                                  onCopy={copyItem}
+                                  onUpdateField={updateItemField}
+                                  onOpenVolumeModal={openVolumeModal}
+                                  kodeOptions={KodeOptions}
+                                  onChangeKode={changeItemKode}
+                                />
+                              ))}
+                            </div>
 
-                    {/* Subtotal per kategori */}
-                    {!!section.items.length && (
-                      <tr className="bg-gray-50">
-                        <td
-                          colSpan={6}
-                          className="px-4 py-3 text-sm text-right text-gray-700"
-                        >
-                          Subtotal {section.title}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                          {formatIDR(
-                            section.items.reduce(
-                              (a, b) => a + (b.hargaTotal ?? 0),
-                              0
-                            )
-                          )}
-                        </td>
-                        <td />
-                      </tr>
+                            {/* Dropzone bawah group */}
+                            <DroppableZone
+                              droppableId={`gdrop-${section.id}-${group.id}`}
+                              className="mt-2"
+                              showHint={group.items.length === 0}
+                            />
+
+                            {/* Subtotal per Title */}
+                            {!!group.items.length && (
+                              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                <div className="text-sm text-gray-800 font-semibold">
+                                  Subtotal {section.title} — {group.title}
+                                </div>
+                                <div className="text-sm font-semibold text-gray-800">
+                                  {formatIDR(
+                                    group.items.reduce(
+                                      (a, b) => a + (b.hargaTotal ?? 0),
+                                      0
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </>
+                    ) : (
+                      /* Fallback: items langsung di kategori (tanpa Title) */
+                      <>
+                        <DroppableZone
+                          droppableId={`section-${section.id}`}
+                          className="mb-2"
+                        />
+                        <div className="space-y-3">
+                          {fallbackItems.map((item, idxInGroup) => (
+                            <SortableItemCard
+                              key={item.id}
+                              indexText={String(idxInGroup + 1)} // 1, 2, 3, ...
+                              item={item}
+                              onEditToggle={toggleEditItem}
+                              onDelete={deleteItem}
+                              onCopy={copyItem}
+                              onUpdateField={updateItemField}
+                              onOpenVolumeModal={openVolumeModal}
+                              kodeOptions={KodeOptions}
+                              onChangeKode={changeItemKode}
+                            />
+                          ))}
+                        </div>
+                        <DroppableZone
+                          droppableId={`dropzone-${section.id}`}
+                          className="mt-2"
+                          showHint={fallbackItems.length === 0}
+                        />
+
+                        {!!fallbackItems.length && (
+                          <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
+                            <div className="text-sm text-gray-700">
+                              Subtotal {section.title}
+                            </div>
+                            <div className="text-sm font-semibold">
+                              {formatIDR(
+                                fallbackItems.reduce(
+                                  (a, b) => a + (b.hargaTotal ?? 0),
+                                  0
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
-                  </SortableContext>
-                ))}
-              </tbody>
-            </table>
+                  </div>
+                </div>
+              </SortableContext>
+            );
+          })}
 
-            {/* Overlay (optional) */}
-            <DragOverlay dropAnimation={defaultDropAnimation} />
-          </DndContext>
-        </div>
+          {/* Overlay */}
+          <DragOverlay dropAnimation={defaultDropAnimation} />
+        </DndContext>
       </div>
 
       {/* Footer total & actions */}
@@ -1509,13 +2198,11 @@ const UpdateEstimation: React.FC = () => {
     (location.hash === "#step2" ? "step2" : "step1");
   const notify = useNotify();
   const [imageFile, setImageFile] = useState<File | null>(null);
-  // Step accordion
-  const [activeAccordion, setActiveAccordion] = useState<string>(initialStep);
 
+  const [activeAccordion, setActiveAccordion] = useState<string>(initialStep);
   const toggleAccordion = (step: string) =>
     setActiveAccordion((prev) => (prev === step ? "" : step));
 
-  // Controlled form states
   const [formData, setFormData] = useState({
     projectName: "",
     owner: "",
@@ -1528,7 +2215,8 @@ const UpdateEstimation: React.FC = () => {
   useEffect(() => {
     if (location.hash === "#step2") setActiveAccordion("step2");
   }, [location.hash]);
-  // Seed dari API
+
+  // Seed dari API -> dukung items + groups
   useEffect(() => {
     if (!detailEstimation) return;
 
@@ -1549,52 +2237,112 @@ const UpdateEstimation: React.FC = () => {
     }));
     setCustomFields(cf);
 
-    // sections + items (beserta volume extras)
+    // sections + (groups|details)
     const sections: Section[] = (detailEstimation.items || []).map(
       (sec: any) => {
-        const items: ItemRow[] = (sec.details || []).map((d: any) => {
-          const vds: VolumeDetailRow[] = (d.volumeDetails || []).map(
-            (vd: any) => ({
-              id: vd.id || uid(),
-              uraian: vd.nama || "",
-              jenis: mapJenisApiToUi(vd.jenis),
-              panjang: Number(vd.panjang ?? 0),
-              lebar: Number(vd.lebar ?? 0),
-              tinggi: Number(vd.tinggi ?? 0),
-              jumlah: Number(vd.jumlah ?? 0),
-              volume: Number(vd.volume ?? 0),
-              extras: Array.isArray(vd.extras)
-                ? vd.extras.map((ex: any) => ({
-                    id: ex.id || ex.name || uid(),
-                    name: ex.name,
-                    value: Number(ex.value ?? 0),
-                  }))
-                : [],
-            })
-          );
-
-          const volumeNumber = Number(d.volume ?? 0);
-          const hargaSatuan = Number(d.hargaSatuan ?? d.harga ?? 0);
+        // Jika API punya groups
+        if (Array.isArray(sec.groups) && sec.groups.length > 0) {
+          const groups: Group[] = sec.groups.map((g: any) => {
+            const details = g.details || g.items || [];
+            const items: ItemRow[] = (details || []).map((d: any) => {
+              const vds: VolumeDetailRow[] = (d.volumeDetails || []).map(
+                (vd: any) => ({
+                  id: vd.id || uid(),
+                  uraian: vd.nama || "",
+                  jenis: mapJenisApiToUi(vd.jenis),
+                  panjang: Number(vd.panjang ?? 0),
+                  lebar: Number(vd.lebar ?? 0),
+                  tinggi: Number(vd.tinggi ?? 0),
+                  jumlah: Number(vd.jumlah ?? 0),
+                  volume: Number(vd.volume ?? 0),
+                  extras: Array.isArray(vd.extras)
+                    ? vd.extras.map((ex: any) => ({
+                        id: ex.id || ex.name || uid(),
+                        name: ex.name,
+                        value: Number(ex.value ?? 0),
+                      }))
+                    : [],
+                })
+              );
+              const volumeNumber = Number(d.volume ?? 0);
+              const hargaSatuan = Number(d.hargaSatuan ?? d.harga ?? 0);
+              return {
+                id: d.id || uid(),
+                kode: d.kode || "",
+                deskripsi: d.deskripsi || "",
+                volume: volumeNumber,
+                volumeDetails: vds,
+                volumeSource: "DETAIL",
+                manualVolumeInput: "",
+                satuan: d.satuan || "",
+                hargaSatuan,
+                hargaTotal: Number(d.hargaTotal ?? volumeNumber * hargaSatuan),
+                isEditing: false,
+              };
+            });
+            return {
+              id: g.id || uid(),
+              title: g.title || "",
+              isEditingTitle: false,
+              items,
+            };
+          });
           return {
-            id: d.id,
-            kode: d.kode || "",
-            deskripsi: d.deskripsi || "",
-            volume: volumeNumber,
-            volumeDetails: vds,
-            volumeSource: "DETAIL", // default: DETAIL saat seed
-            manualVolumeInput: "",
-            satuan: d.satuan || "",
-            hargaSatuan,
-            hargaTotal: Number(d.hargaTotal ?? volumeNumber * hargaSatuan),
-            isEditing: false,
+            id: sec.id,
+            title: sec.title,
+            isEditingTitle: false,
+            groups,
+            items: undefined,
           };
-        });
+        }
+
+        // Format lama: details langsung di section
+        const items: ItemRow[] = (sec.details || sec.items || []).map(
+          (d: any) => {
+            const vds: VolumeDetailRow[] = (d.volumeDetails || []).map(
+              (vd: any) => ({
+                id: vd.id || uid(),
+                uraian: vd.nama || "",
+                jenis: mapJenisApiToUi(vd.jenis),
+                panjang: Number(vd.panjang ?? 0),
+                lebar: Number(vd.lebar ?? 0),
+                tinggi: Number(vd.tinggi ?? 0),
+                jumlah: Number(vd.jumlah ?? 0),
+                volume: Number(vd.volume ?? 0),
+                extras: Array.isArray(vd.extras)
+                  ? vd.extras.map((ex: any) => ({
+                      id: ex.id || ex.name || uid(),
+                      name: ex.name,
+                      value: Number(ex.value ?? 0),
+                    }))
+                  : [],
+              })
+            );
+
+            const volumeNumber = Number(d.volume ?? 0);
+            const hargaSatuan = Number(d.hargaSatuan ?? d.harga ?? 0);
+            return {
+              id: d.id || uid(),
+              kode: d.kode || "",
+              deskripsi: d.deskripsi || "",
+              volume: volumeNumber,
+              volumeDetails: vds,
+              volumeSource: "DETAIL",
+              manualVolumeInput: "",
+              satuan: d.satuan || "",
+              hargaSatuan,
+              hargaTotal: Number(d.hargaTotal ?? volumeNumber * hargaSatuan),
+              isEditing: false,
+            };
+          }
+        );
 
         return {
           id: sec.id,
           title: sec.title,
-          items,
           isEditingTitle: false,
+          groups: [],
+          items,
         };
       }
     );

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import Input from "../../components/input";
 import ImageProyek from "../../assets/images/image 1.png";
 import {
@@ -16,18 +16,19 @@ import { useGetAdminAllWithItemsFlat } from "../../hooks/useHsp";
 import type { Option } from "../../components/SearchableSelect";
 import SearchableSelect from "../../components/SearchableSelect";
 
-// dnd-kit
+/* dnd-kit */
 import {
   DndContext,
   PointerSensor,
   useSensor,
   useSensors,
-  closestCorners,
   useDroppable,
   defaultDropAnimation,
   DragOverlay,
   type DragEndEvent,
   type DragOverEvent,
+  pointerWithin,
+  MeasuringStrategy,
 } from "@dnd-kit/core";
 import {
   SortableContext,
@@ -35,12 +36,13 @@ import {
   rectSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import type { VolumeDetailRow } from "./VolumeModal";
+
+/* Volume Modal */
+import type { VolumeDetailRow, ExtraCol } from "./VolumeModal";
 import VolModal from "./VolumeModal";
+
 import { BackButton } from "../../components/BackButton";
 import { useNavigate } from "react-router-dom";
-import { BsThreeDotsVertical } from "react-icons/bs";
-
 import { useNotify } from "../../components/Notify/notify";
 
 /* ------------------------------ Helpers ------------------------------ */
@@ -52,20 +54,64 @@ const uid = () =>
 const formatIDR = (n: number = 0) =>
   `Rp ${Math.max(0, Number(n || 0)).toLocaleString("id-ID")}`;
 
-// Hapus semua yang bukan digit/koma/titik, normalize koma->titik
-const sanitizeMoneyInput = (v: string) => {
-  const cleaned = v.replace(/[^\d.,]/g, "").replace(/,/g, ".");
-  return cleaned.replace(/^0+(?=\d)/, "");
-};
+const sanitizeMoneyInput = (v: string) =>
+  v
+    .replace(/[^\d.,]/g, "")
+    .replace(/,/g, ".")
+    .replace(/^0+(?=\d)/, "");
+const toNumber = (v?: string) =>
+  v == null || v.trim() === "" ? 0 : Number(v) || 0;
 
-const toNumber = (v?: string) => {
-  if (v == null || v.trim() === "") return 0;
-  const n = Number(v);
-  return Number.isFinite(n) ? n : 0;
+/** Volume efektif mengikuti mode - MANUAL > DETAIL */
+type VolumeSource = "MANUAL" | "DETAIL";
+const getEffectiveVolume = (i: ItemRow) =>
+  (i.volumeSource === "MANUAL"
+    ? Math.max(0, toNumber(i.manualVolumeInput || "0"))
+    : Math.max(0, Number(i.volume || 0))) || 0;
+
+/* --- Numbering helpers --- */
+const toRoman = (num: number) => {
+  if (num <= 0) return "";
+  const map: [number, string][] = [
+    [1000, "M"],
+    [900, "CM"],
+    [500, "D"],
+    [400, "CD"],
+    [100, "C"],
+    [90, "XC"],
+    [50, "L"],
+    [40, "XL"],
+    [10, "X"],
+    [9, "IX"],
+    [5, "V"],
+    [4, "IV"],
+    [1, "I"],
+  ];
+  let n = num;
+  let out = "";
+  for (const [v, s] of map) {
+    while (n >= v) {
+      out += s;
+      n -= v;
+    }
+  }
+  return out;
 };
+const toAlpha = (idx0: number) => {
+  // 0->a, 25->z, 26->aa
+  let n = idx0 + 1;
+  let out = "";
+  while (n > 0) {
+    n--; // 1-based to 0-based char
+    out = String.fromCharCode(97 + (n % 26)) + out;
+    n = Math.floor(n / 26);
+  }
+  return out;
+};
+const toArabic = (idx0: number) => String(idx0 + 1);
 
 /* ------------------------------ Types ------------------------------ */
-interface CustomField {
+interface CustomFieldUI {
   id: string;
   label: string;
   value: string;
@@ -74,39 +120,45 @@ interface CustomField {
 interface ProjectProfile {
   projectName: string;
   owner: string;
-  ppn: string; // keep string for easy input bind
+  ppn: string;
   notes: string;
   customFields: Record<string, string>;
 }
-type VolumeSource = "MANUAL" | "DETAIL";
 
 type ItemRow = {
   id: string;
   kode: string;
   deskripsi: string;
 
-  // AUTO hasil dari modal
   volume: number;
   volumeDetails?: VolumeDetailRow[];
 
-  // NEW: input manual tanpa toggle
   volumeSource?: VolumeSource; // "MANUAL" | "DETAIL"
-  manualVolumeInput?: string; // string input untuk angka manual
+  manualVolumeInput?: string; // input string manual
 
   satuan: string;
-  hargaSatuan: number; // nilai final untuk hitung & tampil non-edit
-  hargaSatuanInput?: string; // nilai string saat editing (boleh kosong)
+  hargaSatuan: number;
+  hargaSatuanInput?: string;
   hargaTotal: number;
   isEditing?: boolean;
 };
-type Section = {
+
+type Group = {
   id: string;
-  title: string;
-  items: ItemRow[];
-  isEditingTitle?: boolean; // edit judul kategori
+  title: string; // contoh: "Cor Beton Sloof 20x25 cm"
+  items: ItemRow[]; // contoh: Pembesian, Bekisting, Beton
+  isEditingTitle?: boolean;
 };
 
-/* --------------------------- Step 1: Profile --------------------------- */
+type Section = {
+  id: string;
+  title: string; // contoh: "IV PEKERJAAN BETON"
+  groups?: Group[]; // daftar Title (opsional)
+  items?: ItemRow[]; // fallback jika tanpa Title
+  isEditingTitle?: boolean;
+};
+
+/* -------------------------- Step 1 (Profil) -------------------------- */
 const CreateStepOne = ({
   onSave,
   formData,
@@ -117,12 +169,7 @@ const CreateStepOne = ({
   setImageFile,
 }: {
   onSave: () => void;
-  formData: {
-    projectName: string;
-    owner: string;
-    ppn: string;
-    notes: string;
-  };
+  formData: { projectName: string; owner: string; ppn: string; notes: string };
   setFormData: React.Dispatch<
     React.SetStateAction<{
       projectName: string;
@@ -131,25 +178,28 @@ const CreateStepOne = ({
       notes: string;
     }>
   >;
-  customFields: CustomField[];
-  setCustomFields: React.Dispatch<React.SetStateAction<CustomField[]>>;
+  customFields: CustomFieldUI[];
+  setCustomFields: React.Dispatch<React.SetStateAction<CustomFieldUI[]>>;
   imageFile: File | null;
   setImageFile: React.Dispatch<React.SetStateAction<File | null>>;
 }) => {
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [newFieldType, setNewFieldType] = useState("text");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  const onPickImage = (f?: File | null) => {
+    setImageFile(f ?? null);
+    if (previewUrl && previewUrl.startsWith("blob:"))
+      URL.revokeObjectURL(previewUrl);
+    setPreviewUrl(f ? URL.createObjectURL(f) : null);
+  };
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
-  const onPickImage = (f?: File | null) => {
-    setImageFile(f ?? null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(f ? URL.createObjectURL(f) : null);
-  };
+
   const handleCustomFieldChange = (id: string, value: string) => {
     setCustomFields((prev) =>
       prev.map((f) => (f.id === id ? { ...f, value } : f))
@@ -232,7 +282,7 @@ const CreateStepOne = ({
             {!!customFields.length && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {customFields.map((field) => (
-                  <div key={field.id} className="flex items-end gap-2">
+                  <div key={field.id} className="flex items-start gap-2">
                     <div className="flex-1">
                       <Input
                         label={field.label}
@@ -286,6 +336,7 @@ const CreateStepOne = ({
               </button>
             </div>
           </div>
+
           <div className="pt-2">
             <button onClick={onSave} className="btn btn-success text-white">
               Lanjut ke Estimation Items
@@ -305,14 +356,14 @@ const CreateStepOne = ({
             </figure>
             <div className="card-body p-4">
               <input
-                id="project-image-input"
+                id="project-image-input-create"
                 type="file"
                 accept="image/*"
                 className="hidden"
                 onChange={(e) => onPickImage(e.target.files?.[0] || null)}
               />
               <label
-                htmlFor="project-image-input"
+                htmlFor="project-image-input-create"
                 className="btn btn-outline btn-sm cursor-pointer"
               >
                 <BiEdit className="mr-1" /> Ganti Gambar
@@ -322,7 +373,7 @@ const CreateStepOne = ({
                   className="btn btn-ghost btn-xs text-red-600 mt-2"
                   onClick={() => onPickImage(null)}
                 >
-                  <BiTrash className="mr-1" /> Hapus pilihan
+                  <BiTrash className="mr-1" /> Batalkan gambar
                 </button>
               )}
               <div className="text-xs text-gray-500">
@@ -336,41 +387,38 @@ const CreateStepOne = ({
   );
 };
 
-/* -------------------------- Table Utilities/Rows -------------------------- */
-function DroppableRow({
+/* ---------------------- Droppable zone (div, non-table) ---------------------- */
+function DroppableZone({
   droppableId,
-  colSpan,
   showHint = false,
+  className = "",
 }: {
   droppableId: string;
-  colSpan: number;
   showHint?: boolean;
+  className?: string;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: droppableId });
   return (
-    <tr ref={setNodeRef}>
-      <td colSpan={colSpan}>
-        <div
-          className={`h-8 transition-all rounded ${
-            isOver ? "border-2 border-dashed border-primary/70" : "border-0"
-          } ${showHint ? "text-xs text-gray-400 italic py-1" : ""}`}
-        >
-          {isOver ? "Lepas di sini" : showHint ? "Drop di sini" : null}
+    <div
+      ref={setNodeRef}
+      className={`h-9 rounded transition-all ${
+        isOver
+          ? "border-2 border-dashed border-primary/70 bg-primary/5"
+          : "border border-dashed border-transparent"
+      } ${className}`}
+    >
+      {showHint && !isOver ? (
+        <div className="text-[11px] text-gray-400 italic px-2 py-1">
+          Drop di sini
         </div>
-      </td>
-    </tr>
+      ) : null}
+    </div>
   );
 }
 
-/** Effective Volume (tanpa toggle): MANUAL > DETAIL */
-const getEffectiveVolume = (i: ItemRow) =>
-  (i.volumeSource === "MANUAL"
-    ? Math.max(0, toNumber(i.manualVolumeInput || "0"))
-    : Math.max(0, Number(i.volume || 0))) || 0;
-
-/** ITEM ROW — pakai id dnd "item-<id>" */
-function SortableItemRow({
-  idxInSection,
+/* --------------------------- Item Card (job) --------------------------- */
+function SortableItemCard({
+  itemIndexDisplay,
   item,
   onEditToggle,
   onDelete,
@@ -380,7 +428,8 @@ function SortableItemRow({
   kodeOptions,
   onChangeKode,
 }: {
-  idxInSection: number;
+  /** string indeks yang sudah diformat (a, b, c / 1, 2, 3) */
+  itemIndexDisplay: string;
   item: ItemRow;
   onEditToggle: (id: string, editing: boolean) => void;
   onDelete: (id: string) => void;
@@ -419,215 +468,375 @@ function SortableItemRow({
       : String(Number(item.volume || 0));
 
   return (
-    <tr
+    <div
       ref={setNodeRef}
       style={style}
-      className={`align-top ${isDragging ? "bg-blue-50" : ""}`}
+      className={`rounded-lg border p-3 sm:p-4 bg-white ${
+        isDragging ? "ring-2 ring-primary/50 bg-blue-50/40" : "border-gray-200"
+      }`}
     >
-      <td className="px-4 py-3 text-sm text-gray-500">{idxInSection + 1}</td>
-
-      {/* Uraian */}
-      <td className="px-4 py-3 text-sm text-gray-800 min-w-[280px]">
-        {item.isEditing ? (
-          <input
-            className="input input-bordered input-sm w-full text-black bg-white border-black"
-            value={item.deskripsi}
-            onChange={(e) =>
-              onUpdateField(item.id, "deskripsi", e.target.value)
-            }
-            placeholder="Nama / deskripsi pekerjaan"
-          />
-        ) : (
-          <span className="break-words">{item.deskripsi || "-"}</span>
-        )}
-      </td>
-      <td className="px-4 py-3 text-sm text-gray-800 w-40">
-        {item.isEditing ? (
-          <SearchableSelect
-            options={kodeOptions}
-            value={item.kode ?? ""}
-            onChange={(v) => v && onChangeKode(item.id, v)}
-            placeholder="Pilih Kode"
-            size="sm"
-          />
-        ) : (
-          <span className="font-mono">{item.kode || "-"}</span>
-        )}
-      </td>
-      {/* Volume: input langsung + tombol Detail */}
-      <td className="px-4 py-3 text-sm text-gray-800">
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min={0}
-            step="any"
-            className="input input-bordered input-sm w-28 text-right text-black bg-white border-black"
-            value={volInputDisplay}
-            onChange={(e) => {
-              // Switch ke MANUAL & update nilai
-              onUpdateField(item.id, "volumeSource", "MANUAL");
-              onUpdateField(item.id, "manualVolumeInput", e.target.value);
-            }}
-            placeholder="0.00"
-          />
-          <button
-            className="btn btn-ghost btn-xs text-blue-600 bg-white"
-            title="Detail Volume"
-            onClick={() => onOpenVolumeModal(item)}
-          >
-            <BiCalculator className="mr-1" /> Detail
-          </button>
+      <div className="flex items-start gap-3">
+        {/* No / drag handle */}
+        <button
+          className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-gray-600 text-xl"
+          title="Drag"
+          aria-label="Drag untuk memindahkan"
+          {...attributes}
+          {...listeners}
+        >
+          ≡
+        </button>
+        <div className="text-md font-semibold text-black min-w-6 pt-1">
+          {itemIndexDisplay}
         </div>
-        {/* <div className="text-[11px] text-gray-500 mt-1">
-          {item.volumeSource === "MANUAL"
-            ? "Mode: manual"
-            : "Mode: dari detail"}
-        </div> */}
-      </td>
 
-      {/* Satuan (Searchable) */}
-      <td className="px-4 py-3 text-sm text-gray-800 w-36">
-        {item.isEditing ? (
-          <SearchableSelect
-            options={unitOptions}
-            value={item.satuan ?? ""}
-            onChange={(v) => onUpdateField(item.id, "satuan", v ?? "")}
-            placeholder="Pilih Satuan"
-            size="sm"
-          />
-        ) : (
-          UnitList.find((u) => u.value === item.satuan)?.label ||
-          item.satuan ||
-          "-"
-        )}
-      </td>
-
-      {/* Harga Satuan */}
-      <td className="px-4 py-3 text-sm text-gray-800">
-        {item.isEditing ? (
-          <input
-            type="text"
-            inputMode="decimal"
-            className="input input-bordered input-sm w-36 text-black bg-white border-black"
-            value={item.hargaSatuanInput ?? ""}
-            onChange={(e) =>
-              onUpdateField(item.id, "hargaSatuanInput", e.target.value)
-            }
-            onBlur={() => onEditToggle(item.id, false)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape")
-                onEditToggle(item.id, false);
-            }}
-            placeholder="0"
-          />
-        ) : (
-          formatIDR(item.hargaSatuan)
-        )}
-      </td>
-
-      {/* Harga Total */}
-      <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-        {formatIDR(item.hargaTotal)}
-      </td>
-
-      {/* Aksi + drag handle */}
-      <td className="px-4 py-3 text-sm">
-        <div className="flex items-center gap-2">
-          {/* Drag handle */}
-
-          {/* Menu kebab */}
-          <div className="dropdown dropdown-end">
-            <button
-              tabIndex={0}
-              className="btn btn-ghost btn-xs bg-white"
-              aria-label="Aksi lainnya"
-              title="Aksi lainnya"
-            >
-              <BsThreeDotsVertical className="text-lg text-black" />
-            </button>
-
-            <ul
-              tabIndex={0}
-              className="dropdown-content z-[1] menu p-2 shadow bg-white text-black rounded-box w-44"
-            >
-              {!item.isEditing ? (
-                <li>
-                  <button
-                    onClick={() => onEditToggle(item.id, true)}
-                    className="justify-start"
-                    title="Edit baris"
-                  >
-                    <BiEdit className="text-blue-600" />
-                    <span>Edit</span>
-                  </button>
-                </li>
+        {/* Content */}
+        <div className="flex-1 space-y-2">
+          {/* Uraian & aksi */}
+          <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+            <div className="flex-1">
+              {item.isEditing ? (
+                <input
+                  className="input input-bordered input-sm w-full text-black bg-white border-black"
+                  value={item.deskripsi}
+                  onChange={(e) =>
+                    onUpdateField(item.id, "deskripsi", e.target.value)
+                  }
+                  placeholder="Nama / deskripsi pekerjaan"
+                />
               ) : (
-                <li>
-                  <button
-                    onClick={() => onEditToggle(item.id, false)}
-                    className="justify-start"
-                    title="Simpan baris"
-                  >
-                    <BiSave className="text-green-600" />
-                    <span>Simpan</span>
-                  </button>
-                </li>
+                <div className="font-medium text-gray-800 break-words">
+                  {item.deskripsi || "-"}
+                </div>
+              )}
+            </div>
+
+            {/* Aksi */}
+            <div className="flex items-center gap-2">
+              {!item.isEditing ? (
+                <button
+                  onClick={() => onEditToggle(item.id, true)}
+                  className="btn btn-ghost btn-xs text-blue-600"
+                  title="Edit"
+                >
+                  <BiEdit className="text-lg" />
+                </button>
+              ) : (
+                <button
+                  onClick={() => onEditToggle(item.id, false)}
+                  className="btn btn-ghost btn-xs text-green-600"
+                  title="Simpan"
+                >
+                  <BiSave className="text-lg" />
+                </button>
               )}
 
-              {/* Salin */}
-              <li>
-                <button
-                  onClick={() => onCopy(item.id)}
-                  className="justify-start"
-                  title="Salin item"
-                >
-                  <BiCopy className="text-indigo-600" />
-                  <span>Salin</span>
-                </button>
-              </li>
-
-              {/* Hapus */}
-              <li>
-                <button
-                  onClick={() => onDelete(item.id)}
-                  className="justify-start"
-                  title="Hapus baris"
-                >
-                  <BiTrash className="text-red-600" />
-                  <span>Hapus</span>
-                </button>
-              </li>
-            </ul>
+              <button
+                onClick={() => onCopy(item.id)}
+                className="btn btn-ghost btn-xs text-indigo-600"
+                title="Salin"
+              >
+                <BiCopy className="text-lg" />
+              </button>
+              <button
+                onClick={() => onDelete(item.id)}
+                className="btn btn-ghost btn-xs text-red-600"
+                title="Hapus"
+              >
+                <BiTrash className="text-lg" />
+              </button>
+            </div>
           </div>
+
+          {/* Grid field: Kode, Vol + Detail, Satuan, Harga Satuan, Total */}
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Kode</div>
+              {item.isEditing ? (
+                <SearchableSelect
+                  options={kodeOptions}
+                  value={item.kode ?? ""}
+                  onChange={(v) => v && onChangeKode(item.id, v)}
+                  placeholder="Pilih Kode"
+                  size="sm"
+                />
+              ) : (
+                <div className="font-mono text-sm text-gray-800">
+                  {item.kode || "-"}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Volume</div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min={0}
+                  step="any"
+                  className="input input-bordered input-sm w-28 text-right text-black bg-white border-black"
+                  value={volInputDisplay}
+                  onChange={(e) => {
+                    onUpdateField(item.id, "volumeSource", "MANUAL");
+                    onUpdateField(item.id, "manualVolumeInput", e.target.value);
+                  }}
+                  placeholder="0.00"
+                />
+                <button
+                  className="btn btn-ghost btn-xs text-blue-600"
+                  title="Detail Volume"
+                  onClick={() => onOpenVolumeModal(item)}
+                >
+                  <BiCalculator className="mr-1" /> Detail
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Satuan</div>
+              {item.isEditing ? (
+                <SearchableSelect
+                  options={unitOptions}
+                  value={item.satuan ?? ""}
+                  onChange={(v) => onUpdateField(item.id, "satuan", v ?? "")}
+                  placeholder="Pilih Satuan"
+                  size="sm"
+                />
+              ) : (
+                <div className="text-sm text-gray-800">
+                  {item.satuan || "-"}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Harga Satuan</div>
+              {item.isEditing ? (
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  className="input input-bordered input-sm w-full text-black bg-white border-black"
+                  value={item.hargaSatuanInput ?? ""}
+                  onChange={(e) =>
+                    onUpdateField(item.id, "hargaSatuanInput", e.target.value)
+                  }
+                  onBlur={() => onEditToggle(item.id, false)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === "Escape")
+                      onEditToggle(item.id, false);
+                  }}
+                  placeholder="0"
+                />
+              ) : (
+                <div className="text-sm text-black font-medium">
+                  {formatIDR(item.hargaSatuan)}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="text-[11px] text-gray-500 mb-1">Harga Total</div>
+              <div className="text-sm font-semibold text-gray-800">
+                {formatIDR(item.hargaTotal)}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------------- Group Header (Title) - Card ---------------------- */
+function SortableGroupHeaderCard({
+  groupIndexArabic,
+  sectionId,
+  group,
+  isLoadingItems,
+  PekerjaanOptions,
+  DropdownPekerjaan,
+  addItemToGroup,
+  deleteGroup,
+  onToggleEditGroupTitle,
+  onChangeGroupTitle,
+}: {
+  sectionIndexRoman: string; // I, II, ...
+  groupIndexArabic: string; // 1, 2, ...
+  sectionId: string;
+  group: Group;
+  isLoadingItems: boolean;
+  PekerjaanOptions: Option[];
+  DropdownPekerjaan: {
+    kode: string;
+    label: string;
+    value: string;
+    detail: {
+      deskripsi: string;
+      satuan: string;
+      harga: number;
+      categoryId?: string;
+      categoryName?: string;
+    };
+  }[];
+  addItemToGroup: (sectionId: string, groupId: string, source?: any) => void;
+  deleteGroup: (sectionId: string, groupId: string) => void;
+  onToggleEditGroupTitle: (
+    sectionId: string,
+    groupId: string,
+    editing: boolean
+  ) => void;
+  onChangeGroupTitle: (
+    sectionId: string,
+    groupId: string,
+    title: string
+  ) => void;
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: `grp-${group.id}` });
+
+  const style: React.CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+  const navigate = useNavigate();
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`rounded-lg px-3 py-2 bg-slate-50 border ${
+        isDragging ? "opacity-80 border-slate-300" : "border-slate-200"
+      }`}
+    >
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+        <div className="flex items-center gap-3">
           <button
-            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-gray-600 text-xl bg-white"
-            title="Drag"
-            aria-label="Drag untuk memindahkan"
+            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing text-black text-xl"
+            title="Urutkan Title"
+            aria-label="Drag Title"
             {...attributes}
             {...listeners}
           >
             ≡
           </button>
+          <div className="text-sm text-slate-600">
+            {groupIndexArabic}
+          </div>
+          <div className="font-semibold text-slate-800">
+            {group.isEditingTitle ? (
+              <input
+                autoFocus
+                className="input input-bordered input-sm text-black bg-white border-black"
+                value={group.title}
+                onChange={(e) =>
+                  onChangeGroupTitle(sectionId, group.id, e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape") {
+                    onToggleEditGroupTitle(sectionId, group.id, false);
+                  }
+                }}
+                onBlur={() =>
+                  onToggleEditGroupTitle(sectionId, group.id, false)
+                }
+                placeholder="Judul (mis. Cor Beton Sloof 20x25 cm)"
+              />
+            ) : (
+              group.title || "Title"
+            )}
+          </div>
         </div>
-      </td>
-    </tr>
+
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="w-72">
+            <SearchableSelect
+              options={PekerjaanOptions}
+              value={""}
+              onChange={(v) => {
+                if (!v) return;
+                const sel = DropdownPekerjaan.find((it) => it.value === v);
+                if (sel) addItemToGroup(sectionId, group.id, sel);
+              }}
+              placeholder={isLoadingItems ? "Memuat..." : "Tambah item HSP"}
+              loading={isLoadingItems}
+              size="sm"
+              clearable={false}
+              isButton={
+                <>
+                  <button
+                    onClick={() => navigate("/hsp")}
+                    className="btn bg-green-500 btn-sm w-full"
+                    title="Tambah item manual"
+                  >
+                    <BiPlus className="mr-1 text-white" /> Item HSP
+                  </button>
+                </>
+              }
+            />
+          </div>
+          <button
+            onClick={() => addItemToGroup(sectionId, group.id)}
+            className="btn btn-solid btn-sm"
+            title="Tambah item manual"
+          >
+            <BiPlus className="mr-1" /> Item
+          </button>
+
+          {!group.isEditingTitle ? (
+            <button
+              onClick={() => onToggleEditGroupTitle(sectionId, group.id, true)}
+              className="btn btn-ghost btn-xs text-blue-600"
+              title="Edit Title"
+            >
+              <BiEdit className="text-lg" />
+            </button>
+          ) : (
+            <button
+              onClick={() => onToggleEditGroupTitle(sectionId, group.id, false)}
+              className="btn btn-ghost btn-xs text-green-600"
+              title="Simpan Title"
+            >
+              <BiSave className="text-lg" />
+            </button>
+          )}
+
+          <button
+            onClick={() => deleteGroup(sectionId, group.id)}
+            className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
+            title="Hapus Title"
+          >
+            <BiTrash className="text-lg" />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 
-/** SECTION HEADER — draggable & editable */
-function SortableSectionHeader({
+/* ----------------------- Section Header (Kategori) - Card ----------------------- */
+function SortableSectionHeaderCard({
   section,
   index,
+  addGroup,
+  deleteSection,
+  onToggleEditTitle,
+  onChangeTitle,
   isLoadingItems,
   PekerjaanOptions,
   DropdownPekerjaan,
   addItemToSection,
-  deleteSection,
-  onToggleEditTitle,
-  onChangeTitle,
 }: {
   section: Section;
   index: number;
+  addGroup: (sectionId: string) => void;
+  deleteSection: (sectionId: string) => void;
+  onToggleEditTitle: (id: string, editing: boolean) => void;
+  onChangeTitle: (id: string, title: string) => void;
   isLoadingItems: boolean;
   PekerjaanOptions: Option[];
   DropdownPekerjaan: {
@@ -643,9 +852,6 @@ function SortableSectionHeader({
     };
   }[];
   addItemToSection: (sectionId: string, source?: any) => void;
-  deleteSection: (sectionId: string) => void;
-  onToggleEditTitle: (id: string, editing: boolean) => void;
-  onChangeTitle: (id: string, title: string) => void;
 }) {
   const {
     attributes,
@@ -660,17 +866,21 @@ function SortableSectionHeader({
     transform: CSS.Transform.toString(transform),
     transition,
   };
+
+  const idxRoman = toRoman(index + 1);
   const navigate = useNavigate();
   return (
-    <tr
+    <div
       ref={setNodeRef}
       style={style}
-      className={`bg-blue-50/70 ${isDragging ? "opacity-80" : ""}`}
+      className={`rounded-xl border p-4 sm:p-5 bg-blue-50/50 ${
+        isDragging ? "opacity-80 border-blue-300" : "border-blue-200"
+      }`}
     >
-      <td className="px-4 py-3 text-sm font-semibold text-blue-700">
-        <div className="flex items-end gap-2">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+        <div className="flex items-center gap-3">
           <button
-            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-2 text-3xl text-black bg-white"
+            className="btn btn-ghost btn-xs cursor-grab active:cursor-grabbing mr-1 text-2xl text-black"
             title="Drag kategori"
             aria-label="Drag kategori"
             {...attributes}
@@ -678,73 +888,76 @@ function SortableSectionHeader({
           >
             ≡
           </button>
-          {String.fromCharCode(65 + index)}
-        </div>
-      </td>
+          <div className="text-blue-700 font-semibold">{idxRoman}</div>
 
-      {/* Judul kategori (editable) */}
-      <td className="px-4 py-3 text-sm font-bold text-blue-800">
-        {section.isEditingTitle ? (
-          <input
-            autoFocus
-            className="input input-bordered input-sm w-full text-black bg-white border-black"
-            value={section.title}
-            onChange={(e) => onChangeTitle(section.id, e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === "Escape") {
-                onToggleEditTitle(section.id, false);
-              }
-            }}
-            onBlur={() => onToggleEditTitle(section.id, false)}
-            placeholder="Judul kategori"
-          />
-        ) : (
-          <span>{section.title}</span>
-        )}
-      </td>
-
-      <td colSpan={5}></td>
-
-      {/* Aksi header kategori */}
-      <td>
-        <div className="flex  gap-2 items-center">
-          {/* Tambah dari HSP */}
-          <div className="w-72">
-            <SearchableSelect
-              options={PekerjaanOptions}
-              value={""}
-              onChange={(v) => {
-                if (!v) return;
-                const sel = DropdownPekerjaan.find((it) => it.value === v);
-                if (sel) addItemToSection(section.id, sel);
-              }}
-              placeholder={isLoadingItems ? "Memuat..." : "Tambah dari HSP"}
-              loading={isLoadingItems}
-              size="sm"
-              clearable={false}
-              isButton={
-                <>
-                  <button
-                    className="w-full px-3 py-2 text-sm rounded-md bg-green-600 text-white hover:bg-green-500"
-                    onClick={() => navigate("/hsp")}
-                  >
-                    Kelola HSP
-                  </button>
-                </>
-              }
-            />
+          <div className="text-blue-800 font-bold">
+            {section.isEditingTitle ? (
+              <input
+                autoFocus
+                className="input input-bordered input-sm text-black bg-white border-black"
+                value={section.title}
+                onChange={(e) => onChangeTitle(section.id, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === "Escape")
+                    onToggleEditTitle(section.id, false);
+                }}
+                onBlur={() => onToggleEditTitle(section.id, false)}
+                placeholder="Judul kategori (mis. IV PEKERJAAN BETON)"
+              />
+            ) : (
+              section.title
+            )}
           </div>
+        </div>
 
-          {/* Tambah manual */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => addItemToSection(section.id)}
-            className="btn btn-solid btn-sm"
-            title="Tambah Manual"
+            onClick={() => addGroup(section.id)}
+            className="btn btn-success btn-xs text-white"
+            title="Tambah Title"
           >
-            <BiPlus className="mr-1" /> Manual
+            <BiPlus className="mr-1" /> Title
           </button>
 
-          {/* Edit / Simpan judul kategori */}
+          {/* Saat tidak ada group -> izinkan tambah item langsung */}
+          {!(section.groups && section.groups.length) && (
+            <>
+              <div className="w-72">
+                <SearchableSelect
+                  options={PekerjaanOptions}
+                  value={""}
+                  onChange={(v) => {
+                    if (!v) return;
+                    const sel = DropdownPekerjaan.find((it) => it.value === v);
+                    if (sel) addItemToSection(section.id, sel);
+                  }}
+                  placeholder={isLoadingItems ? "Memuat..." : "Tambah item HSP"}
+                  loading={isLoadingItems}
+                  size="sm"
+                  clearable={false}
+                  isButton={
+                    <>
+                      <button
+                        onClick={() => navigate("/hsp")}
+                        className="btn bg-green-500 btn-sm w-full"
+                        title="Tambah item manual"
+                      >
+                        <BiPlus className="mr-1 text-white" /> Item HSP
+                      </button>
+                    </>
+                  }
+                />
+              </div>
+              <button
+                onClick={() => addItemToSection(section.id)}
+                className="btn btn-solid btn-xs"
+                title="Tambah item manual"
+              >
+                <BiPlus className="mr-1" /> Item
+              </button>
+            </>
+          )}
+
           {!section.isEditingTitle ? (
             <button
               onClick={() => onToggleEditTitle(section.id, true)}
@@ -763,7 +976,6 @@ function SortableSectionHeader({
             </button>
           )}
 
-          {/* Hapus kategori */}
           <button
             onClick={() => deleteSection(section.id)}
             className="btn btn-ghost btn-xs text-red-600 hover:bg-red-600 hover:text-white"
@@ -772,18 +984,21 @@ function SortableSectionHeader({
             <BiTrash className="text-lg" />
           </button>
         </div>
-      </td>
-    </tr>
+      </div>
+    </div>
   );
 }
 
-/* --------------------------- Step 2: Items Table --------------------------- */
+/* --------------------------- Step 2 (Items + DnD) --------------------------- */
 type CreateStepTwoProps = {
   projectProfile: ProjectProfile;
   onSave: (data: any) => void;
 };
 
-const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
+const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
+  projectProfile,
+  onSave,
+}) => {
   const [sections, setSections] = useState<Section[]>([]);
   const [isAddingSection, setIsAddingSection] = useState(false);
   const [isManualSection, setIsManualSection] = useState(false);
@@ -800,48 +1015,63 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     VolumeDetailRow[] | undefined
   >(undefined);
 
-  const { data: hspAll, isLoading } = useGetAdminAllWithItemsFlat();
+  const { data: hspAll, isLoading: isLoadingHsp } =
+    useGetAdminAllWithItemsFlat();
   const itemJobList = hspAll?.items ?? [];
   const categories = hspAll?.categories ?? [];
-  // Opsi unik untuk dropdown KODE (ambil harga default untuk kode tsb)
+
   const KodeOptions: Option[] = useMemo(() => {
-    const byKode = new Map<string, { harga: number }>();
+    const uniq = new Set<string>();
+    const out: Option[] = [];
     for (const it of itemJobList) {
       const k = it?.kode ?? "";
-      if (!k) continue;
-      if (!byKode.has(k)) byKode.set(k, { harga: Number(it?.harga ?? 0) });
+      if (!k || uniq.has(k)) continue;
+      uniq.add(k);
+      out.push({ label: k, value: k });
     }
-    return Array.from(byKode.keys()).map((k) => ({ label: k, value: k }));
+    return out;
   }, [itemJobList]);
 
-  // Ganti kode: hanya update kode & hargaSatuan (recalc total). Lainnya tetap.
   const changeItemKode = (id: string, kodeBaru: string) => {
-    // cari harga untuk kodeBaru (ambil first match)
-    const found = itemJobList.find((it: any) => it?.kode === kodeBaru);
-    const newHarga = Number(found?.harga ?? 0);
+    const job = itemJobList.find((it: any) => it?.kode === kodeBaru);
+    const hargaBaru = Number(job?.harga ?? 0);
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) => {
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== id) return i;
+            const next: ItemRow = { ...i, kode: kodeBaru };
+            next.hargaSatuan = hargaBaru;
+            next.hargaSatuanInput = undefined;
+            const volEff = getEffectiveVolume(next);
+            next.hargaTotal = volEff * hargaBaru;
+            return next;
+          }),
+        })),
+        items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
-          const next = { ...i, kode: kodeBaru } as ItemRow;
-          // set hargaSatuan dari kode, bersihkan input edit supaya konsisten
-          next.hargaSatuan = newHarga;
+          const next: ItemRow = { ...i, kode: kodeBaru };
+          next.hargaSatuan = hargaBaru;
           next.hargaSatuanInput = undefined;
-          // Recalc total pakai volume efektif
-          const effVol = getEffectiveVolume(next);
-          next.hargaTotal = effVol * newHarga;
+          const volEff = getEffectiveVolume(next);
+          next.hargaTotal = volEff * hargaBaru;
           return next;
         }),
       }))
     );
   };
+
   const CategoryOptions: Option[] = useMemo(
     () =>
-      (categories ?? []).map((c: { name: string }) => ({
-        label: c.name,
-        value: c.name,
-      })),
+      (categories ?? [])
+        .slice()
+        .sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)))
+        .map((c: any) => ({
+          label: c.name,
+          value: c.name,
+        })),
     [categories]
   );
 
@@ -866,7 +1096,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         const unique = `${it.kode}::${it.ownerUserId ?? "GLOBAL"}`;
         return {
           kode: it.kode,
-          label: ` ${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
+          label: `${it.deskripsi} - ${formatIDR(it.harga ?? 0)}/${
             it.satuan ?? "-"
           }`,
           value: unique,
@@ -876,6 +1106,8 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
             harga: it.harga ?? 0,
             categoryId: it.hspCategoryId,
             categoryName: it.categoryName,
+            scope: it.scope,
+            ownerUserId: it.ownerUserId,
           },
         };
       }),
@@ -895,7 +1127,13 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     if (!title) return;
     setSections((prev) => [
       ...prev,
-      { id: uid(), title, items: [], isEditingTitle: false },
+      {
+        id: uid(),
+        title,
+        isEditingTitle: false,
+        groups: [],
+        items: undefined,
+      },
     ]);
     setIsAddingSection(false);
     setIsManualSection(false);
@@ -906,10 +1144,113 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   const deleteSection = (sectionId: string) =>
     setSections((prev) => prev.filter((s) => s.id !== sectionId));
 
+  /* Groups */
+  const addGroup = (sectionId: string) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const groups = s.groups ?? [];
+        return {
+          ...s,
+          groups: [
+            ...groups,
+            { id: uid(), title: "Title Baru", items: [], isEditingTitle: true },
+          ],
+          items: undefined,
+        };
+      })
+    );
+  };
+
+  const deleteGroup = (sectionId: string, groupId: string) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? { ...s, groups: (s.groups || []).filter((g) => g.id !== groupId) }
+          : s
+      )
+    );
+  };
+
+  const onToggleEditGroupTitle = (
+    sectionId: string,
+    groupId: string,
+    editing: boolean
+  ) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              groups: (s.groups || []).map((g) =>
+                g.id === groupId ? { ...g, isEditingTitle: editing } : g
+              ),
+            }
+          : s
+      )
+    );
+  };
+
+  const onChangeGroupTitle = (
+    sectionId: string,
+    groupId: string,
+    title: string
+  ) => {
+    setSections((prev) =>
+      prev.map((s) =>
+        s.id === sectionId
+          ? {
+              ...s,
+              groups: (s.groups || []).map((g) =>
+                g.id === groupId ? { ...g, title } : g
+              ),
+            }
+          : s
+      )
+    );
+  };
+
+  /* Items pada Group */
+  const addItemToGroup = (
+    sectionId: string,
+    groupId: string,
+    source?: PekerjaanDropdown
+  ) => {
+    setSections((prev) =>
+      prev.map((s) => {
+        if (s.id !== sectionId) return s;
+        const groups = (s.groups || []).map((g) => {
+          if (g.id !== groupId) return g;
+          const base: ItemRow = {
+            id: uid(),
+            kode: source?.kode || "",
+            deskripsi: source?.detail.deskripsi || "",
+            volume: 0,
+            volumeDetails: [],
+            volumeSource: "DETAIL",
+            manualVolumeInput: "",
+            satuan: source?.detail.satuan || "",
+            hargaSatuan: source?.detail.harga ?? 0,
+            hargaSatuanInput:
+              source?.detail.harga && source.detail.harga > 0
+                ? String(source.detail.harga)
+                : "",
+            hargaTotal: 0,
+            isEditing: true,
+          };
+          return { ...g, items: [...g.items, base] };
+        });
+        return { ...s, groups, items: undefined };
+      })
+    );
+  };
+
+  // Items langsung pada Section (tanpa Title)
   const addItemToSection = (sectionId: string, source?: PekerjaanDropdown) => {
     setSections((prev) =>
       prev.map((s) => {
         if (s.id !== sectionId) return s;
+        const items = s.items ? [...s.items] : [];
         const base: ItemRow = {
           id: uid(),
           kode: source?.kode || "",
@@ -927,14 +1268,26 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           hargaTotal: 0,
           isEditing: true,
         };
-        return { ...s, items: [...s.items, base] };
+        items.push(base);
+        return {
+          ...s,
+          groups: s.groups && s.groups.length > 0 ? s.groups : [],
+          items,
+        };
       })
     );
   };
 
   const deleteItem = (itemId: string) => {
     setSections((prev) =>
-      prev.map((s) => ({ ...s, items: s.items.filter((i) => i.id !== itemId) }))
+      prev.map((s) => ({
+        ...s,
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.filter((i) => i.id !== itemId),
+        })),
+        items: (s.items || []).filter((i) => i.id !== itemId),
+      }))
     );
   };
 
@@ -942,9 +1295,31 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) => {
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== id) return i;
+            if (editing) {
+              const hsInput =
+                i.hargaSatuan > 0
+                  ? String(i.hargaSatuan)
+                  : i.hargaSatuanInput ?? "";
+              return { ...i, isEditing: true, hargaSatuanInput: hsInput };
+            } else {
+              const hs = toNumber(i.hargaSatuanInput);
+              const volEff = getEffectiveVolume(i);
+              return {
+                ...i,
+                isEditing: false,
+                hargaSatuan: hs,
+                hargaSatuanInput: undefined,
+                hargaTotal: volEff * hs,
+              };
+            }
+          }),
+        })),
+        items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
-
           if (editing) {
             const hsInput =
               i.hargaSatuan > 0
@@ -953,12 +1328,13 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
             return { ...i, isEditing: true, hargaSatuanInput: hsInput };
           } else {
             const hs = toNumber(i.hargaSatuanInput);
+            const volEff = getEffectiveVolume(i);
             return {
               ...i,
               isEditing: false,
               hargaSatuan: hs,
               hargaSatuanInput: undefined,
-              hargaTotal: getEffectiveVolume(i) * hs,
+              hargaTotal: volEff * hs,
             };
           }
         }),
@@ -970,10 +1346,33 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) => {
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== id) return i;
+
+            if (field === "hargaSatuanInput") {
+              const input = sanitizeMoneyInput(String(value));
+              const hs = toNumber(input);
+              const next = { ...i, hargaSatuanInput: input } as ItemRow;
+              next.hargaTotal = getEffectiveVolume(next) * hs;
+              return next;
+            }
+
+            const next: ItemRow = { ...i, [field]: value } as ItemRow;
+
+            const hs =
+              typeof next.hargaSatuanInput === "string"
+                ? toNumber(next.hargaSatuanInput)
+                : Number(next.hargaSatuan || 0);
+
+            next.hargaTotal = getEffectiveVolume(next) * hs;
+            return next;
+          }),
+        })),
+        items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
 
-          // hargaSatuanInput: sanitize & hitung ulang
           if (field === "hargaSatuanInput") {
             const input = sanitizeMoneyInput(String(value));
             const hs = toNumber(input);
@@ -982,14 +1381,11 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
             return next;
           }
 
-          // field lain (termasuk volumeSource & manualVolumeInput)
           const next: ItemRow = { ...i, [field]: value } as ItemRow;
-
           const hs =
             typeof next.hargaSatuanInput === "string"
               ? toNumber(next.hargaSatuanInput)
               : Number(next.hargaSatuan || 0);
-
           next.hargaTotal = getEffectiveVolume(next) * hs;
           return next;
         }),
@@ -997,26 +1393,53 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     );
   };
 
-  /* -------------------------- Copy item -------------------------- */
   const copyItem = (itemId: string) => {
     setSections((prev) =>
       prev.map((s) => {
-        const idx = s.items.findIndex((i) => i.id === itemId);
-        if (idx === -1) return s;
-        const src = s.items[idx];
-        const clone: ItemRow = {
-          ...src,
-          id: uid(),
-          isEditing: true,
-          hargaSatuanInput: src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
-          volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
-          volumeSource: src.volumeSource ?? "DETAIL",
-          manualVolumeInput: src.manualVolumeInput ?? "",
-          hargaTotal: getEffectiveVolume(src) * (Number(src.hargaSatuan) || 0),
-        } as ItemRow;
-        const items = [...s.items];
-        items.splice(idx + 1, 0, clone);
-        return { ...s, items };
+        const next = { ...s };
+        if (next.groups?.length) {
+          next.groups = next.groups.map((g) => {
+            const idx = g.items.findIndex((i) => i.id === itemId);
+            if (idx === -1) return g;
+            const src = g.items[idx];
+            const clone: ItemRow = {
+              ...src,
+              id: uid(),
+              isEditing: true,
+              hargaSatuanInput:
+                src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
+              volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
+              volumeSource: src.volumeSource ?? "DETAIL",
+              manualVolumeInput: src.manualVolumeInput ?? "",
+              hargaTotal:
+                getEffectiveVolume(src) * (Number(src.hargaSatuan) || 0),
+            };
+            const items = [...g.items];
+            items.splice(idx + 1, 0, clone);
+            return { ...g, items };
+          });
+        } else if (next.items?.length) {
+          const idx = next.items.findIndex((i) => i.id === itemId);
+          if (idx !== -1) {
+            const src = next.items[idx];
+            const clone: ItemRow = {
+              ...src,
+              id: uid(),
+              isEditing: true,
+              hargaSatuanInput:
+                src.hargaSatuan > 0 ? String(src.hargaSatuan) : "",
+              volumeDetails: src.volumeDetails ? [...src.volumeDetails] : [],
+              volumeSource: src.volumeSource ?? "DETAIL",
+              manualVolumeInput: src.manualVolumeInput ?? "",
+              hargaTotal:
+                getEffectiveVolume(src) * (Number(src.hargaSatuan) || 0),
+            };
+            const items = [...next.items];
+            items.splice(idx + 1, 0, clone);
+            next.items = items;
+          }
+        }
+        return next;
       })
     );
   };
@@ -1037,22 +1460,38 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
-        items: s.items.map((i) => {
+        groups: (s.groups || []).map((g) => ({
+          ...g,
+          items: g.items.map((i) => {
+            if (i.id !== itemId) return i;
+            const volume = Number(totalVol || 0);
+            const next: ItemRow = {
+              ...i,
+              volume,
+              volumeDetails: rows,
+              volumeSource: "DETAIL",
+            };
+            const hs =
+              typeof next.hargaSatuanInput === "string"
+                ? toNumber(next.hargaSatuanInput)
+                : Number(next.hargaSatuan || 0);
+            next.hargaTotal = getEffectiveVolume(next) * hs;
+            return next;
+          }),
+        })),
+        items: (s.items || []).map((i) => {
           if (i.id !== itemId) return i;
-
           const volume = Number(totalVol || 0);
           const next: ItemRow = {
             ...i,
             volume,
             volumeDetails: rows,
-            volumeSource: "DETAIL", // hasil modal = pakai DETAIL
+            volumeSource: "DETAIL",
           };
-
           const hs =
             typeof next.hargaSatuanInput === "string"
               ? toNumber(next.hargaSatuanInput)
               : Number(next.hargaSatuan || 0);
-
           next.hargaTotal = getEffectiveVolume(next) * hs;
           return next;
         }),
@@ -1062,14 +1501,65 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
 
   /* --------------------------- Drag & Drop Logic -------------------------- */
   const isSectionId = (dndId: string) => dndId.startsWith("sec-");
+  const isGroupId = (dndId: string) => dndId.startsWith("grp-");
   const isItemId = (dndId: string) => dndId.startsWith("item-");
   const rawSectionId = (dndId: string) => dndId.replace(/^sec-/, "");
+  const rawGroupId = (dndId: string) => dndId.replace(/^grp-/, "");
   const rawItemId = (dndId: string) => dndId.replace(/^item-/, "");
 
-  const findSectionIdByItemId = (itemDndId: string) => {
+  const findPathByItemDndId = (itemDndId: string) => {
     const itemId = rawItemId(itemDndId);
-    for (const s of sections)
-      if (s.items.some((i) => i.id === itemId)) return s.id;
+    for (const s of sections) {
+      if (s.groups?.length) {
+        for (const g of s.groups) {
+          if (g.items.some((i) => i.id === itemId))
+            return { sectionId: s.id, groupId: g.id };
+        }
+      }
+      if (s.items?.some((i) => i.id === itemId)) return { sectionId: s.id };
+    }
+    return null;
+  };
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 5 },
+    })
+  );
+  const splitTail = (s: string) => {
+    const p = s.lastIndexOf("-");
+    return p === -1 ? [s, ""] : [s.slice(0, p), s.slice(p + 1)];
+  };
+
+  const parseGroupOverId = (overId: string) => {
+    if (!overId.startsWith("ghead-") && !overId.startsWith("gdrop-"))
+      return null;
+    const kind = overId.startsWith("ghead-") ? "head" : "drop";
+    const rest = overId.replace(/^ghead-/, "").replace(/^gdrop-/, "");
+    const [sectionId, groupId] = splitTail(rest);
+    return { kind, sectionId, groupId };
+  };
+
+  const parseSectionOverId = (overId: string) => {
+    if (overId.startsWith("section-")) {
+      return {
+        kind: "section" as const,
+        sectionId: overId.slice("section-".length),
+      };
+    }
+    if (overId.startsWith("dropzone-")) {
+      return {
+        kind: "dropzone" as const,
+        sectionId: overId.slice("dropzone-".length),
+      };
+    }
+    return null;
+  };
+
+  const findSectionIdByGroupId = (groupId: string, data: Section[]) => {
+    for (const s of data) {
+      if (s.groups?.some((g) => g.id === groupId)) return s.id;
+    }
     return null;
   };
 
@@ -1081,7 +1571,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     const overId = String(over.id);
     if (activeId === overId) return;
 
-    // Reorder KATEGORI
+    // --- Reorder Section
     if (isSectionId(activeId) && isSectionId(overId)) {
       const fromId = rawSectionId(activeId);
       const toId = rawSectionId(overId);
@@ -1090,51 +1580,130 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         const fromIdx = next.findIndex((s) => s.id === fromId);
         const toIdx = next.findIndex((s) => s.id === toId);
         if (fromIdx < 0 || toIdx < 0) return prev;
-        const [moved] = next.splice(fromIdx, 1);
-        next.splice(toIdx, 0, moved);
+        const [m] = next.splice(fromIdx, 1);
+        next.splice(toIdx, 0, m);
         return next;
       });
       return;
     }
 
-    // Drag ITEM
+    // --- Reorder Group dalam Section
+    if (isGroupId(activeId) && isGroupId(overId)) {
+      const fromG = rawGroupId(activeId);
+      const toG = rawGroupId(overId);
+      setSections((prev) =>
+        prev.map((s) => {
+          if (!s.groups?.length) return s;
+          const idxFrom = s.groups.findIndex((g) => g.id === fromG);
+          const idxTo = s.groups.findIndex((g) => g.id === toG);
+          if (idxFrom < 0 || idxTo < 0) return s;
+          const arr = [...s.groups];
+          const [m] = arr.splice(idxFrom, 1);
+          arr.splice(idxTo, 0, m);
+          return { ...s, groups: arr };
+        })
+      );
+      return;
+    }
+
+    // --- Item drag
     if (!isItemId(activeId)) return;
-    const isOverItem = isItemId(overId);
-    const isOverSectionTop = overId.startsWith("section-");
-    const isOverSectionBottom = overId.startsWith("dropzone-");
 
-    const fromSectionId = findSectionIdByItemId(activeId);
-    if (!fromSectionId) return;
+    const activePath = findPathByItemDndId(activeId);
+    if (!activePath) return;
 
-    const toSectionId = isOverItem
-      ? findSectionIdByItemId(overId)!
-      : isOverSectionTop
-      ? overId.replace("section-", "")
-      : isOverSectionBottom
-      ? overId.replace("dropzone-", "")
-      : null;
+    const overIsItem = isItemId(overId);
+    const overGroupRow = parseGroupOverId(overId);
+    const overSectionRow = parseSectionOverId(overId);
+    const overIsGroupHeader = isGroupId(overId);
+    const overIsSectionHeader = isSectionId(overId);
+
+    let toSectionId: string | undefined;
+    let toGroupId: string | undefined;
+
+    if (overIsItem) {
+      const p = findPathByItemDndId(overId);
+      toSectionId = p?.sectionId;
+      toGroupId = p?.groupId;
+    } else if (overGroupRow) {
+      toSectionId = overGroupRow.sectionId;
+      toGroupId = overGroupRow.groupId;
+    } else if (overIsGroupHeader) {
+      const gId = rawGroupId(overId);
+      toSectionId = findSectionIdByGroupId(gId, sections) || undefined;
+      toGroupId = gId;
+    } else if (overSectionRow) {
+      toSectionId = overSectionRow.sectionId;
+      toGroupId = undefined;
+    } else if (overIsSectionHeader) {
+      toSectionId = rawSectionId(overId);
+      toGroupId = undefined;
+    }
 
     if (!toSectionId) return;
 
     const activeItemId = rawItemId(activeId);
-    const overItemId = isOverItem ? rawItemId(overId) : null;
+    const overItemId = overIsItem ? rawItemId(overId) : null;
 
     setSections((prev) => {
-      const next = prev.map((s) => ({ ...s, items: [...s.items] }));
-      const from = next.find((s) => s.id === fromSectionId)!;
-      const to = next.find((s) => s.id === toSectionId)!;
+      const next = prev.map((s) => ({
+        ...s,
+        groups: s.groups?.map((g) => ({ ...g, items: [...g.items] })),
+        items: s.items ? [...s.items] : undefined,
+      }));
 
-      const fromIdx = from.items.findIndex((i) => i.id === activeItemId);
-      const [moved] = from.items.splice(fromIdx, 1);
-
-      if (isOverItem && overItemId) {
-        const overIdx = to.items.findIndex((i) => i.id === overItemId);
-        to.items.splice(overIdx, 0, moved);
-      } else if (isOverSectionTop) {
-        to.items.unshift(moved);
-      } else if (isOverSectionBottom) {
-        to.items.push(moved);
+      // 1) Ambil item dari sumber
+      let moving: ItemRow | null = null;
+      for (const s of next) {
+        if (s.id !== activePath.sectionId) continue;
+        if (activePath.groupId && s.groups?.length) {
+          const g = s.groups.find((x) => x.id === activePath.groupId);
+          if (g) {
+            const idx = g.items.findIndex((i) => i.id === activeItemId);
+            if (idx >= 0) [moving] = g.items.splice(idx, 1);
+          }
+        } else if (s.items) {
+          const idx = s.items.findIndex((i) => i.id === activeItemId);
+          if (idx >= 0) [moving] = s.items.splice(idx, 1);
+        }
       }
+      if (!moving) return prev;
+
+      // 2) Taruh ke tujuan
+      const targetSection = next.find((s) => s.id === toSectionId);
+      if (!targetSection) return prev;
+
+      if (toGroupId && targetSection.groups?.length) {
+        const g = targetSection.groups.find((x) => x.id === toGroupId);
+        if (!g) return prev;
+
+        if (overIsItem && overItemId) {
+          const idx = g.items.findIndex((i) => i.id === overItemId);
+          g.items.splice(idx < 0 ? g.items.length : idx, 0, moving);
+        } else if (overGroupRow?.kind === "head") {
+          g.items.unshift(moving);
+        } else if (overIsGroupHeader) {
+          g.items.push(moving);
+        } else {
+          g.items.push(moving);
+        }
+      } else {
+        targetSection.items = targetSection.items || [];
+
+        if (overIsItem && overItemId) {
+          const idx = targetSection.items.findIndex((i) => i.id === overItemId);
+          targetSection.items.splice(
+            idx < 0 ? targetSection.items.length : idx,
+            0,
+            moving
+          );
+        } else if (overSectionRow?.kind === "section" || overIsSectionHeader) {
+          targetSection.items.unshift(moving);
+        } else {
+          targetSection.items.push(moving);
+        }
+      }
+
       return next;
     });
   };
@@ -1142,47 +1711,92 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
   const handleDragOver = (_e: DragOverEvent) => {};
 
   /* ------------------------------ Aggregations ----------------------------- */
-  const subtotal = sections.reduce(
-    (acc, s) =>
-      acc + s.items.reduce((t, i) => t + Number(i.hargaTotal ?? 0), 0),
-    0
-  );
+  const subtotal = sections.reduce((sectAcc, s) => {
+    const fromGroups =
+      s.groups?.reduce(
+        (acc, g) =>
+          acc + g.items.reduce((t, i) => t + Number(i.hargaTotal || 0), 0),
+        0
+      ) || 0;
+    const fromItems =
+      s.items?.reduce((t, i) => t + Number(i.hargaTotal || 0), 0) || 0;
+    return sectAcc + fromGroups + fromItems;
+  }, 0);
+
   const ppnPct = Math.max(0, Number(projectProfile.ppn || "0"));
   const ppnAmount = (subtotal * ppnPct) / 100;
   const grandTotal = subtotal + ppnAmount;
 
+  /* ------------------------------ Save payload ----------------------------- */
   const handleSaveAllData = () => {
-    const estimationItem = sections.map((s) => ({
-      title: s.title,
-      item: s.items.map((i) => {
-        const isManual = i.volumeSource === "MANUAL";
-        const effectiveVol = getEffectiveVolume(i);
-
+    const estimationItem = sections.map((s) => {
+      if (s.groups && s.groups.length > 0) {
         return {
-          kode: i.kode,
-          nama: i.deskripsi,
-          satuan: i.satuan,
-          harga: i.hargaSatuan,
-          volume: effectiveVol,
-          hargaTotal: effectiveVol * Number(i.hargaSatuan || 0),
-          details: isManual
-            ? []
-            : (i.volumeDetails || []).map((d) => ({
-                nama: d.uraian,
-                jenis: d.jenis, // "penjumlahan" | "pengurangan"
-                panjang: d.panjang,
-                lebar: d.lebar,
-                tinggi: d.tinggi,
-                jumlah: d.jumlah,
-                volume: Number(d.volume.toFixed(2)),
-                extras:
-                  d.extras && d.extras.length
-                    ? d.extras.map((x) => ({ name: x.name, value: x.value }))
-                    : [],
-              })),
+          title: s.title,
+          groups: s.groups.map((g) => ({
+            title: g.title,
+            items: g.items.map((i) => {
+              const effectiveVol = getEffectiveVolume(i);
+              const isManual = i.volumeSource === "MANUAL";
+              return {
+                kode: i.kode,
+                nama: i.deskripsi,
+                satuan: i.satuan,
+                harga: i.hargaSatuan,
+                volume: effectiveVol,
+                hargaTotal: effectiveVol * Number(i.hargaSatuan || 0),
+                details: isManual
+                  ? []
+                  : (i.volumeDetails || []).map((d) => ({
+                      nama: d.uraian,
+                      jenis: d.jenis,
+                      panjang: d.panjang,
+                      lebar: d.lebar,
+                      tinggi: d.tinggi,
+                      jumlah: d.jumlah,
+                      volume: Number(Number(d.volume).toFixed(2)),
+                      extras: (d.extras || []).map((ex: ExtraCol) => ({
+                        name: ex.name,
+                        value: ex.value,
+                      })),
+                    })),
+              };
+            }),
+          })),
         };
-      }),
-    }));
+      }
+
+      return {
+        title: s.title,
+        item: (s.items || []).map((i) => {
+          const effectiveVol = getEffectiveVolume(i);
+          const isManual = i.volumeSource === "MANUAL";
+          return {
+            kode: i.kode,
+            nama: i.deskripsi,
+            satuan: i.satuan,
+            harga: i.hargaSatuan,
+            volume: effectiveVol,
+            hargaTotal: effectiveVol * Number(i.hargaSatuan || 0),
+            details: isManual
+              ? []
+              : (i.volumeDetails || []).map((d) => ({
+                  nama: d.uraian,
+                  jenis: d.jenis,
+                  panjang: d.panjang,
+                  lebar: d.lebar,
+                  tinggi: d.tinggi,
+                  jumlah: d.jumlah,
+                  volume: Number(Number(d.volume).toFixed(2)),
+                  extras: (d.extras || []).map((ex: ExtraCol) => ({
+                    name: ex.name,
+                    value: ex.value,
+                  })),
+                })),
+          };
+        }),
+      };
+    });
 
     const dataToSave = {
       projectName: projectProfile.projectName,
@@ -1195,6 +1809,7 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
     onSave(dataToSave);
   };
 
+  /* --------------------------- Section handlers --------------------------- */
   const toggleEditSectionTitle = (sectionId: string, editing: boolean) => {
     setSections((prev) =>
       prev.map((s) =>
@@ -1218,7 +1833,9 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
           {projectProfile.projectName || "Nama Proyek"}
         </h2>
         <div className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="badge">{projectProfile.owner || "Owner: "}</span>
+          <span className="badge">
+            {projectProfile.owner ? `Owner: ${projectProfile.owner}` : "Owner"}
+          </span>
           <span className="badge">PPN {ppnPct || 0}%</span>
         </div>
       </div>
@@ -1239,8 +1856,9 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
                 options={CategoryOptions}
                 value={selectedSectionFromList}
                 onChange={(v) => setSelectedSectionFromList(v || "")}
-                placeholder={isLoading ? "Memuat..." : "Pilih Kategori"}
-                loading={isLoading}
+                placeholder={isLoadingHsp ? "Memuat..." : "Pilih Kategori"}
+                loading={isLoadingHsp}
+                size="sm"
               />
             )}
             <div className="flex flex-wrap gap-2">
@@ -1284,139 +1902,192 @@ const CreateStepTwo = ({ projectProfile, onSave }: CreateStepTwoProps) => {
         )}
       </div>
 
-      {/* TABLE + DnD */}
-      <div className="collapse bg-transparent shadow-none">
-        <div className="overflow-x-auto rounded-lg border border-gray-200 h-[500px]">
-          <DndContext
-            sensors={useSensors(
-              useSensor(PointerSensor, {
-                activationConstraint: { distance: 5 },
-              })
-            )}
-            onDragEnd={handleDragEnd}
-            onDragOver={handleDragOver}
-            collisionDetection={closestCorners}
-          >
-            <table className="table min-w-[1100px]">
-              <thead className="bg-gray-50 sticky top-0 z-[1]">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    No
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Uraian Pekerjaan
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Kode
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Vol
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Satuan
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Harga Satuan
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Harga Total
-                  </th>
-                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase">
-                    Aksi
-                  </th>
-                </tr>
-              </thead>
+      {/* CARD LIST + DnD */}
+      <div className="space-y-4">
+        <DndContext
+          sensors={sensors}
+          onDragEnd={handleDragEnd}
+          onDragOver={handleDragOver}
+          collisionDetection={pointerWithin}
+          autoScroll={{
+            enabled: true,
+            acceleration: 12,
+            interval: 10,
+            threshold: { x: 0.2, y: 0.2 },
+          }}
+          measuring={{
+            droppable: {
+              strategy: MeasuringStrategy.Always,
+            },
+          }}
+        >
+          {sections.length === 0 && (
+            <div className="rounded-lg border border-gray-200 bg-white p-6 text-center text-sm text-gray-500">
+              Belum ada kategori.
+            </div>
+          )}
 
-              <tbody className="bg-white">
-                {sections.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={8}
-                      className="px-6 py-8 text-center text-sm text-gray-500"
-                    >
-                      Belum ada kategori. Tambahkan kategori pekerjaan terlebih
-                      dahulu.
-                    </td>
-                  </tr>
-                )}
+          {sections.map((section, sIdx) => {
+            const groups = section.groups || [];
+            const fallbackItems = section.items || [];
+            const sRoman = toRoman(sIdx + 1);
 
-                {sections.map((section, sIdx) => (
-                  <SortableContext
-                    key={section.id}
-                    items={section.items.map((i) => `item-${i.id}`)}
-                    strategy={rectSortingStrategy}
-                  >
-                    {/* Header Kategori */}
-                    <SortableSectionHeader
+            return (
+              <SortableContext
+                key={section.id}
+                items={[
+                  ...groups.map((g) => `grp-${g.id}`),
+                  ...groups.flatMap((g) => g.items.map((i) => `item-${i.id}`)),
+                  ...fallbackItems.map((i) => `item-${i.id}`),
+                ]}
+                strategy={rectSortingStrategy}
+              >
+                {/* Kategori Card */}
+                <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                  {/* Header kategori */}
+                  <div className="p-4 border-b border-gray-200">
+                    <SortableSectionHeaderCard
                       section={section}
                       index={sIdx}
-                      isLoadingItems={isLoading}
-                      PekerjaanOptions={PekerjaanOptions}
-                      DropdownPekerjaan={DropdownPekerjaan}
-                      addItemToSection={addItemToSection}
+                      addGroup={addGroup}
                       deleteSection={deleteSection}
                       onToggleEditTitle={toggleEditSectionTitle}
                       onChangeTitle={changeSectionTitle}
+                      isLoadingItems={isLoadingHsp}
+                      PekerjaanOptions={PekerjaanOptions}
+                      DropdownPekerjaan={DropdownPekerjaan}
+                      addItemToSection={addItemToSection}
                     />
+                  </div>
 
-                    {/* DROPPABLE: header (drop ke atas list) */}
-                    <DroppableRow
-                      droppableId={`section-${section.id}`}
-                      colSpan={8}
-                    />
+                  {/* Body kategori */}
+                  <div className="p-4 space-y-4">
+                    {/* Jika punya groups (Title) */}
+                    {groups.length > 0 ? (
+                      <>
+                        {groups.map((group, gIdx) => (
+                          <React.Fragment key={group.id}>
+                            {/* Header Title */}
+                            <SortableGroupHeaderCard
+                              sectionIndexRoman={sRoman}
+                              groupIndexArabic={toArabic(gIdx)}
+                              sectionId={section.id}
+                              group={group}
+                              isLoadingItems={isLoadingHsp}
+                              PekerjaanOptions={PekerjaanOptions}
+                              DropdownPekerjaan={DropdownPekerjaan}
+                              addItemToGroup={addItemToGroup}
+                              deleteGroup={deleteGroup}
+                              onToggleEditGroupTitle={onToggleEditGroupTitle}
+                              onChangeGroupTitle={onChangeGroupTitle}
+                            />
 
-                    {/* Items */}
-                    {section.items.map((item, idxInSection) => (
-                      <SortableItemRow
-                        key={item.id}
-                        idxInSection={idxInSection}
-                        item={item}
-                        onEditToggle={toggleEditItem}
-                        onDelete={deleteItem}
-                        onCopy={copyItem}
-                        onUpdateField={updateItemField}
-                        onOpenVolumeModal={openVolumeModal}
-                        kodeOptions={KodeOptions}
-                        onChangeKode={changeItemKode}
-                      />
-                    ))}
+                            {/* Dropzone atas group */}
+                            <DroppableZone
+                              droppableId={`ghead-${section.id}-${group.id}`}
+                              className="my-2"
+                            />
 
-                    {/* DROPPABLE: bawah (akhir list) */}
-                    <DroppableRow
-                      droppableId={`dropzone-${section.id}`}
-                      colSpan={7}
-                      showHint={section.items.length === 0}
-                    />
+                            {/* Items (huruf kecil a,b,...) */}
+                            <div className="space-y-3">
+                              {group.items.map((item, idxInGroup) => (
+                                <SortableItemCard
+                                  key={item.id}
+                                  itemIndexDisplay={toAlpha(idxInGroup)}
+                                  item={item}
+                                  onEditToggle={toggleEditItem}
+                                  onDelete={deleteItem}
+                                  onCopy={copyItem}
+                                  onUpdateField={updateItemField}
+                                  onOpenVolumeModal={openVolumeModal}
+                                  kodeOptions={KodeOptions}
+                                  onChangeKode={changeItemKode}
+                                />
+                              ))}
+                            </div>
 
-                    {/* Subtotal per kategori */}
-                    {!!section.items.length && (
-                      <tr className="bg-gray-50">
-                        <td
-                          colSpan={5}
-                          className="px-4 py-3 text-sm text-right text-gray-700"
-                        >
-                          Subtotal {section.title}
-                        </td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">
-                          {formatIDR(
-                            section.items.reduce(
-                              (a, b) => a + (b.hargaTotal ?? 0),
-                              0
-                            )
-                          )}
-                        </td>
-                        <td />
-                      </tr>
+                            {/* Dropzone bawah group */}
+                            <DroppableZone
+                              droppableId={`gdrop-${section.id}-${group.id}`}
+                              className="mt-2"
+                              showHint={group.items.length === 0}
+                            />
+
+                            {/* Subtotal per Title */}
+                            {!!group.items.length && (
+                              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                <div className="text-sm text-gray-800 font-semibold">
+                                  Subtotal {section.title} — {group.title}
+                                </div>
+                                <div className="text-sm font-semibold  text-gray-800">
+                                  {formatIDR(
+                                    group.items.reduce(
+                                      (a, b) => a + (b.hargaTotal ?? 0),
+                                      0
+                                    )
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </React.Fragment>
+                        ))}
+                      </>
+                    ) : (
+                      /* Fallback: items langsung di kategori (tanpa Title) */
+                      <>
+                        <DroppableZone
+                          droppableId={`section-${section.id}`}
+                          className="mb-2"
+                        />
+                        <div className="space-y-3">
+                          {fallbackItems.map((item, idxInGroup) => (
+                            <SortableItemCard
+                              key={item.id}
+                              // Tanpa title ⇒ item pakai angka 1,2,3...
+                              itemIndexDisplay={toArabic(idxInGroup)}
+                              item={item}
+                              onEditToggle={toggleEditItem}
+                              onDelete={deleteItem}
+                              onCopy={copyItem}
+                              onUpdateField={updateItemField}
+                              onOpenVolumeModal={openVolumeModal}
+                              kodeOptions={KodeOptions}
+                              onChangeKode={changeItemKode}
+                            />
+                          ))}
+                        </div>
+                        <DroppableZone
+                          droppableId={`dropzone-${section.id}`}
+                          className="mt-2"
+                          showHint={fallbackItems.length === 0}
+                        />
+
+                        {!!fallbackItems.length && (
+                          <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
+                            <div className="text-sm text-gray-700">
+                              Subtotal {section.title}
+                            </div>
+                            <div className="text-sm font-semibold">
+                              {formatIDR(
+                                fallbackItems.reduce(
+                                  (a, b) => a + (b.hargaTotal ?? 0),
+                                  0
+                                )
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     )}
-                  </SortableContext>
-                ))}
-              </tbody>
-            </table>
+                  </div>
+                </div>
+              </SortableContext>
+            );
+          })}
 
-            {/* Overlay (optional) */}
-            <DragOverlay dropAnimation={defaultDropAnimation} />
-          </DndContext>
-        </div>
+          {/* Overlay */}
+          <DragOverlay dropAnimation={defaultDropAnimation} />
+        </DndContext>
       </div>
 
       {/* Footer total & actions */}
@@ -1478,7 +2149,7 @@ const CreateEstimation = () => {
     ppn: "11",
     notes: "",
   });
-  const [customFields, setCustomFields] = useState<CustomField[]>([]);
+  const [customFields, setCustomFields] = useState<CustomFieldUI[]>([]);
   const createMutation = useCreateEstimation();
   const notify = useNotify();
   const toggleAccordion = (step: string) =>
@@ -1505,7 +2176,7 @@ const CreateEstimation = () => {
           setFormData({ projectName: "", owner: "", ppn: "11", notes: "" });
           setCustomFields([]);
           setActiveAccordion("step1");
-          setImageFile(null); // reset image
+          setImageFile(null);
           notify("Berhasil menyimpan data", "success");
         },
       }
@@ -1519,12 +2190,12 @@ const CreateEstimation = () => {
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-gray-900">Create Estimation</h1>
         <p className="text-sm text-gray-600">
-          Lengkapi profil proyek, lalu tambahkan item pekerjaan pada tabel di
-          bawah.
+          Lengkapi profil proyek, lalu tambahkan item pekerjaan.
         </p>
       </div>
 
       <div className="join join-vertical w-full gap-4">
+        {/* Step 1 */}
         <div className="collapse collapse-arrow join-item rounded-xl border border-gray-200 bg-white">
           <input
             type="radio"
@@ -1548,7 +2219,7 @@ const CreateEstimation = () => {
           </div>
         </div>
 
-        {/* ACCORDION: Step 2 */}
+        {/* Step 2 */}
         <div className="collapse collapse-arrow join-item rounded-xl border border-gray-200 bg-white">
           <input
             type="radio"
@@ -1557,7 +2228,7 @@ const CreateEstimation = () => {
             onChange={() => toggleAccordion("step2")}
           />
           <div className="collapse-title text-lg font-semibold text-gray-900">
-            {`  2) Estimation Items`}
+            {`2) Estimation Items`}
           </div>
           <div className="collapse-content p-0">
             <div className="p-4 sm:p-5">
