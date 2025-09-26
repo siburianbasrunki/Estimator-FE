@@ -31,7 +31,6 @@ type HspDataMap = Record<string, ItemType[]>;
 export const HspView = () => {
   const [search, setSearch] = useState("");
   const [selectedFileName, setSelectedFileName] = useState<string>("");
-
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const { data: units, isLoading: isLoadingUnits } = useGetUnits("");
   const unitOptions = useMemo(
@@ -55,8 +54,10 @@ export const HspView = () => {
   const [selectedCategoryId, setSelectedCategoryId] = useState<
     string | undefined
   >(undefined);
-  const  {isPending: isPendingCreate, mutateAsync: createItemAsync} = useCreateHspItem();
-  const { mutateAsync: updateItemAsync , isPending: isPendingUpdate} = useUpdateHspItem();
+  const { isPending: isPendingCreate, mutateAsync: createItemAsync } =
+    useCreateHspItem();
+  const { mutateAsync: updateItemAsync, isPending: isPendingUpdate } =
+    useUpdateHspItem();
   const { data: sources } = useGetSources();
   const sourceOptions = (sources ?? []).map((s) => s.label);
   const deleteItem = useDeleteHspItem();
@@ -660,13 +661,15 @@ export const HspView = () => {
                   )}
                 </select>
               </div>
-              <button
-                type="button"
-                onClick={() => navigate("/source")}
-                className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 w-full"
-              >
-                Tambah Sumber
-              </button>
+              {isAdmin && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/source")}
+                  className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 w-full"
+                >
+                  Tambah Sumber
+                </button>
+              )}
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
               <button
@@ -810,6 +813,7 @@ export const HspView = () => {
                   )}
                 </select>
               </div>
+
               <button
                 type="button"
                 onClick={() => navigate("/source")}
