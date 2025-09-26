@@ -1032,16 +1032,20 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   const categories = hspAll?.categories ?? [];
 
   const KodeOptions: Option[] = useMemo(() => {
-    const uniq = new Set<string>();
-    const out: Option[] = [];
-    for (const it of itemJobList) {
-      const k = it?.kode ?? "";
-      if (!k || uniq.has(k)) continue;
-      uniq.add(k);
-      out.push({ label: k, value: k });
-    }
-    return out;
-  }, [itemJobList]);
+  const seen = new Set<string>();
+  const out: Option[] = [];
+  for (const it of itemJobList) {
+    const k = String(it?.kode ?? "").trim();
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    const desc = String(it?.deskripsi ?? "").trim();
+    out.push({
+      label: desc ? `${k} — ${desc}` : k,
+      value: k,                          
+    });
+  }
+  return out;
+}, [itemJobList]);
 
   const changeItemKode = (id: string, kodeBaru: string) => {
     const job = itemJobList.find((it: any) => it?.kode === kodeBaru);

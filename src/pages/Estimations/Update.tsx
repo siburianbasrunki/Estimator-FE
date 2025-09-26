@@ -1037,13 +1037,17 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
   const categories = hspAll?.categories ?? [];
 
   const KodeOptions: Option[] = useMemo(() => {
-    const uniq = new Set<string>();
+    const seen = new Set<string>();
     const out: Option[] = [];
     for (const it of itemJobList) {
-      const k = it?.kode ?? "";
-      if (!k || uniq.has(k)) continue;
-      uniq.add(k);
-      out.push({ label: k, value: k });
+      const k = String(it?.kode ?? "").trim();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      const desc = String(it?.deskripsi ?? "").trim();
+      out.push({
+        label: desc ? `${k} — ${desc}` : k, 
+        value: k,
+      });
     }
     return out;
   }, [itemJobList]);
