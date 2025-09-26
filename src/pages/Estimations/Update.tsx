@@ -723,6 +723,8 @@ function SortableGroupHeaderCard({
     transition,
   };
 
+  const navigate = useNavigate();
+
   return (
     <div
       ref={setNodeRef}
@@ -782,6 +784,17 @@ function SortableGroupHeaderCard({
               loading={isLoadingItems}
               size="sm"
               clearable={false}
+              isButton={
+                <>
+                  <button
+                    onClick={() => navigate("/hsp")}
+                    className="btn bg-green-500 btn-sm w-full"
+                    title="Tambah item manual"
+                  >
+                    <BiPlus className="mr-1 text-white" /> Item HSP
+                  </button>
+                </>
+              }
             />
           </div>
           <button
