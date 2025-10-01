@@ -1032,20 +1032,20 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   const categories = hspAll?.categories ?? [];
 
   const KodeOptions: Option[] = useMemo(() => {
-  const seen = new Set<string>();
-  const out: Option[] = [];
-  for (const it of itemJobList) {
-    const k = String(it?.kode ?? "").trim();
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    const desc = String(it?.deskripsi ?? "").trim();
-    out.push({
-      label: desc ? `${k} — ${desc}` : k,
-      value: k,                          
-    });
-  }
-  return out;
-}, [itemJobList]);
+    const seen = new Set<string>();
+    const out: Option[] = [];
+    for (const it of itemJobList) {
+      const k = String(it?.kode ?? "").trim();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      const desc = String(it?.deskripsi ?? "").trim();
+      out.push({
+        label: desc ? `${k} — ${desc}` : k,
+        value: k,
+      });
+    }
+    return out;
+  }, [itemJobList]);
 
   const changeItemKode = (id: string, kodeBaru: string) => {
     const job = itemJobList.find((it: any) => it?.kode === kodeBaru);
@@ -2086,7 +2086,7 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
                             <div className="text-sm text-gray-700">
                               Subtotal {section.title}
                             </div>
-                            <div className="text-sm font-semibold">
+                            <div className="text-sm font-semibold text-black">
                               {formatIDR(
                                 fallbackItems.reduce(
                                   (a, b) => a + (b.hargaTotal ?? 0),
@@ -2204,9 +2204,17 @@ const CreateEstimation = () => {
   const navigate = useNavigate();
   return (
     <div className="mx-auto p-3 sm:p-4">
-      <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
+      <BackButton
+        className="
+    fixed z-40
+    left-4 top-20 
+    md:left-[calc(16rem+1rem)]  
+  "
+        onClick={() => navigate("/estimation")}
+        title="Kembali"
+      />
 
-      <div className="mb-5">
+      <div className="mb-5 mt-8">
         <h1 className="text-2xl font-bold text-gray-900">Create Estimation</h1>
         <p className="text-sm text-gray-600">
           Lengkapi profil proyek, lalu tambahkan item pekerjaan.

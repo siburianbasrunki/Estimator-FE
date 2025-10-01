@@ -1045,7 +1045,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
       seen.add(k);
       const desc = String(it?.deskripsi ?? "").trim();
       out.push({
-        label: desc ? `${k} — ${desc}` : k, 
+        label: desc ? `${k} — ${desc}` : k,
         value: k,
       });
     }
@@ -2143,7 +2143,7 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
                             <div className="text-sm text-gray-700">
                               Subtotal {section.title}
                             </div>
-                            <div className="text-sm font-semibold">
+                            <div className="text-sm font-semibold text-black">
                               {formatIDR(
                                 fallbackItems.reduce(
                                   (a, b) => a + (b.hargaTotal ?? 0),
@@ -2441,9 +2441,17 @@ const UpdateEstimation: React.FC = () => {
 
   return (
     <div className="mx-auto p-3 sm:p-4">
-      <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
+      <BackButton
+        className="
+          fixed z-40
+          left-4 top-20 
+          md:left-[calc(16rem+1rem)]  
+        "
+        onClick={() => navigate("/estimation")}
+        title="Kembali"
+      />
 
-      <div className="mb-5">
+      <div className="mb-5 mt-8">
         <h1 className="text-2xl font-bold text-gray-900">Update Estimation</h1>
       </div>
 
