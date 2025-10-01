@@ -372,7 +372,7 @@ export const AhspView: React.FC = () => {
     <div className="space-y-6">
       <BackButton
         className="
-    fixed z-40
+    fixed z-10
     left-4 top-20 
     md:left-[calc(16rem+1rem)]  
   "

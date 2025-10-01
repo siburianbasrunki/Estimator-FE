@@ -372,7 +372,7 @@ export const DetailEstimation: React.FC = () => {
     <div className="max-w mx-auto space-y-6 text-black">
       <BackButton
         className="
-    fixed z-40
+    fixed z-10
     left-4 top-20 
     md:left-[calc(16rem+1rem)]  
   "
