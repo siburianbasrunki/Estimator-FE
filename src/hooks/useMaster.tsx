@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
-import HspService, { type ImportMasterSummary } from "../service/hsp";
 import type {
   MasterCreatePayload,
   MasterItem,
   MasterType,
   MasterUpdatePayload,
 } from "../model/master";
+import type { ImportMasterSummary } from "../service/master";
+import MasterService from "../service/master";
 
 export const useImportMaster = (type: MasterType) => {
   const qc = useQueryClient();
@@ -27,13 +28,13 @@ export const useImportMaster = (type: MasterType) => {
       preferDaily = true,
     }) => {
       if (type === "MATERIAL") {
-        return HspService.importMasterMaterials(file, {
+        return MasterService.importMasterMaterials(file, {
           useHargaFile,
           lockExistingPrice,
         });
       }
       if (type === "LABOR") {
-        return HspService.importMasterLabor(file, {
+        return MasterService.importMasterLabor(file, {
           useHargaFile,
           lockExistingPrice,
           preferDaily,
@@ -72,7 +73,7 @@ export const useListMaster = (
   return useQuery({
     queryKey: ["master", type, q, page, pageSize, orderBy, orderDir],
     queryFn: async () => {
-      const res = await HspService.listMaster(type, {
+      const res = await MasterService.listMaster(type, {
         q,
         skip,
         take,
@@ -89,7 +90,7 @@ export const useListMaster = (
 export const useCreateMaster = (type: MasterType) => {
   const qc = useQueryClient();
   return useMutation<MasterItem, Error, MasterCreatePayload>({
-    mutationFn: (payload) => HspService.createMaster(payload),
+    mutationFn: (payload) => MasterService.createMaster(payload),
     onSuccess: () => {
       toast.success("Data berhasil dibuat");
       qc.invalidateQueries({ queryKey: ["master", type] });
@@ -106,7 +107,7 @@ export const useUpdateMaster = (type: MasterType) => {
     { id: string; payload: MasterUpdatePayload; recompute?: boolean }
   >({
     mutationFn: ({ id, payload, recompute }) =>
-      HspService.updateMaster(id, payload, { recompute }),
+      MasterService.updateMaster(id, payload, { recompute }),
     onSuccess: () => {
       toast.success("Data berhasil diperbarui");
       qc.invalidateQueries({ queryKey: ["master", type] });
@@ -123,7 +124,7 @@ export const useUpdateMasterByCode = (type: MasterType) => {
     { code: string; payload: MasterUpdatePayload }
   >({
     mutationFn: ({ code, payload }) =>
-      HspService.updateMasterByCode(code, payload),
+      MasterService.updateMasterByCode(code, payload),
     onSuccess: () => {
       toast.success("Data berhasil diperbarui");
       qc.invalidateQueries({ queryKey: ["master", type] });
@@ -135,7 +136,7 @@ export const useUpdateMasterByCode = (type: MasterType) => {
 export const useDeleteMasterByCode = (type: MasterType) => {
   const qc = useQueryClient();
   return useMutation<void, Error, { code: string }>({
-    mutationFn: ({ code }) => HspService.deleteMasterByCode(code),
+    mutationFn: ({ code }) => MasterService.deleteMasterByCode(code),
     onSuccess: () => {
       toast.success("Data berhasil dihapus");
       qc.invalidateQueries({ queryKey: ["master", type] });
@@ -147,7 +148,7 @@ export const useDeleteMasterByCode = (type: MasterType) => {
 export const useDeleteMaster = (type: MasterType) => {
   const qc = useQueryClient();
   return useMutation<void, Error, { id: string }>({
-    mutationFn: ({ id }) => HspService.deleteMaster(id),
+    mutationFn: ({ id }) => MasterService.deleteMaster(id),
     onSuccess: () => {
       toast.success("Data berhasil dihapus");
       qc.invalidateQueries({ queryKey: ["master", type] });

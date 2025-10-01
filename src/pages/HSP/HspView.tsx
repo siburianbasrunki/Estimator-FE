@@ -661,7 +661,7 @@ export const HspView = () => {
                   )}
                 </select>
               </div>
-              {isAdmin && (
+              {/* {isAdmin && ( */}
                 <button
                   type="button"
                   onClick={() => navigate("/source")}
@@ -669,7 +669,7 @@ export const HspView = () => {
                 >
                   Tambah Sumber
                 </button>
-              )}
+              {/* )} */}
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
               <button

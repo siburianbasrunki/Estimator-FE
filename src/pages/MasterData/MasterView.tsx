@@ -294,7 +294,7 @@ export const MasterView: React.FC<Props> = ({ type }) => {
                 className="w-72 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-black placeholder-gray-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-200"
                 placeholder="Cari: kode / nama / satuan"
                 value={q}
-                onChange={(e) => setQ(e.target.value)} // jangan reset page di sini
+                onChange={(e) => setQ(e.target.value)} 
               />
               {refetching && (
                 <span className="text-xs text-gray-500">Mencari…</span>

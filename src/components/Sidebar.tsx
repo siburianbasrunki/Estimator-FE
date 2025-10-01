@@ -78,7 +78,7 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
             name: "Manajemen Sumber HSP",
             href: "/source",
             icon: MdSource,
-            show: isAdmin,
+            // show: isAdmin,
           },
           {
             name: "Manajement Units",
