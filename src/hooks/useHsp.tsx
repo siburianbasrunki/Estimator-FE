@@ -4,6 +4,7 @@ import type { AdminAllWithItemsFlat, ImportHspSummary } from "../service/hsp";
 import HspService from "../service/hsp";
 import { useParams } from "react-router-dom";
 import type { AhspDetailModel, ItemJobListResponse } from "../model/hsp";
+import MasterService from "../service/master";
 
 export const useImportHsp = () => {
   return useMutation<ImportHspSummary, Error, File>({
@@ -131,7 +132,7 @@ export const useToggleMasterOverride = () => {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ code, active }: { code: string; active: boolean }) =>
-      HspService.setMasterOverrideActive(code, active),
+      MasterService.setMasterOverrideActive(code, active),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["master"] }),
   });
 };
@@ -161,7 +162,7 @@ export const useSearchMaster = ({
 }) => {
   return useQuery({
     queryKey: ["master", type, q, page, take],
-    queryFn: () => HspService.searchMaster(type, q, page, take),
+    queryFn: () => MasterService.searchMaster(type, q, page, take),
   });
 };
 
