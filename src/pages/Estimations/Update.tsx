@@ -564,7 +564,15 @@ function SortableItemCard({
                 <SearchableSelect
                   options={kodeOptions}
                   value={item.kode ?? ""}
-                  onChange={(v) => v && onChangeKode(item.id, v)}
+                  onChange={(v) => {
+                    if (!v) {
+                      onUpdateField(item.id, "kode", "");
+                      // onUpdateField(item.id, "hargaSatuan", 0);
+                      // onUpdateField(item.id, "hargaSatuanInput", "");
+                      return;
+                    }
+                    onChangeKode(item.id, v);
+                  }}
                   placeholder="Pilih Kode"
                   size="sm"
                 />

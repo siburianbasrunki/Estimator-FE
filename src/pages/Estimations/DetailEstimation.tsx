@@ -615,24 +615,24 @@ export const DetailEstimation: React.FC = () => {
                                 #{idx + 1}
                               </span>
                               <span className="text-xs text-gray-500">
-                                {d.kode}
+                                {d.kode || "-"}
                               </span>
                             </div>
                             <div className="font-medium whitespace-pre-wrap mb-2">
-                              {d.deskripsi}
+                              {d.deskripsi || "-"}
                             </div>
                             <div className="text-sm grid grid-cols-2 gap-2">
                               <div>
                                 <div className="text-gray-500 text-xs">
                                   Volume
                                 </div>
-                                <div className="font-medium">{d.volume}</div>
+                                <div className="font-medium">{d.volume || "-"}</div>
                               </div>
                               <div>
                                 <div className="text-gray-500 text-xs">
                                   Satuan
                                 </div>
-                                <div className="font-medium">{d.satuan}</div>
+                                <div className="font-medium">{d.satuan || "-"}</div>
                               </div>
                               <div>
                                 <div className="text-gray-500 text-xs">
@@ -702,11 +702,11 @@ export const DetailEstimation: React.FC = () => {
                                           #{idx + 1}
                                         </span>
                                         <span className="text-xs text-gray-500">
-                                          {d.kode}
+                                          {d.kode || "-"}
                                         </span>
                                       </div>
                                       <div className="font-medium whitespace-pre-wrap mb-2">
-                                        {d.deskripsi}
+                                        {d.deskripsi  || "-"}
                                       </div>
                                       <div className="text-sm grid grid-cols-2 gap-2">
                                         <div>
@@ -714,7 +714,7 @@ export const DetailEstimation: React.FC = () => {
                                             Volume
                                           </div>
                                           <div className="font-medium">
-                                            {d.volume}
+                                            {d.volume || "-"}
                                           </div>
                                         </div>
                                         <div>
@@ -722,7 +722,7 @@ export const DetailEstimation: React.FC = () => {
                                             Satuan
                                           </div>
                                           <div className="font-medium">
-                                            {d.satuan}
+                                            {d.satuan || "-"} 
                                           </div>
                                         </div>
                                         <div>
@@ -793,16 +793,16 @@ export const DetailEstimation: React.FC = () => {
                                 <tr key={d.id}>
                                   <td>{idx + 1}</td>
                                   <td className="whitespace-pre-wrap">
-                                    {d.deskripsi}
+                                    {d.deskripsi || "-"}
                                   </td>
                                   <td className="font-medium whitespace-nowrap">
-                                    {d.kode}
+                                    {d.kode || "-"}
                                   </td>
                                   <td className="text-right whitespace-nowrap">
-                                    {d.volume}
+                                    {d.volume || "-"}
                                   </td>
                                   <td className="whitespace-nowrap">
-                                    {d.satuan}
+                                    {d.satuan || "-"}
                                   </td>
                                   <td className="text-right whitespace-nowrap">
                                     {formatIDR(d.hargaSatuan)}
@@ -874,16 +874,16 @@ export const DetailEstimation: React.FC = () => {
                                         <tr key={d.id}>
                                           <td>{idx + 1}</td>
                                           <td className="whitespace-pre-wrap">
-                                            {d.deskripsi}
+                                            {d.deskripsi || "-"}
                                           </td>
                                           <td className="font-medium whitespace-nowrap">
-                                            {d.kode}
+                                            {d.kode || "-"}
                                           </td>
                                           <td className="text-right whitespace-nowrap">
-                                            {d.volume}
+                                            {d.volume || "-"}
                                           </td>
                                           <td className="whitespace-nowrap">
-                                            {d.satuan}
+                                            {d.satuan || "-"}
                                           </td>
                                           <td className="text-right whitespace-nowrap">
                                             {formatIDR(d.hargaSatuan)}
