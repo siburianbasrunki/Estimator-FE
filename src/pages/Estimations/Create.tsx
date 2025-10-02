@@ -8,12 +8,15 @@ import {
   BiSave,
   BiCalculator,
   BiCopy,
+  BiChevronDown,
+  BiChevronUp,
 } from "react-icons/bi";
 import Button from "../../components/Button";
 import { useCreateEstimation } from "../../hooks/useEstimation";
 import { useGetAdminAllWithItemsFlat } from "../../hooks/useHsp";
 import type { Option } from "../../components/SearchableSelect";
 import SearchableSelect from "../../components/SearchableSelect";
+import clsx from "clsx";
 
 /* dnd-kit */
 import {
@@ -551,9 +554,18 @@ function SortableItemCard({
                 <SearchableSelect
                   options={kodeOptions}
                   value={item.kode ?? ""}
-                  onChange={(v) => v && onChangeKode(item.id, v)}
+                  onChange={(v) => {
+                    if (!v) {
+                      onUpdateField(item.id, "kode", "");
+                      // onUpdateField(item.id, "hargaSatuan", 0);
+                      // onUpdateField(item.id, "hargaSatuanInput", "");
+                      return;
+                    }
+                    onChangeKode(item.id, v);
+                  }}
                   placeholder="Pilih Kode"
                   size="sm"
+                  clearable={true}
                 />
               ) : (
                 <div className="font-mono text-sm text-gray-800">
@@ -835,6 +847,8 @@ function SortableSectionHeaderCard({
   PekerjaanOptions,
   DropdownPekerjaan,
   addItemToSection,
+  isOpen,
+  onToggleOpen,
 }: {
   section: Section;
   index: number;
@@ -857,6 +871,8 @@ function SortableSectionHeaderCard({
     };
   }[];
   addItemToSection: (sectionId: string, source?: any) => void;
+  isOpen: boolean;
+  onToggleOpen: (sectionId: string) => void;
 }) {
   const {
     attributes,
@@ -988,6 +1004,23 @@ function SortableSectionHeaderCard({
           >
             <BiTrash className="text-lg" />
           </button>
+          <button
+            type="button"
+            className="btn btn-accent btn-xs"
+            title={isOpen ? "Sembunyikan" : "Tampilkan"}
+            aria-expanded={isOpen}
+            aria-controls={`section-panel-${section.id}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleOpen(section.id);
+            }}
+          >
+            {isOpen ? (
+              <BiChevronUp className="text-lg" />
+            ) : (
+              <BiChevronDown className="text-lg" />
+            )}
+          </button>
         </div>
       </div>
     </div>
@@ -1011,6 +1044,9 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   const [manualSectionTitle, setManualSectionTitle] = useState("");
   const { data: units, isLoading: isLoadingUnits } = useGetUnits("");
   const [volModalOpen, setVolModalOpen] = useState(false);
+  const [openSectionsMap, setOpenSectionsMap] = useState<
+    Record<string, boolean>
+  >({});
   const [volTargetItemId, setVolTargetItemId] = useState<string | null>(null);
   const [volTargetItemLabel, setVolTargetItemLabel] = useState<
     string | undefined
@@ -1032,20 +1068,20 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   const categories = hspAll?.categories ?? [];
 
   const KodeOptions: Option[] = useMemo(() => {
-  const seen = new Set<string>();
-  const out: Option[] = [];
-  for (const it of itemJobList) {
-    const k = String(it?.kode ?? "").trim();
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
-    const desc = String(it?.deskripsi ?? "").trim();
-    out.push({
-      label: desc ? `${k} — ${desc}` : k,
-      value: k,                          
-    });
-  }
-  return out;
-}, [itemJobList]);
+    const seen = new Set<string>();
+    const out: Option[] = [];
+    for (const it of itemJobList) {
+      const k = String(it?.kode ?? "").trim();
+      if (!k || seen.has(k)) continue;
+      seen.add(k);
+      const desc = String(it?.deskripsi ?? "").trim();
+      out.push({
+        label: desc ? `${k} — ${desc}` : k,
+        value: k,
+      });
+    }
+    return out;
+  }, [itemJobList]);
 
   const changeItemKode = (id: string, kodeBaru: string) => {
     const job = itemJobList.find((it: any) => it?.kode === kodeBaru);
@@ -1076,6 +1112,9 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
         }),
       }))
     );
+  };
+  const toggleSectionOpen = (sectionId: string) => {
+    setOpenSectionsMap((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
   };
 
   const CategoryOptions: Option[] = useMemo(
@@ -1140,25 +1179,31 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
       ? manualSectionTitle.trim()
       : selectedSectionFromList;
     if (!title) return;
+    const newId = uid();
     setSections((prev) => [
       ...prev,
       {
-        id: uid(),
+        id: newId,
         title,
         isEditingTitle: false,
         groups: [],
         items: undefined,
       },
     ]);
+    setOpenSectionsMap((prev) => ({ ...prev, [newId]: true }));
     setIsAddingSection(false);
     setIsManualSection(false);
     setSelectedSectionFromList("");
     setManualSectionTitle("");
   };
 
-  const deleteSection = (sectionId: string) =>
+  const deleteSection = (sectionId: string) => {
     setSections((prev) => prev.filter((s) => s.id !== sectionId));
-
+    setOpenSectionsMap((prev) => {
+      const { [sectionId]: _, ...rest } = prev;
+      return rest;
+    });
+  };
   /* Groups */
   const addGroup = (sectionId: string) => {
     setSections((prev) =>
@@ -1841,7 +1886,7 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
 
   /* --------------------------------- Render -------------------------------- */
   return (
-    <div className="bg-white rounded-xl shadow p-4 sm:p-6">
+    <div className="bg-white rounded-xl shadow p-4 sm:p-6 pb-32">
       {/* Title Bar */}
       <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 mb-4 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg sm:text-xl font-bold text-gray-900">
@@ -1958,146 +2003,162 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
                 strategy={rectSortingStrategy}
               >
                 {/* Kategori Card */}
-                <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                <div
+                  className={clsx(
+                    "collapse rounded-xl border border-gray-200 bg-white",
+                    openSectionsMap[section.id]
+                      ? "collapse-open"
+                      : "collapse-close"
+                  )}
+                >
                   {/* Header kategori */}
-                  <div className="p-4 border-b border-gray-200">
-                    <SortableSectionHeaderCard
-                      section={section}
-                      index={sIdx}
-                      addGroup={addGroup}
-                      deleteSection={deleteSection}
-                      onToggleEditTitle={toggleEditSectionTitle}
-                      onChangeTitle={changeSectionTitle}
-                      isLoadingItems={isLoadingHsp}
-                      PekerjaanOptions={PekerjaanOptions}
-                      DropdownPekerjaan={DropdownPekerjaan}
-                      addItemToSection={addItemToSection}
-                    />
+                  <div className="collapse-title p-0">
+                    <div className="p-4 border-b border-gray-200">
+                      <SortableSectionHeaderCard
+                        section={section}
+                        index={sIdx}
+                        addGroup={addGroup}
+                        deleteSection={deleteSection}
+                        onToggleEditTitle={toggleEditSectionTitle}
+                        onChangeTitle={changeSectionTitle}
+                        isLoadingItems={isLoadingHsp}
+                        PekerjaanOptions={PekerjaanOptions}
+                        DropdownPekerjaan={DropdownPekerjaan}
+                        addItemToSection={addItemToSection}
+                        isOpen={!!openSectionsMap[section.id]}
+                        onToggleOpen={toggleSectionOpen}
+                      />
+                    </div>
                   </div>
 
                   {/* Body kategori */}
-                  <div className="p-4 space-y-4">
-                    {/* Jika punya groups (Title) */}
-                    {groups.length > 0 ? (
-                      <>
-                        {groups.map((group, gIdx) => (
-                          <React.Fragment key={group.id}>
-                            {/* Header Title */}
-                            <SortableGroupHeaderCard
-                              sectionIndexRoman={sRoman}
-                              groupIndexArabic={toArabic(gIdx)}
-                              sectionId={section.id}
-                              group={group}
-                              isLoadingItems={isLoadingHsp}
-                              PekerjaanOptions={PekerjaanOptions}
-                              DropdownPekerjaan={DropdownPekerjaan}
-                              addItemToGroup={addItemToGroup}
-                              deleteGroup={deleteGroup}
-                              onToggleEditGroupTitle={onToggleEditGroupTitle}
-                              onChangeGroupTitle={onChangeGroupTitle}
-                            />
+                  <div
+                    id={`section-panel-${section.id}`}
+                    className="collapse-content p-0"
+                  >
+                    <div className="p-4 space-y-4">
+                      {/* Jika punya groups (Title) */}
+                      {groups.length > 0 ? (
+                        <>
+                          {groups.map((group, gIdx) => (
+                            <React.Fragment key={group.id}>
+                              {/* Header Title */}
+                              <SortableGroupHeaderCard
+                                sectionIndexRoman={sRoman}
+                                groupIndexArabic={toArabic(gIdx)}
+                                sectionId={section.id}
+                                group={group}
+                                isLoadingItems={isLoadingHsp}
+                                PekerjaanOptions={PekerjaanOptions}
+                                DropdownPekerjaan={DropdownPekerjaan}
+                                addItemToGroup={addItemToGroup}
+                                deleteGroup={deleteGroup}
+                                onToggleEditGroupTitle={onToggleEditGroupTitle}
+                                onChangeGroupTitle={onChangeGroupTitle}
+                              />
 
-                            {/* Dropzone atas group */}
-                            <DroppableZone
-                              droppableId={`ghead-${section.id}-${group.id}`}
-                              className="my-2"
-                            />
+                              {/* Dropzone atas group */}
+                              <DroppableZone
+                                droppableId={`ghead-${section.id}-${group.id}`}
+                                className="my-2"
+                              />
 
-                            {/* Items (huruf kecil a,b,...) */}
-                            <div className="space-y-3">
-                              {group.items.map((item, idxInGroup) => (
-                                <SortableItemCard
-                                  key={item.id}
-                                  itemIndexDisplay={toAlpha(idxInGroup)}
-                                  item={item}
-                                  onEditToggle={toggleEditItem}
-                                  onDelete={deleteItem}
-                                  onCopy={copyItem}
-                                  onUpdateField={updateItemField}
-                                  onOpenVolumeModal={openVolumeModal}
-                                  kodeOptions={KodeOptions}
-                                  onChangeKode={changeItemKode}
-                                  unitOptions={UnitOptions}
-                                  unitsLoading={isLoadingUnits}
-                                />
-                              ))}
-                            </div>
-
-                            {/* Dropzone bawah group */}
-                            <DroppableZone
-                              droppableId={`gdrop-${section.id}-${group.id}`}
-                              className="mt-2"
-                              showHint={group.items.length === 0}
-                            />
-
-                            {/* Subtotal per Title */}
-                            {!!group.items.length && (
-                              <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
-                                <div className="text-sm text-gray-800 font-semibold">
-                                  Subtotal {section.title} — {group.title}
-                                </div>
-                                <div className="text-sm font-semibold  text-gray-800">
-                                  {formatIDR(
-                                    group.items.reduce(
-                                      (a, b) => a + (b.hargaTotal ?? 0),
-                                      0
-                                    )
-                                  )}
-                                </div>
+                              {/* Items (huruf kecil a,b,...) */}
+                              <div className="space-y-3">
+                                {group.items.map((item, idxInGroup) => (
+                                  <SortableItemCard
+                                    key={item.id}
+                                    itemIndexDisplay={toAlpha(idxInGroup)}
+                                    item={item}
+                                    onEditToggle={toggleEditItem}
+                                    onDelete={deleteItem}
+                                    onCopy={copyItem}
+                                    onUpdateField={updateItemField}
+                                    onOpenVolumeModal={openVolumeModal}
+                                    kodeOptions={KodeOptions}
+                                    onChangeKode={changeItemKode}
+                                    unitOptions={UnitOptions}
+                                    unitsLoading={isLoadingUnits}
+                                  />
+                                ))}
                               </div>
-                            )}
-                          </React.Fragment>
-                        ))}
-                      </>
-                    ) : (
-                      /* Fallback: items langsung di kategori (tanpa Title) */
-                      <>
-                        <DroppableZone
-                          droppableId={`section-${section.id}`}
-                          className="mb-2"
-                        />
-                        <div className="space-y-3">
-                          {fallbackItems.map((item, idxInGroup) => (
-                            <SortableItemCard
-                              key={item.id}
-                              // Tanpa title ⇒ item pakai angka 1,2,3...
-                              itemIndexDisplay={toArabic(idxInGroup)}
-                              item={item}
-                              onEditToggle={toggleEditItem}
-                              onDelete={deleteItem}
-                              onCopy={copyItem}
-                              onUpdateField={updateItemField}
-                              onOpenVolumeModal={openVolumeModal}
-                              kodeOptions={KodeOptions}
-                              onChangeKode={changeItemKode}
-                              unitOptions={UnitOptions}
-                              unitsLoading={isLoadingUnits}
-                            />
-                          ))}
-                        </div>
-                        <DroppableZone
-                          droppableId={`dropzone-${section.id}`}
-                          className="mt-2"
-                          showHint={fallbackItems.length === 0}
-                        />
 
-                        {!!fallbackItems.length && (
-                          <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
-                            <div className="text-sm text-gray-700">
-                              Subtotal {section.title}
-                            </div>
-                            <div className="text-sm font-semibold">
-                              {formatIDR(
-                                fallbackItems.reduce(
-                                  (a, b) => a + (b.hargaTotal ?? 0),
-                                  0
-                                )
+                              {/* Dropzone bawah group */}
+                              <DroppableZone
+                                droppableId={`gdrop-${section.id}-${group.id}`}
+                                className="mt-2"
+                                showHint={group.items.length === 0}
+                              />
+
+                              {/* Subtotal per Title */}
+                              {!!group.items.length && (
+                                <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-lg p-3">
+                                  <div className="text-sm text-gray-800 font-semibold">
+                                    Subtotal {section.title} — {group.title}
+                                  </div>
+                                  <div className="text-sm font-semibold  text-gray-800">
+                                    {formatIDR(
+                                      group.items.reduce(
+                                        (a, b) => a + (b.hargaTotal ?? 0),
+                                        0
+                                      )
+                                    )}
+                                  </div>
+                                </div>
                               )}
-                            </div>
+                            </React.Fragment>
+                          ))}
+                        </>
+                      ) : (
+                        /* Fallback: items langsung di kategori (tanpa Title) */
+                        <>
+                          <DroppableZone
+                            droppableId={`section-${section.id}`}
+                            className="mb-2"
+                          />
+                          <div className="space-y-3">
+                            {fallbackItems.map((item, idxInGroup) => (
+                              <SortableItemCard
+                                key={item.id}
+                                // Tanpa title ⇒ item pakai angka 1,2,3...
+                                itemIndexDisplay={toArabic(idxInGroup)}
+                                item={item}
+                                onEditToggle={toggleEditItem}
+                                onDelete={deleteItem}
+                                onCopy={copyItem}
+                                onUpdateField={updateItemField}
+                                onOpenVolumeModal={openVolumeModal}
+                                kodeOptions={KodeOptions}
+                                onChangeKode={changeItemKode}
+                                unitOptions={UnitOptions}
+                                unitsLoading={isLoadingUnits}
+                              />
+                            ))}
                           </div>
-                        )}
-                      </>
-                    )}
+                          <DroppableZone
+                            droppableId={`dropzone-${section.id}`}
+                            className="mt-2"
+                            showHint={fallbackItems.length === 0}
+                          />
+
+                          {!!fallbackItems.length && (
+                            <div className="flex items-center justify-between bg-gray-50 border border-gray-200 rounded-lg p-3">
+                              <div className="text-sm text-gray-700">
+                                Subtotal {section.title}
+                              </div>
+                              <div className="text-sm font-semibold text-black">
+                                {formatIDR(
+                                  fallbackItems.reduce(
+                                    (a, b) => a + (b.hargaTotal ?? 0),
+                                    0
+                                  )
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
               </SortableContext>
@@ -2108,36 +2169,45 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
           <DragOverlay dropAnimation={defaultDropAnimation} />
         </DndContext>
       </div>
+      <div className="h-10" />
 
       {/* Footer total & actions */}
-      <div className="rounded-lg border border-gray-200 p-4 mt-5 bg-white">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="text-sm">
-            <div className="flex items-center justify-between gap-8">
-              <span className="text-gray-600">Subtotal</span>
-              <span className="font-semibold text-gray-900">
-                {formatIDR(subtotal)}
-              </span>
+      <div
+        className="
+          fixed bottom-0 left-0 right-0
+          md:left-[calc(15rem+1rem)]
+          z-50 border-t border-gray-200 bg-white/90 backdrop-blur
+        "
+      >
+        <div className="mx-auto max-w-7xl px-4 py-3">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-sm">
+              <div className="flex items-center justify-between gap-8">
+                <span className="text-gray-600">Subtotal</span>
+                <span className="font-semibold text-gray-900">
+                  {formatIDR(subtotal)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-8">
+                <span className="text-gray-600">PPN ({ppnPct}%)</span>
+                <span className="font-semibold text-gray-900">
+                  {formatIDR(ppnAmount)}
+                </span>
+              </div>
+              <div className="divider my-2" />
+              <div className="flex items-center justify-between gap-8">
+                <span className="text-gray-800 font-semibold">Grand Total</span>
+                <span className="text-lg font-bold text-gray-900">
+                  {formatIDR(grandTotal)}
+                </span>
+              </div>
             </div>
-            <div className="flex items-center justify-between gap-8">
-              <span className="text-gray-600">PPN ({ppnPct}%)</span>
-              <span className="font-semibold text-gray-900">
-                {formatIDR(ppnAmount)}
-              </span>
-            </div>
-            <div className="divider my-2" />
-            <div className="flex items-center justify-between gap-8">
-              <span className="text-gray-800 font-semibold">Grand Total</span>
-              <span className="text-lg font-bold text-gray-900">
-                {formatIDR(grandTotal)}
-              </span>
-            </div>
-          </div>
 
-          <div className="flex flex-wrap gap-2 justify-end">
-            <Button variant="success" onClick={handleSaveAllData}>
-              Simpan Estimation
-            </Button>
+            <div className="flex flex-wrap gap-2 justify-end">
+              <Button variant="success" onClick={handleSaveAllData}>
+                Simpan Estimation
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -2204,9 +2274,17 @@ const CreateEstimation = () => {
   const navigate = useNavigate();
   return (
     <div className="mx-auto p-3 sm:p-4">
-      <BackButton onClick={() => navigate("/estimation")} title="Kembali" />
+      <BackButton
+        className="
+    fixed z-10
+    left-4 top-20 
+    md:left-[calc(16rem+1rem)]  
+  "
+        onClick={() => navigate("/estimation")}
+        title="Kembali"
+      />
 
-      <div className="mb-5">
+      <div className="mb-5 mt-8">
         <h1 className="text-2xl font-bold text-gray-900">Create Estimation</h1>
         <p className="text-sm text-gray-600">
           Lengkapi profil proyek, lalu tambahkan item pekerjaan.

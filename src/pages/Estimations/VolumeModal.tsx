@@ -1,8 +1,9 @@
 // src/pages/estimation/VolumeModal.tsx
-import { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { BiPlus, BiTrash, BiX } from "react-icons/bi";
 
+/* ===================== Types ===================== */
 export type ExtraCol = {
   id: string;
   name: string; // nama kolom custom
@@ -21,12 +22,6 @@ export type VolumeDetailRow = {
   volume: number; // computed
 };
 
-const uid = () =>
-  typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-
-/** ===== UI row state (string untuk input) ===== */
 type RowUI = {
   id: string;
   uraian: string;
@@ -38,6 +33,12 @@ type RowUI = {
   extraValues: Record<string, string>;
   volume: number; // preview (no sign)
 };
+
+/* ===================== Utils ===================== */
+const uid = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : `id-${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
 const toNum = (v: string | number | undefined) => {
   if (typeof v === "number") return Number.isFinite(v) ? v : 0;
@@ -62,6 +63,58 @@ function computeRowVolumeUI(r: RowUI, extraCols: { id: string }[]) {
   return Number.isFinite(vol) ? vol : 0;
 }
 
+/* ===================== InputCell (TOP-LEVEL) ===================== */
+/** Dipindah ke top-level + React.memo agar tidak re-mount saat parent re-render */
+type InputCellProps = {
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  unit?: string;
+  invalid?: boolean;
+  width?: string;
+  type?: "decimal" | "numeric";
+};
+
+export const InputCell = React.memo(function InputCell({
+  value,
+  onChange,
+  placeholder,
+  unit,
+  invalid,
+  width = "w-28",
+  type = "decimal",
+}: InputCellProps) {
+  return (
+    <div className={`relative ${width}`}>
+      <input
+        type="text"
+        inputMode={type} // "decimal" | "numeric"
+        className={`input input-bordered input-sm w-full pr-10 text-black bg-white ${
+          invalid
+            ? "border-red-500 focus:border-red-500 focus:outline-red-500"
+            : "border-gray-300"
+        }`}
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const v = e.target.value;
+          const cleaned =
+            type === "decimal"
+              ? v.replace(/[^\d.,]/g, "")
+              : v.replace(/\D/g, "");
+          onChange(cleaned);
+        }}
+      />
+      {unit ? (
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-500 select-none">
+          {unit}
+        </span>
+      ) : null}
+    </div>
+  );
+});
+
+/* ===================== Modal Component ===================== */
 export default function VolModal({
   open,
   onClose,
@@ -79,6 +132,7 @@ export default function VolModal({
     []
   );
   const [rows, setRows] = useState<RowUI[]>([]);
+  const initFPRef = useRef<string>("");
 
   // Normalize dari initialRows -> extraCols & rows UI
   useEffect(() => {
@@ -126,6 +180,15 @@ export default function VolModal({
       return draft;
     });
 
+    // Fingerprint untuk hindari reset bila initialRows tidak berubah
+    const fp = JSON.stringify(
+      (initialRows || []).map((r) => ({
+        id: r.id,
+        extrasLen: r.extras?.length ?? 0,
+      }))
+    );
+    if (fp === initFPRef.current) return;
+    initFPRef.current = fp;
     setRows(norm.length ? norm : []);
   }, [open, initialRows]);
 
@@ -220,46 +283,6 @@ export default function VolModal({
       })
     );
   };
-
-  const InputCell = ({
-    value,
-    onChange,
-    placeholder,
-    unit,
-    invalid,
-    width = "w-28",
-    type = "decimal",
-  }: {
-    value: string;
-    onChange: (v: string) => void;
-    placeholder?: string;
-    unit?: string;
-    invalid?: boolean;
-    width?: string;
-    type?: "decimal" | "numeric";
-  }) => (
-    <div className={`relative ${width}`}>
-      <input
-        type="number"
-        inputMode={type}
-        step={type === "decimal" ? "any" : "1"}
-        min={0}
-        className={`input input-bordered input-sm w-full pr-10 text-black bg-white ${
-          invalid
-            ? "border-red-500 focus:border-red-500 focus:outline-red-500"
-            : "border-gray-300"
-        }`}
-        value={value}
-        placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value)}
-      />
-      {unit ? (
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-gray-500 select-none">
-          {unit}
-        </span>
-      ) : null}
-    </div>
-  );
 
   const handleSave = () => {
     const out: VolumeDetailRow[] = rows.map((r) => {

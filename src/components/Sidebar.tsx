@@ -146,8 +146,8 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
         if (window.innerWidth < 768) setSidebarOpen(false);
       }}
     >
-      <item.icon className="w-5 h-5 mr-3" />
-      <span>{item.name}</span>
+      <item.icon className="w-5 h-5 mr-3 shrink-0" />
+      <span className="truncate">{item.name}</span>
     </NavLink>
   );
 
@@ -161,15 +161,24 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
       )}
 
       <div
-        className={`fixed inset-y-0 left-0 z-20 bg-white shadow-lg w-64 transition-transform duration-300 ease-in-out ${
-          sidebarOpen ? "translate-x-0" : "-translate-x-full"
-        } md:translate-x-0`}
+        className={`
+          fixed inset-y-0 left-0 z-20 bg-white shadow-lg transition-transform duration-300 ease-in-out
+          w-64 md:w-56 lg:w-64
+          ${
+            sidebarOpen ? "translate-x-0" : "-translate-x-full"
+          } md:translate-x-0
+          flex flex-col   /* ⟵ penting: kolom penuh */
+        `}
       >
-        <div className="flex items-center flex-row justify-center h-16 px-4 bg-white">
-          <img src={Logo} alt="Logo" className="w-60 h-45 mr-2 mt-1" />
+        <div className="sticky top-0 z-10 bg-white">
+          <div className="flex items-center flex-row justify-center h-16 px-4 bg-white">
+            {" "}
+            <img src={Logo} alt="Logo" className="w-60 h-39 mr-2 mt-1" />{" "}
+          </div>
+          <div className="h-px bg-gray-200" />
         </div>
 
-        <nav className="px-4 py-6">
+        <nav className="flex-1 overflow-y-auto px-4 py-4">
           <ul className="space-y-2">
             {singles
               .filter((i) => i.show !== false)
@@ -213,23 +222,32 @@ const Sidebar = ({ sidebarOpen, setSidebarOpen }: SidebarProps) => {
                     </button>
 
                     <div
-                      className={`overflow-hidden transition-[max-height] duration-300 ${
-                        open[group.key] ? "max-h-96" : "max-h-0"
-                      }`}
+                      className={`
+                        grid transition-[grid-template-rows] duration-300
+                        ${
+                          open[group.key]
+                            ? "grid-rows-[1fr]"
+                            : "grid-rows-[0fr]"
+                        }
+                      `}
                     >
-                      <ul className="mt-2 space-y-2 pl-2">
-                        {visibleItems.map((item) => (
-                          <li key={item.name}>
-                            <ItemLink item={item} />
-                          </li>
-                        ))}
-                      </ul>
+                      <div className="overflow-hidden">
+                        <ul className="mt-2 space-y-2 pl-2">
+                          {visibleItems.map((item) => (
+                            <li key={item.name}>
+                              <ItemLink item={item} />
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     </div>
                   </li>
                 );
               })}
           </ul>
         </nav>
+
+        <div className="h-2 md:h-3" />
       </div>
     </>
   );

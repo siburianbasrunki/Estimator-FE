@@ -370,8 +370,16 @@ export const AhspView: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <BackButton onClick={() => navigate("/hsp")} title="Kembali" />
-      <div className="flex items-center">
+      <BackButton
+        className="
+    fixed z-10
+    left-4 top-20 
+    md:left-[calc(16rem+1rem)]  
+  "
+        onClick={() => navigate("/hsp")}
+        title="Kembali"
+      />
+      <div className="flex items-center mt-15">
         <h1 className="mb-2 text-2xl font-bold text-gray-800">AHSP</h1>
         <BiChevronRight className="text-black h-6 w-6" />
         <p className="text-lg text-gray-600 font-semibold">
