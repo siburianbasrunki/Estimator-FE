@@ -557,15 +557,15 @@ function SortableItemCard({
                   onChange={(v) => {
                     if (!v) {
                       onUpdateField(item.id, "kode", "");
-                      // onUpdateField(item.id, "hargaSatuan", 0);
-                      // onUpdateField(item.id, "hargaSatuanInput", "");
+                      onUpdateField(item.id, "hargaSatuan", 0);
+                      onUpdateField(item.id, "hargaSatuanInput", "");
                       return;
                     }
                     onChangeKode(item.id, v);
                   }}
                   placeholder="Pilih Kode"
                   size="sm"
-                  clearable={true}
+                  clearable
                 />
               ) : (
                 <div className="font-mono text-sm text-gray-800">
@@ -1070,24 +1070,28 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   const categories = hspAll?.categories ?? [];
 
   const KodeOptions: Option[] = useMemo(() => {
-    const seen = new Set<string>();
-    const out: Option[] = [];
+    const map = new Map<string, Option>();
     for (const it of itemJobList) {
       const k = String(it?.kode ?? "").trim();
-      if (!k || seen.has(k)) continue;
-      seen.add(k);
+      if (!k || map.has(k)) continue;
       const desc = String(it?.deskripsi ?? "").trim();
-      out.push({
-        label: desc ? `${k} — ${desc}` : k,
+      const price = Number(it?.harga ?? 0);
+      const unit = String(it?.satuan ?? "").trim();
+      map.set(k, {
         value: k,
+        label: [k, desc || null, `${formatIDR(price)}${unit ? `/${unit}` : ""}`]
+          .filter(Boolean)
+          .join(" — "),
       });
     }
-    return out;
+    return [...map.values()];
   }, [itemJobList]);
 
   const changeItemKode = (id: string, kodeBaru: string) => {
-    const job = itemJobList.find((it: any) => it?.kode === kodeBaru);
-    const hargaBaru = Number(job?.harga ?? 0);
+    const job = itemJobList.find(
+      (it: any) => String(it?.kode ?? "") === kodeBaru
+    );
+
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
@@ -1095,26 +1099,47 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
           ...g,
           items: g.items.map((i) => {
             if (i.id !== id) return i;
+
             const next: ItemRow = { ...i, kode: kodeBaru };
-            next.hargaSatuan = hargaBaru;
-            next.hargaSatuanInput = undefined;
-            const volEff = getEffectiveVolume(next);
-            next.hargaTotal = volEff * hargaBaru;
+
+            // Hanya update harga; JANGAN sentuh deskripsi/satuan
+            if (job) {
+              const hargaBaru = Number(job.harga ?? 0);
+
+              // set angka fix ke state
+              next.hargaSatuan = hargaBaru;
+
+              // kalau lagi editing, tampilkan juga di input supaya kelihatan
+              next.hargaSatuanInput = i.isEditing
+                ? String(hargaBaru)
+                : undefined;
+
+              // hitung ulang total dengan volume efektif
+              const volEff = getEffectiveVolume(next);
+              next.hargaTotal = volEff * hargaBaru;
+            }
             return next;
           }),
         })),
         items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
+
           const next: ItemRow = { ...i, kode: kodeBaru };
-          next.hargaSatuan = hargaBaru;
-          next.hargaSatuanInput = undefined;
-          const volEff = getEffectiveVolume(next);
-          next.hargaTotal = volEff * hargaBaru;
+
+          if (job) {
+            const hargaBaru = Number(job.harga ?? 0);
+            next.hargaSatuan = hargaBaru;
+            next.hargaSatuanInput = i.isEditing ? String(hargaBaru) : undefined;
+
+            const volEff = getEffectiveVolume(next);
+            next.hargaTotal = volEff * hargaBaru;
+          }
           return next;
         }),
       }))
     );
   };
+
   const toggleSectionOpen = (sectionId: string) => {
     setOpenSectionsMap((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
   };
