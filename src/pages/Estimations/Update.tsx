@@ -1089,18 +1089,26 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
       const k = String(it?.kode ?? "").trim();
       if (!k || seen.has(k)) continue;
       seen.add(k);
+
       const desc = String(it?.deskripsi ?? "").trim();
+      const price = Number(it?.harga ?? 0);
+      const unit = String(it?.satuan ?? "").trim();
+
       out.push({
-        label: desc ? `${k} — ${desc}` : k,
         value: k,
+        label: [k, desc || null, `${formatIDR(price)}${unit ? `/${unit}` : ""}`]
+          .filter(Boolean)
+          .join(" — "),
       });
     }
     return out;
   }, [itemJobList]);
-
   const changeItemKode = (id: string, kodeBaru: string) => {
-    const job = itemJobList.find((it: any) => it?.kode === kodeBaru);
-    const hargaBaru = Number(job?.harga ?? 0);
+    const job = itemJobList.find(
+      (it: any) => String(it?.kode ?? "") === kodeBaru
+    );
+    const hargaBaru = job ? Number(job.harga ?? 0) : undefined;
+
     setSections((prev) =>
       prev.map((s) => ({
         ...s,
@@ -1109,21 +1117,28 @@ const UpdateStepTwo: React.FC<UpdateStepTwoProps> = ({
           items: g.items.map((i) => {
             if (i.id !== id) return i;
             const next: ItemRow = { ...i, kode: kodeBaru };
-            next.hargaSatuan = hargaBaru;
-            next.hargaSatuanInput = undefined;
-            const volEff = getEffectiveVolume(next);
-            next.hargaTotal = volEff * hargaBaru;
+
+            if (hargaBaru !== undefined) {
+              next.hargaSatuan = hargaBaru;
+              next.hargaSatuanInput = i.isEditing
+                ? String(hargaBaru)
+                : undefined;
+              const volEff = getEffectiveVolume(next);
+              next.hargaTotal = volEff * hargaBaru;
+            }
             return next;
           }),
         })),
-        // fallback lama
         items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
           const next: ItemRow = { ...i, kode: kodeBaru };
-          next.hargaSatuan = hargaBaru;
-          next.hargaSatuanInput = undefined;
-          const volEff = getEffectiveVolume(next);
-          next.hargaTotal = volEff * hargaBaru;
+
+          if (hargaBaru !== undefined) {
+            next.hargaSatuan = hargaBaru;
+            next.hargaSatuanInput = i.isEditing ? String(hargaBaru) : undefined;
+            const volEff = getEffectiveVolume(next);
+            next.hargaTotal = volEff * hargaBaru;
+          }
           return next;
         }),
       }))
