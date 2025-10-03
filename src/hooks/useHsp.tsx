@@ -1,29 +1,31 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 import type { AdminAllWithItemsFlat, ImportHspSummary } from "../service/hsp";
 import HspService from "../service/hsp";
 import { useParams } from "react-router-dom";
 import type { AhspDetailModel, ItemJobListResponse } from "../model/hsp";
 import MasterService from "../service/master";
+import { useNotify } from "../components/Notify/notify";
 
 export const useImportHsp = () => {
+  const toast = useNotify();
   return useMutation<ImportHspSummary, Error, File>({
     mutationFn: (file: File) => HspService.importHsp(file),
     onSuccess: (data) => {
       if (data.status === "success") {
         const cat = data.summary?.categories;
         const it = data.summary?.items;
-        toast.success(
+        toast(
           `Import sukses. Kategori: +${cat?.created || 0} | Item: +${
             it?.created || 0
-          } (update ${it?.updated || 0})`
+          } (update ${it?.updated || 0})`,
+          "success"
         );
       } else {
-        toast.error(data?.message || "Import HSP gagal");
+        toast(data?.message || "Import HSP gagal", "error");
       }
     },
     onError: (err) => {
-      toast.error(err.message || "Import HSP gagal");
+      toast(err.message || "Import HSP gagal", "error");
     },
   });
 };
@@ -78,6 +80,7 @@ export const useHspDetail = () => {
 // ====== Mutations ======
 export const useUpdateAhspComponent = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   const { code } = useParams();
   return useMutation<
     void,
@@ -93,39 +96,42 @@ export const useUpdateAhspComponent = () => {
     mutationFn: ({ componentId, ...payload }) =>
       HspService.updateAhspComponent(componentId, payload),
     onSuccess: () => {
-      toast.success("Komponen disimpan");
+      toast("Komponen disimpan", "success");
       qc.invalidateQueries({ queryKey: ["hspDetail", code] });
     },
-    onError: (e) => toast.error(e.message || "Gagal menyimpan komponen"),
+    onError: (e) => toast(e.message || "Gagal menyimpan komponen", "error"),
   });
 };
 
 export const useUpdateAhspOverhead = () => {
+  const toast = useNotify();
   const qc = useQueryClient();
   const { code } = useParams();
   return useMutation<void, Error, { code: string; overheadPercent: number }>({
     mutationFn: ({ code, overheadPercent }) =>
       HspService.updateAhspOverhead(code, overheadPercent),
     onSuccess: () => {
-      toast.success("Overhead disimpan");
+      toast("Overhead disimpan", "success");
       qc.invalidateQueries({ queryKey: ["hspDetail", code] });
     },
-    onError: (e) => toast.error(e.message || "Gagal menyimpan overhead"),
+    onError: (e) => toast(e.message || "Gagal menyimpan overhead", "error"),
   });
 };
 export const useToggleHspOverride = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: ({ kode, active }: { kode: string; active: boolean }) =>
       HspService.setHspOverrideActive(kode, active),
     onSuccess: (_, vars) => {
-      toast.success(
-        vars.active ? "Pakai versi saya (USER)" : "Kembali pakai Admin"
+      toast(
+        vars.active ? "Pakai versi saya (USER)" : "Kembali pakai Admin",
+        "success"
       );
       qc.invalidateQueries({ queryKey: ["hspDetail", vars.kode] });
       qc.invalidateQueries({ queryKey: ["hsp"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal mengganti sumber"),
+    onError: (e: any) => toast(e?.message || "Gagal mengganti sumber", "error"),
   });
 };
 export const useToggleMasterOverride = () => {
@@ -138,14 +144,15 @@ export const useToggleMasterOverride = () => {
 };
 export const useRecomputeHsp = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   const { code } = useParams();
   return useMutation<void, Error, { itemId: string }>({
     mutationFn: ({ itemId }) => HspService.recomputeHsp(itemId),
     onSuccess: () => {
-      toast.success("Recompute sukses");
+      toast("Recompute sukses", "success");
       qc.invalidateQueries({ queryKey: ["hspDetail", code] });
     },
-    onError: (e) => toast.error(e.message || "Gagal recompute"),
+    onError: (e) => toast(e.message || "Gagal recompute", "error"),
   });
 };
 
@@ -169,75 +176,84 @@ export const useSearchMaster = ({
 export const useCreateAhspComponent = () => {
   const qc = useQueryClient();
   const { code } = useParams();
+  const toast = useNotify();
   return useMutation({
     mutationFn: ({ code, payload }: any) =>
       HspService.createAhspComponent(code, payload),
     onSuccess: () => {
-      toast.success("Komponen ditambahkan");
+      toast("Komponen ditambahkan", "success");
       qc.invalidateQueries({ queryKey: ["hspDetail", code] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal menambah komponen"),
+    onError: (e: any) =>
+      toast(e?.message || "Gagal menambah komponen", "error"),
   });
 };
 
 export const useDeleteAhspComponent = () => {
   const qc = useQueryClient();
   const { code } = useParams();
+  const toast = useNotify();
   return useMutation({
     mutationFn: ({ componentId }: { componentId: string }) =>
       HspService.deleteAhspComponent(componentId),
     onSuccess: () => {
-      toast.success("Komponen dihapus");
+      toast("Komponen dihapus", "success");
       qc.invalidateQueries({ queryKey: ["hspDetail", code] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal menghapus komponen"),
+    onError: (e: any) =>
+      toast(e?.message || "Gagal menghapus komponen", "error"),
   });
 };
 
 export const useCreateCategory = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: (name: string) => HspService.createCategory(name),
     onSuccess: () => {
-      toast.success("Kategori dibuat");
+      toast("Kategori dibuat", "success");
       qc.invalidateQueries({ queryKey: ["categoryJob"] });
       qc.invalidateQueries({ queryKey: ["hsp"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal membuat kategori"),
+    onError: (e: any) => toast(e?.message || "Gagal membuat kategori", "error"),
   });
 };
 
 export const useUpdateCategory = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: ({ id, name }: { id: string; name: string }) =>
       HspService.updateCategory(id, name),
     onSuccess: () => {
-      toast.success("Kategori diperbarui");
+      toast("Kategori diperbarui", "success");
       qc.invalidateQueries({ queryKey: ["categoryJob"] });
       qc.invalidateQueries({ queryKey: ["hsp"] });
     },
     onError: (e: any) =>
-      toast.error(e?.message || "Gagal memperbarui kategori"),
+      toast(e?.message || "Gagal memperbarui kategori", "error"),
   });
 };
 
 export const useDeleteCategory = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: (id: string) => HspService.deleteCategory(id),
     onSuccess: () => {
-      toast.success("Kategori dihapus");
+      toast("Kategori dihapus", "success");
       qc.invalidateQueries({ queryKey: ["categoryJob"] });
       qc.invalidateQueries({ queryKey: ["hsp"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal menghapus kategori"),
+    onError: (e: any) =>
+      toast(e?.message || "Gagal menghapus kategori", "error"),
   });
 };
 
 // Item CRUD hooks
 export const useCreateHspItem = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: (payload: {
       hspCategoryId: string;
@@ -247,16 +263,17 @@ export const useCreateHspItem = () => {
       source?: "UUD" | "Sendiri";
     }) => HspService.createHspItem(payload),
     onSuccess: () => {
-      toast.success("Item dibuat");
+      toast("Item dibuat", "success");
       qc.invalidateQueries({ queryKey: ["hsp"] });
       qc.invalidateQueries({ queryKey: ["itemJob"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal membuat item"),
+    onError: (e: any) => toast(e?.message || "Gagal membuat item", "success"),
   });
 };
 
 export const useUpdateHspItem = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: ({
       kode,
@@ -272,23 +289,24 @@ export const useUpdateHspItem = () => {
       };
     }) => HspService.updateHspItemByKode(kode, payload),
     onSuccess: () => {
-      toast.success("Item diperbarui");
+      toast("Item diperbarui", "success");
       qc.invalidateQueries({ queryKey: ["hsp"] });
       qc.invalidateQueries({ queryKey: ["itemJob"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal memperbarui item"),
+    onError: (e: any) => toast(e?.message || "Gagal memperbarui item", "error"),
   });
 };
 
 export const useDeleteHspItem = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: (kode: string) => HspService.deleteHspItemByKode(kode),
     onSuccess: () => {
-      toast.success("Item dihapus");
+      toast("Item dihapus", "success");
       qc.invalidateQueries({ queryKey: ["hsp"] });
       qc.invalidateQueries({ queryKey: ["itemJob"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal menghapus item"),
+    onError: (e: any) => toast(e?.message || "Gagal menghapus item", "error"),
   });
 };

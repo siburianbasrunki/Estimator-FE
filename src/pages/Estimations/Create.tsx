@@ -1031,11 +1031,13 @@ function SortableSectionHeaderCard({
 type CreateStepTwoProps = {
   projectProfile: ProjectProfile;
   onSave: (data: any) => void;
+  isPending: boolean;
 };
 
 const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   projectProfile,
   onSave,
+  isPending,
 }) => {
   const [sections, setSections] = useState<Section[]>([]);
   const [isAddingSection, setIsAddingSection] = useState(false);
@@ -2204,8 +2206,12 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
             </div>
 
             <div className="flex flex-wrap gap-2 justify-end">
-              <Button variant="success" onClick={handleSaveAllData}>
-                Simpan Estimation
+              <Button
+                variant="success"
+                onClick={handleSaveAllData}
+                disabled={isPending}
+              >
+                {isPending ? "Menyimpan..." : "Simpan Estimation"}
               </Button>
             </div>
           </div>
@@ -2240,6 +2246,7 @@ const CreateEstimation = () => {
   });
   const [customFields, setCustomFields] = useState<CustomFieldUI[]>([]);
   const createMutation = useCreateEstimation();
+  const { isPending } = useCreateEstimation();
   const notify = useNotify();
   const toggleAccordion = (step: string) =>
     setActiveAccordion((prev) => (prev === step ? "" : step));
@@ -2332,6 +2339,7 @@ const CreateEstimation = () => {
               <CreateStepTwo
                 projectProfile={projectProfile}
                 onSave={handleSaveData}
+                isPending={isPending}
               />
             </div>
           </div>

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import UnitService, { type Unit } from "../service/units";
-import toast from "react-hot-toast";
+import { useNotify } from "../components/Notify/notify";
 
 export const useGetUnits = (q: string) => {
   return useQuery({
@@ -12,19 +12,21 @@ export const useGetUnits = (q: string) => {
 
 export const useCreateUnit = () => {
   const qc = useQueryClient();
+  const notify = useNotify();
   return useMutation({
     mutationFn: (p: { code: string; label: string }) =>
       UnitService.createUnit(p),
     onSuccess: () => {
-      toast.success("Unit dibuat");
+      notify("Unit dibuat", "success");
       qc.invalidateQueries({ queryKey: ["units"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal membuat unit"),
+    onError: (e: any) => notify(e?.message || "Gagal membuat unit", "error"),
   });
 };
 
 export const useUpdateUnit = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: ({
       id,
@@ -34,21 +36,22 @@ export const useUpdateUnit = () => {
       payload: Partial<Pick<Unit, "code" | "label">>;
     }) => UnitService.updateUnit(id, payload),
     onSuccess: () => {
-      toast.success("Unit diperbarui");
+      toast("Unit diperbarui", "success");
       qc.invalidateQueries({ queryKey: ["units"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal memperbarui unit"),
+    onError: (e: any) => toast(e?.message || "Gagal memperbarui unit", "error"),
   });
 };
 
 export const useDeleteUnit = () => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation({
     mutationFn: (id: string) => UnitService.deleteUnit(id),
     onSuccess: () => {
-      toast.success("Unit dihapus");
+      toast("Unit dihapus", "success");
       qc.invalidateQueries({ queryKey: ["units"] });
     },
-    onError: (e: any) => toast.error(e?.message || "Gagal menghapus unit"),
+    onError: (e: any) => toast(e?.message || "Gagal menghapus unit", "error"),
   });
 };
