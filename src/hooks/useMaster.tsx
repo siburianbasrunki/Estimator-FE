@@ -1,5 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import toast from "react-hot-toast";
 import type {
   MasterCreatePayload,
   MasterItem,
@@ -8,9 +7,11 @@ import type {
 } from "../model/master";
 import type { ImportMasterSummary } from "../service/master";
 import MasterService from "../service/master";
+import { useNotify } from "../components/Notify/notify";
 
 export const useImportMaster = (type: MasterType) => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation<
     ImportMasterSummary,
     Error,
@@ -43,10 +44,10 @@ export const useImportMaster = (type: MasterType) => {
       throw new Error("Import hanya tersedia untuk MATERIAL & LABOR");
     },
     onSuccess: (res) => {
-      toast.success(res?.message || "Import selesai");
+      toast(res?.message || "Import selesai", "success");
       qc.invalidateQueries({ queryKey: ["master", type] });
     },
-    onError: (e) => toast.error(e.message || "Gagal import"),
+    onError: (e) => toast(e.message || "Gagal import", "error"),
   });
 };
 
@@ -82,25 +83,27 @@ export const useListMaster = (
       });
       return res;
     },
-    staleTime: 5 * 1000,            
-    refetchOnWindowFocus: false,    
+    staleTime: 5 * 1000,
+    refetchOnWindowFocus: false,
   });
 };
 
 export const useCreateMaster = (type: MasterType) => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation<MasterItem, Error, MasterCreatePayload>({
     mutationFn: (payload) => MasterService.createMaster(payload),
     onSuccess: () => {
-      toast.success("Data berhasil dibuat");
+      toast("Data berhasil dibuat", "success");
       qc.invalidateQueries({ queryKey: ["master", type] });
     },
-    onError: (e) => toast.error(e.message || "Gagal membuat data"),
+    onError: (e) => toast(e.message || "Gagal membuat data", "error"),
   });
 };
 
 export const useUpdateMaster = (type: MasterType) => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation<
     MasterItem,
     Error,
@@ -109,15 +112,16 @@ export const useUpdateMaster = (type: MasterType) => {
     mutationFn: ({ id, payload, recompute }) =>
       MasterService.updateMaster(id, payload, { recompute }),
     onSuccess: () => {
-      toast.success("Data berhasil diperbarui");
+      toast("Data berhasil diperbarui", "success");
       qc.invalidateQueries({ queryKey: ["master", type] });
     },
-    onError: (e) => toast.error(e.message || "Gagal memperbarui data"),
+    onError: (e) => toast(e.message || "Gagal memperbarui data", "error"),
   });
 };
 
 export const useUpdateMasterByCode = (type: MasterType) => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation<
     MasterItem,
     Error,
@@ -126,33 +130,35 @@ export const useUpdateMasterByCode = (type: MasterType) => {
     mutationFn: ({ code, payload }) =>
       MasterService.updateMasterByCode(code, payload),
     onSuccess: () => {
-      toast.success("Data berhasil diperbarui");
+      toast("Data berhasil diperbarui", "success");
       qc.invalidateQueries({ queryKey: ["master", type] });
     },
-    onError: (e) => toast.error(e.message || "Gagal memperbarui data"),
+    onError: (e) => toast(e.message || "Gagal memperbarui data", "error"),
   });
 };
 
 export const useDeleteMasterByCode = (type: MasterType) => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation<void, Error, { code: string }>({
     mutationFn: ({ code }) => MasterService.deleteMasterByCode(code),
     onSuccess: () => {
-      toast.success("Data berhasil dihapus");
+      toast("Data berhasil dihapus", "success");
       qc.invalidateQueries({ queryKey: ["master", type] });
     },
-    onError: (e) => toast.error(e.message || "Gagal menghapus data"),
+    onError: (e) => toast(e.message || "Gagal menghapus data", "error"),
   });
 };
 
 export const useDeleteMaster = (type: MasterType) => {
   const qc = useQueryClient();
+  const toast = useNotify();
   return useMutation<void, Error, { id: string }>({
     mutationFn: ({ id }) => MasterService.deleteMaster(id),
     onSuccess: () => {
-      toast.success("Data berhasil dihapus");
+      toast("Data berhasil dihapus", "success");
       qc.invalidateQueries({ queryKey: ["master", type] });
     },
-    onError: (e) => toast.error(e.message || "Gagal menghapus data"),
+    onError: (e) => toast(e.message || "Gagal menghapus data", "error"),
   });
 };

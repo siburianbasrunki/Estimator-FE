@@ -1,8 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import EstimationService from "../service/estimation";
-import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import type { EstimationCreateModel } from "../model/estimation";
+import { useNotify } from "../components/Notify/notify";
 
 export const useEstimations = (
   page: number = 1,
@@ -26,7 +26,7 @@ export const useEstimation = (id: string) => {
 export const useCreateEstimation = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-
+  const notify = useNotify();
   return useMutation({
     mutationFn: (payload: {
       data: EstimationCreateModel;
@@ -34,18 +34,18 @@ export const useCreateEstimation = () => {
     }) => EstimationService.createEstimation(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["estimations"] });
-      toast("Estimation created successfully");
+      notify("Estimation created successfully", "success");
       navigate(`/estimation`);
     },
     onError: (error: Error) => {
-      toast(error.message);
+      notify(error.message, "error");
     },
   });
 };
 
 export const useUpdateEstimation = () => {
   const queryClient = useQueryClient();
-  // const navigate = useNavigate();
+  const notify = useNotify();
   return useMutation({
     mutationFn: ({
       id,
@@ -59,26 +59,26 @@ export const useUpdateEstimation = () => {
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["estimations"] });
       queryClient.invalidateQueries({ queryKey: ["estimation", variables.id] });
-      toast("Estimation updated successfully");
+      notify("Estimation updated successfully", "success");
       // navigate(`/estimation`);
     },
     onError: (error: Error) => {
-      toast(error.message);
+      notify(error.message, "error");
     },
   });
 };
 
 export const useDeleteEstimation = () => {
   const queryClient = useQueryClient();
-
+  const notify = useNotify();
   return useMutation({
     mutationFn: (id: string) => EstimationService.deleteEstimation(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["estimations"] });
-      toast.success("Estimation deleted successfully");
+      notify("Estimation deleted successfully", "success");
     },
     onError: (error: Error) => {
-      toast.error(error.message);
+      notify(error.message, "error");
     },
   });
 };
