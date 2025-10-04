@@ -130,6 +130,7 @@ interface ProjectProfile {
 
 type ItemRow = {
   id: string;
+  kodeKey?: string;
   kode: string;
   deskripsi: string;
 
@@ -553,12 +554,14 @@ function SortableItemCard({
               {item.isEditing ? (
                 <SearchableSelect
                   options={kodeOptions}
-                  value={item.kode ?? ""}
+                  value={item.kodeKey ?? ""}
                   onChange={(v) => {
                     if (!v) {
+                      onUpdateField(item.id, "kodeKey", "");
                       onUpdateField(item.id, "kode", "");
                       onUpdateField(item.id, "hargaSatuan", 0);
                       onUpdateField(item.id, "hargaSatuanInput", "");
+                      onUpdateField(item.id, "hargaTotal", 0);
                       return;
                     }
                     onChangeKode(item.id, v);
@@ -1069,27 +1072,13 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
   const itemJobList = hspAll?.items ?? [];
   const categories = hspAll?.categories ?? [];
 
-  const KodeOptions: Option[] = useMemo(() => {
-    const map = new Map<string, Option>();
-    for (const it of itemJobList) {
-      const k = String(it?.kode ?? "").trim();
-      if (!k || map.has(k)) continue;
-      const desc = String(it?.deskripsi ?? "").trim();
-      const price = Number(it?.harga ?? 0);
-      const unit = String(it?.satuan ?? "").trim();
-      map.set(k, {
-        value: k,
-        label: [k, desc || null, `${formatIDR(price)}${unit ? `/${unit}` : ""}`]
-          .filter(Boolean)
-          .join(" — "),
-      });
-    }
-    return [...map.values()];
-  }, [itemJobList]);
+  const changeItemKode = (id: string, composite: string) => {
+    const [kodeBaru, ownerKey = "GLOBAL"] = (composite || "").split("::");
 
-  const changeItemKode = (id: string, kodeBaru: string) => {
     const job = itemJobList.find(
-      (it: any) => String(it?.kode ?? "") === kodeBaru
+      (it: any) =>
+        String(it?.kode ?? "") === kodeBaru &&
+        String(it?.ownerUserId ?? "GLOBAL") === ownerKey
     );
 
     setSections((prev) =>
@@ -1100,23 +1089,19 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
           items: g.items.map((i) => {
             if (i.id !== id) return i;
 
-            const next: ItemRow = { ...i, kode: kodeBaru };
+            const next: ItemRow = { ...i, kodeKey: composite, kode: kodeBaru };
 
-            // Hanya update harga; JANGAN sentuh deskripsi/satuan
             if (job) {
               const hargaBaru = Number(job.harga ?? 0);
-
-              // set angka fix ke state
               next.hargaSatuan = hargaBaru;
-
-              // kalau lagi editing, tampilkan juga di input supaya kelihatan
               next.hargaSatuanInput = i.isEditing
                 ? String(hargaBaru)
                 : undefined;
-
-              // hitung ulang total dengan volume efektif
               const volEff = getEffectiveVolume(next);
               next.hargaTotal = volEff * hargaBaru;
+
+              // (opsional) ikutkan satuan jika ingin sinkron penuh
+              // next.satuan = job.satuan ?? next.satuan;
             }
             return next;
           }),
@@ -1124,13 +1109,12 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
         items: (s.items || []).map((i) => {
           if (i.id !== id) return i;
 
-          const next: ItemRow = { ...i, kode: kodeBaru };
+          const next: ItemRow = { ...i, kodeKey: composite, kode: kodeBaru };
 
           if (job) {
             const hargaBaru = Number(job.harga ?? 0);
             next.hargaSatuan = hargaBaru;
             next.hargaSatuanInput = i.isEditing ? String(hargaBaru) : undefined;
-
             const volEff = getEffectiveVolume(next);
             next.hargaTotal = volEff * hargaBaru;
           }
@@ -1199,6 +1183,7 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
     () => DropdownPekerjaan.map((p) => ({ label: p.label, value: p.value })),
     [DropdownPekerjaan]
   );
+  const KodeOptions: Option[] = PekerjaanOptions;
 
   /* ----------------------------- Add / Remove ----------------------------- */
   const addSection = () => {
@@ -1310,6 +1295,7 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
           if (g.id !== groupId) return g;
           const base: ItemRow = {
             id: uid(),
+            kodeKey:source?.value,
             kode: source?.kode || "",
             deskripsi: source?.detail.deskripsi || "",
             volume: 0,
@@ -1340,6 +1326,7 @@ const CreateStepTwo: React.FC<CreateStepTwoProps> = ({
         const items = s.items ? [...s.items] : [];
         const base: ItemRow = {
           id: uid(),
+          kodeKey:source?.value,
           kode: source?.kode || "",
           deskripsi: source?.detail.deskripsi || "",
           volume: 0,
