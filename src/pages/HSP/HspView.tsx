@@ -163,10 +163,7 @@ export const HspView = () => {
   useEffect(() => {
     if (!openEdit) return;
     setEditUnit(openEdit.satuan || "");
-
-    setEditSource(
-      openEdit.source ?? (sourceOptions.length ? sourceOptions[0].value : "")
-    );
+    setEditSource(openEdit.source ?? "");
   }, [openEdit]);
   useEffect(() => {
     if (!openCreate) {
