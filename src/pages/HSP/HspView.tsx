@@ -23,7 +23,8 @@ type ItemType = {
   deskripsi: string;
   satuan: string;
   harga: number;
-  source?: "UUD" | "Sendiri" | null;
+  sourceCode?: string;
+  sourceLabel?: string;
 };
 
 type HspDataMap = Record<string, ItemType[]>;
@@ -59,7 +60,12 @@ export const HspView = () => {
   const { mutateAsync: updateItemAsync, isPending: isPendingUpdate } =
     useUpdateHspItem();
   const { data: sources } = useGetSources();
-  const sourceOptions = (sources ?? []).map((s) => s.label);
+  const sourceOptions = (sources ?? []).map((s) => ({
+    label: s.label,
+    value: s.code,
+  }));
+  const [createSource, setCreateSource] = useState<string>("");
+  const [editSource, setEditSource] = useState<string>("");
   const deleteItem = useDeleteHspItem();
   const profile = useProfile();
   const isAdmin = profile?.data?.role === "ADMIN";
@@ -69,7 +75,7 @@ export const HspView = () => {
     hspCategoryId: string;
     deskripsi: string;
     satuan: string;
-    source?: "UUD" | "Sendiri" | null;
+    source?: string;
   }>(null);
   const [openDelete, setOpenDelete] = useState<null | { kode: string }>(null);
   const catNameToId = useMemo(() => {
@@ -146,6 +152,34 @@ export const HspView = () => {
       0
     );
   }, [filteredData]);
+
+  useEffect(() => {
+    if (!openCreate) return;
+    if (!createSource && sourceOptions.length) {
+      setCreateSource(sourceOptions[0].value);
+    }
+  }, [openCreate, sourceOptions, createSource]);
+
+  useEffect(() => {
+    if (!openEdit) return;
+    setEditUnit(openEdit.satuan || "");
+
+    setEditSource(
+      openEdit.source ?? (sourceOptions.length ? sourceOptions[0].value : "")
+    );
+  }, [openEdit]);
+  useEffect(() => {
+    if (!openCreate) {
+      setCreateSource("");
+    }
+  }, [openCreate]);
+
+  useEffect(() => {
+    if (!openEdit) {
+      setEditSource("");
+      setEditUnit("");
+    }
+  }, [openEdit]);
 
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const startIdx = (page - 1) * pageSize; // inklusif
@@ -455,7 +489,7 @@ export const HspView = () => {
                           {row.item.deskripsi}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {row.item.source || "-"}
+                          {row.item.sourceLabel || "-"}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {row.item.satuan}
@@ -484,7 +518,7 @@ export const HspView = () => {
                                   )?.id ?? "",
                                 deskripsi: row.item.deskripsi,
                                 satuan: row.item.satuan,
-                                source: (row.item as any).source ?? "UUD",
+                                source: row.item.sourceCode ?? "",
                               })
                             }
                           />
@@ -644,31 +678,30 @@ export const HspView = () => {
                 <select
                   id="create-source"
                   className="select select-bordered w-full text-black bg-white border-black"
-                  defaultValue={sourceOptions[0] ?? ""}
+                  value={createSource}
+                  onChange={(e) => setCreateSource(e.target.value)}
                 >
                   {sourceOptions.length === 0 ? (
-                    <>
-                      <option value="" disabled>
-                        Tidak ada sumber aktif
-                      </option>
-                    </>
+                    <option value="" disabled>
+                      Tidak ada sumber aktif
+                    </option>
                   ) : (
                     sourceOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
                       </option>
                     ))
                   )}
                 </select>
               </div>
               {/* {isAdmin && ( */}
-                <button
-                  type="button"
-                  onClick={() => navigate("/source")}
-                  className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 w-full"
-                >
-                  Tambah Sumber
-                </button>
+              <button
+                type="button"
+                onClick={() => navigate("/source")}
+                className="rounded-md border border-indigo-600 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 w-full"
+              >
+                Tambah Sumber
+              </button>
               {/* )} */}
             </div>
             <div className="p-4 border-t flex justify-end gap-2">
@@ -691,11 +724,7 @@ export const HspView = () => {
                     document.getElementById("create-desc") as HTMLInputElement
                   )?.value.trim();
                   const satuan = (createUnit || "").trim();
-                  const source = (
-                    document.getElementById(
-                      "create-source"
-                    ) as HTMLSelectElement
-                  )?.value as "UUD" | "Sendiri";
+                  const source = createSource;
 
                   if (!hspCategoryId || !kode || !deskripsi) {
                     notify("Kategori, Kode, dan Deskripsi wajib diisi", "info");
@@ -797,8 +826,9 @@ export const HspView = () => {
                 </label>
                 <select
                   id="edit-source"
-                  defaultValue={openEdit.source ?? sourceOptions[0] ?? ""}
                   className="select select-bordered w-full text-black bg-white border-black"
+                  value={editSource}
+                  onChange={(e) => setEditSource(e.target.value)}
                 >
                   {sourceOptions.length === 0 ? (
                     <option value="" disabled>
@@ -806,8 +836,8 @@ export const HspView = () => {
                     </option>
                   ) : (
                     sourceOptions.map((opt) => (
-                      <option key={opt} value={opt}>
-                        {opt}
+                      <option key={opt.value} value={opt.value}>
+                        {opt.label}
                       </option>
                     ))
                   )}
@@ -842,9 +872,7 @@ export const HspView = () => {
                     document.getElementById("edit-desc") as HTMLInputElement
                   )?.value.trim();
                   const satuan = (editUnit || "").trim();
-                  const source = (
-                    document.getElementById("edit-source") as HTMLSelectElement
-                  )?.value as "UUD" | "Sendiri";
+                  const source = editSource;
                   if (!hspCategoryId || !kode || !deskripsi) {
                     notify("Kategori, Kode, dan Deskripsi wajib diisi", "info");
                     return;

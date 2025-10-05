@@ -260,7 +260,7 @@ export const useCreateHspItem = () => {
       kode: string;
       deskripsi: string;
       satuan?: string;
-      source?: "UUD" | "Sendiri";
+      source?: string;
     }) => HspService.createHspItem(payload),
     onSuccess: () => {
       toast("Item dibuat", "success");
@@ -285,7 +285,7 @@ export const useUpdateHspItem = () => {
         kode?: string;
         deskripsi?: string;
         satuan?: string;
-        source?: "UUD" | "Sendiri";
+        source?: string;
       };
     }) => HspService.updateHspItemByKode(kode, payload),
     onSuccess: () => {

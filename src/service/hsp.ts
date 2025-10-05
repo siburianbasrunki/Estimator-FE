@@ -342,7 +342,7 @@ const HspService = {
     kode: string;
     deskripsi: string;
     satuan?: string;
-    source?: "UUD" | "Sendiri";
+    source?: string;
   }) {
     const { hsp } = getEndpoints();
     const res = await fetch(`${hsp}/items`, {
@@ -398,7 +398,7 @@ const HspService = {
       kode?: string;
       deskripsi?: string;
       satuan?: string;
-      source?: "UUD" | "Sendiri";
+      source?: string;
     }
   ) {
     const { hsp } = getEndpoints();
